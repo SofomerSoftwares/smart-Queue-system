@@ -1,0 +1,1019 @@
+import fs from 'fs';
+import path from 'path';
+import bcrypt from 'bcryptjs';
+import { 
+  User, 
+  Role, 
+  Permission, 
+  Service, 
+  Counter, 
+  QueueTicket, 
+  QueueEvent, 
+  OfficeSetting, 
+  AudioSetting, 
+  AudioAsset, 
+  AuditLog,
+  RoleName
+} from './types.js';
+
+const DATA_DIR = path.join(process.cwd(), 'data');
+const DATA_FILE = path.join(DATA_DIR, 'queue_db.json');
+
+// Ensure data dir exists
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+export const PERMISSIONS: Permission[] = [
+  { id: 'dashboard.view', name: 'View Dashboard', description: 'Access dashboard screens' },
+  { id: 'queue.view', name: 'View Queue', description: 'View current queue list and status' },
+  { id: 'queue.manage', name: 'Manage Queue', description: 'Reset or manage entire queue' },
+  { id: 'ticket.create', name: 'Create Ticket', description: 'Issue new anonymous queue ticket' },
+  { id: 'ticket.call', name: 'Call Ticket', description: 'Call next ticket to counter' },
+  { id: 'ticket.recall', name: 'Recall Ticket', description: 'Recall previously called ticket' },
+  { id: 'ticket.start', name: 'Start Service', description: 'Start serving the customer' },
+  { id: 'ticket.complete', name: 'Complete Ticket', description: 'Mark ticket as finished' },
+  { id: 'ticket.transfer', name: 'Transfer Ticket', description: 'Transfer ticket to another service or counter' },
+  { id: 'ticket.cancel', name: 'Cancel Ticket', description: 'Cancel an active ticket' },
+  { id: 'ticket.no_show', name: 'Mark No-Show', description: 'Mark customer as absent' },
+  { id: 'services.view', name: 'View Services', description: 'View service configurations' },
+  { id: 'services.create', name: 'Create Service', description: 'Add new service' },
+  { id: 'services.update', name: 'Update Service', description: 'Modify existing service' },
+  { id: 'services.delete', name: 'Delete Service', description: 'Remove service' },
+  { id: 'counters.view', name: 'View Counters', description: 'View counter stations' },
+  { id: 'counters.create', name: 'Create Counter', description: 'Add new counter' },
+  { id: 'counters.update', name: 'Update Counter', description: 'Modify counter status or details' },
+  { id: 'counters.delete', name: 'Delete Counter', description: 'Remove counter' },
+  { id: 'staff.view', name: 'View Staff', description: 'View staff members' },
+  { id: 'staff.create', name: 'Create Staff', description: 'Register new staff member' },
+  { id: 'staff.update', name: 'Update Staff', description: 'Edit staff member' },
+  { id: 'staff.delete', name: 'Delete Staff', description: 'Remove staff member' },
+  { id: 'reports.view', name: 'View Reports', description: 'Access daily and analytical reports' },
+  { id: 'settings.view', name: 'View Settings', description: 'View system configuration' },
+  { id: 'settings.update', name: 'Update Settings', description: 'Change system configuration' },
+  { id: 'audio.manage', name: 'Manage Audio', description: 'Configure Gemini voice and background music' }
+];
+
+export const ROLES: Record<RoleName, Role> = {
+  ADMIN: {
+    id: 'role-admin',
+    name: 'ADMIN',
+    description: 'Full administrative access',
+    permissions: PERMISSIONS.map(p => p.id)
+  },
+  RECEPTIONIST: {
+    id: 'role-receptionist',
+    name: 'RECEPTIONIST',
+    description: 'Front desk ticket creation and queue triage',
+    permissions: [
+      'dashboard.view',
+      'queue.view',
+      'ticket.create',
+      'ticket.cancel',
+      'ticket.transfer',
+      'services.view'
+    ]
+  },
+  SERVICE_OFFICER: {
+    id: 'role-service-officer',
+    name: 'SERVICE_OFFICER',
+    description: 'Counter service officer handling customer tickets',
+    permissions: [
+      'dashboard.view',
+      'queue.view',
+      'ticket.call',
+      'ticket.recall',
+      'ticket.start',
+      'ticket.complete',
+      'ticket.no_show',
+      'ticket.transfer'
+    ]
+  }
+};
+
+export interface DatabaseSchema {
+  users: User[];
+  services: Service[];
+  counters: Counter[];
+  tickets: QueueTicket[];
+  events: QueueEvent[];
+  officeSetting: OfficeSetting;
+  audioSetting: AudioSetting;
+  audioAssets: AudioAsset[];
+  auditLogs: AuditLog[];
+}
+
+function getTodayKey(): string {
+  const d = new Date();
+  return d.toISOString().split('T')[0];
+}
+
+function seedDatabase(): DatabaseSchema {
+  const salt = bcrypt.genSaltSync(10);
+  const now = new Date().toISOString();
+
+  const users: User[] = [
+    {
+      id: 'usr-admin-1',
+      name: 'Alemayehu Tadesse (Admin)',
+      username: 'admin',
+      passwordHash: bcrypt.hashSync('Admin@123', salt),
+      roleId: 'role-admin',
+      role: 'ADMIN',
+      status: 'ACTIVE',
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: 'usr-reception-1',
+      name: 'Bethlehem Haile (Front Desk)',
+      username: 'reception',
+      passwordHash: bcrypt.hashSync('Reception@123', salt),
+      roleId: 'role-receptionist',
+      role: 'RECEPTIONIST',
+      status: 'ACTIVE',
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: 'usr-officer-1',
+      name: 'Dawit Mengistu (Counter 1)',
+      username: 'officer1',
+      passwordHash: bcrypt.hashSync('Officer@123', salt),
+      roleId: 'role-service-officer',
+      role: 'SERVICE_OFFICER',
+      status: 'ACTIVE',
+      assignedCounterId: 'cnt-1',
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: 'usr-officer-2',
+      name: 'Samrawit Bekele (Counter 2)',
+      username: 'officer2',
+      passwordHash: bcrypt.hashSync('Officer@123', salt),
+      roleId: 'role-service-officer',
+      role: 'SERVICE_OFFICER',
+      status: 'ACTIVE',
+      assignedCounterId: 'cnt-2',
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: 'usr-officer-3',
+      name: 'Kassahun Worku (Counter 3)',
+      username: 'officer3',
+      passwordHash: bcrypt.hashSync('Officer@123', salt),
+      roleId: 'role-service-officer',
+      role: 'SERVICE_OFFICER',
+      status: 'ACTIVE',
+      assignedCounterId: 'cnt-3',
+      createdAt: now,
+      updatedAt: now
+    }
+  ];
+
+  const services: Service[] = [
+    {
+      id: 'srv-1',
+      name: 'New Application',
+      nameAmharic: 'አዲስ ማመልከቻ',
+      prefix: 'A',
+      description: 'First time registration and new service applications',
+      estimatedDurationMinutes: 8,
+      color: '#059669', // Emerald
+      isActive: true,
+      order: 1
+    },
+    {
+      id: 'srv-2',
+      name: 'Renewal & Extension',
+      nameAmharic: 'እድሳት እና ማራዘሚያ',
+      prefix: 'R',
+      description: 'Renew permits, licenses or documentation',
+      estimatedDurationMinutes: 5,
+      color: '#2563eb', // Blue
+      isActive: true,
+      order: 2
+    },
+    {
+      id: 'srv-3',
+      name: 'Payment & Cashier',
+      nameAmharic: 'ክፍያ እና ገንዘብ መቀበያ',
+      prefix: 'P',
+      description: 'Fee settlements, receipts and bank approvals',
+      estimatedDurationMinutes: 4,
+      color: '#7c3aed', // Purple
+      isActive: true,
+      order: 3
+    },
+    {
+      id: 'srv-4',
+      name: 'Document Collection',
+      nameAmharic: 'ሰነድ እና ካርድ መቀበያ',
+      prefix: 'D',
+      description: 'Collect processed documents, ID cards and certificates',
+      estimatedDurationMinutes: 3,
+      color: '#ea580c', // Orange
+      isActive: true,
+      order: 4
+    },
+    {
+      id: 'srv-5',
+      name: 'Customer Support',
+      nameAmharic: 'የደንበኞች አገልግሎት እና መረጃ',
+      prefix: 'S',
+      description: 'Inquiries, status checks and consultation',
+      estimatedDurationMinutes: 6,
+      color: '#0891b2', // Cyan
+      isActive: true,
+      order: 5
+    },
+    {
+      id: 'srv-6',
+      name: 'Complaint & Review',
+      nameAmharic: 'አቤቱታ እና ቅሬታ ማስተናገጃ',
+      prefix: 'C',
+      description: 'Official complaints and dispute escalation',
+      estimatedDurationMinutes: 10,
+      color: '#e11d48', // Rose
+      isActive: true,
+      order: 6
+    }
+  ];
+
+  const counters: Counter[] = [
+    {
+      id: 'cnt-1',
+      number: 1,
+      name: 'Counter 1 (Main Registration)',
+      nameAmharic: 'ቆጣሪ 1 (ዋና ምዝገባ)',
+      status: 'SERVING',
+      currentOfficerId: 'usr-officer-1',
+      currentOfficerName: 'Dawit Mengistu',
+      updatedAt: now
+    },
+    {
+      id: 'cnt-2',
+      number: 2,
+      name: 'Counter 2 (Applications & Renewals)',
+      nameAmharic: 'ቆጣሪ 2 (ማመልከቻ እና እድሳት)',
+      status: 'AVAILABLE',
+      currentOfficerId: 'usr-officer-2',
+      currentOfficerName: 'Samrawit Bekele',
+      updatedAt: now
+    },
+    {
+      id: 'cnt-3',
+      number: 3,
+      name: 'Counter 3 (Cashier & Payments)',
+      nameAmharic: 'ቆጣሪ 3 (ክፍያ እና ሂሳብ)',
+      status: 'AVAILABLE',
+      currentOfficerId: 'usr-officer-3',
+      currentOfficerName: 'Kassahun Worku',
+      updatedAt: now
+    },
+    {
+      id: 'cnt-4',
+      number: 4,
+      name: 'Counter 4 (Express Collection)',
+      nameAmharic: 'ቆጣሪ 4 (ፈጣን ሰነድ መሰብሰቢያ)',
+      status: 'CLOSED',
+      updatedAt: now
+    }
+  ];
+
+  const officeSetting: OfficeSetting = {
+    id: 'setting-1',
+    officeName: 'Ministry of Innovation & Service Center',
+    officeNameAmharic: 'የፈጠራ እና ቴክኖሎጂ አገልግሎት መስጫ ማዕከል',
+    officeAddress: 'Bole Road, Building 4B, Addis Ababa, Ethiopia',
+    contactNumber: '+251 11 551 7000',
+    displayNotice: 'Welcome to our Office. Please wait for your ticket number to be called.',
+    displayNoticeAmharic: 'እንኳን ወደ ቢሮአችን በደህና መጡ። ቁጥርዎ በድምፅ እና በስክሪን እስኪጠራ ድረስ በትዕግስት ይጠብቁ።',
+    dailyResetTime: '00:00',
+    estimatedWaitPerPersonMinutes: 4,
+    qrCodeUrlBase: ''
+  };
+
+  const audioSetting: AudioSetting = {
+    id: 'audio-setting-1',
+    voiceEnabled: true,
+    language: 'AMHARIC',
+    ttsModel: process.env.GEMINI_TTS_MODEL || 'gemini-3.1-flash-tts-preview',
+    ttsVoice: process.env.GEMINI_TTS_VOICE || 'Kore',
+    volume: 85,
+    repeatCount: 1,
+    announcementDelaySeconds: 1,
+    backgroundMusicEnabled: true,
+    backgroundMusicVolume: 12,
+    musicModel: process.env.GEMINI_MUSIC_MODEL || 'gemini-2.5-flash'
+  };
+
+  const audioAssets: AudioAsset[] = [
+    {
+      id: 'asset-music-1',
+      title: 'Gentle Addis Ambient Lo-Fi (Calm Office)',
+      type: 'MUSIC',
+      url: 'preset:ambient-calm-1',
+      source: 'PRESET',
+      durationSeconds: 180,
+      createdAt: now
+    },
+    {
+      id: 'asset-music-2',
+      title: 'Serene Acoustic Krar Waves (Peaceful Lounge)',
+      type: 'MUSIC',
+      url: 'preset:acoustic-peace-2',
+      source: 'PRESET',
+      durationSeconds: 210,
+      createdAt: now
+    },
+    {
+      id: 'asset-chime-1',
+      title: 'Modern Airport Queue Chime',
+      type: 'CHIME',
+      url: 'preset:chime-airport',
+      source: 'PRESET',
+      durationSeconds: 2,
+      createdAt: now
+    }
+  ];
+
+  // Seed sample initial tickets for today
+  const todayKey = getTodayKey();
+  const sampleTickets: QueueTicket[] = [
+    {
+      id: 'tkt-001',
+      ticketNumber: 'A-001',
+      sequenceNumber: 1,
+      prefix: 'A',
+      serviceId: 'srv-1',
+      serviceName: 'New Application',
+      serviceNameAmharic: 'አዲስ ማመልከቻ',
+      counterId: 'cnt-1',
+      counterNumber: 1,
+      officerId: 'usr-officer-1',
+      officerName: 'Dawit Mengistu',
+      status: 'SERVING',
+      priority: 'NORMAL',
+      issuedAt: new Date(Date.now() - 15 * 60000).toISOString(),
+      calledAt: new Date(Date.now() - 10 * 60000).toISOString(),
+      serviceStartedAt: new Date(Date.now() - 8 * 60000).toISOString(),
+      waitingDurationSeconds: 420,
+      dateKey: todayKey
+    },
+    {
+      id: 'tkt-002',
+      ticketNumber: 'R-001',
+      sequenceNumber: 1,
+      prefix: 'R',
+      serviceId: 'srv-2',
+      serviceName: 'Renewal & Extension',
+      serviceNameAmharic: 'እድሳት እና ማራዘሚያ',
+      counterId: 'cnt-2',
+      counterNumber: 2,
+      officerId: 'usr-officer-2',
+      officerName: 'Samrawit Bekele',
+      status: 'COMPLETED',
+      priority: 'NORMAL',
+      issuedAt: new Date(Date.now() - 25 * 60000).toISOString(),
+      calledAt: new Date(Date.now() - 18 * 60000).toISOString(),
+      serviceStartedAt: new Date(Date.now() - 17 * 60000).toISOString(),
+      completedAt: new Date(Date.now() - 5 * 60000).toISOString(),
+      waitingDurationSeconds: 480,
+      serviceDurationSeconds: 720,
+      dateKey: todayKey
+    },
+    {
+      id: 'tkt-003',
+      ticketNumber: 'A-002',
+      sequenceNumber: 2,
+      prefix: 'A',
+      serviceId: 'srv-1',
+      serviceName: 'New Application',
+      serviceNameAmharic: 'አዲስ ማመልከቻ',
+      status: 'WAITING',
+      priority: 'NORMAL',
+      issuedAt: new Date(Date.now() - 12 * 60000).toISOString(),
+      dateKey: todayKey
+    },
+    {
+      id: 'tkt-004',
+      ticketNumber: 'P-001',
+      sequenceNumber: 1,
+      prefix: 'P',
+      serviceId: 'srv-3',
+      serviceName: 'Payment & Cashier',
+      serviceNameAmharic: 'ክፍያ እና ገንዘብ መቀበያ',
+      status: 'WAITING',
+      priority: 'PRIORITY',
+      issuedAt: new Date(Date.now() - 8 * 60000).toISOString(),
+      dateKey: todayKey
+    },
+    {
+      id: 'tkt-005',
+      ticketNumber: 'D-001',
+      sequenceNumber: 1,
+      prefix: 'D',
+      serviceId: 'srv-4',
+      serviceName: 'Document Collection',
+      serviceNameAmharic: 'ሰነድ እና ካርድ መቀበያ',
+      status: 'WAITING',
+      priority: 'NORMAL',
+      issuedAt: new Date(Date.now() - 4 * 60000).toISOString(),
+      dateKey: todayKey
+    }
+  ];
+
+  // Link counter 1 to tkt-001
+  counters[0].currentTicketId = 'tkt-001';
+  counters[0].currentTicketNumber = 'A-001';
+
+  return {
+    users,
+    services,
+    counters,
+    tickets: sampleTickets,
+    events: [],
+    officeSetting,
+    audioSetting,
+    audioAssets,
+    auditLogs: []
+  };
+}
+
+class Database {
+  private data: DatabaseSchema;
+  private isWriting = false;
+  private queueLock = false;
+
+  constructor() {
+    this.data = this.load();
+  }
+
+  private load(): DatabaseSchema {
+    try {
+      if (fs.existsSync(DATA_FILE)) {
+        const raw = fs.readFileSync(DATA_FILE, 'utf-8');
+        return JSON.parse(raw);
+      }
+    } catch (err) {
+      console.warn('Failed to load existing database file, initializing fresh seed:', err);
+    }
+    const fresh = seedDatabase();
+    this.saveImmediate(fresh);
+    return fresh;
+  }
+
+  private saveImmediate(snapshot: DatabaseSchema) {
+    try {
+      fs.writeFileSync(DATA_FILE, JSON.stringify(snapshot, null, 2), 'utf-8');
+    } catch (err) {
+      console.error('Failed to write database file:', err);
+    }
+  }
+
+  public save() {
+    if (this.isWriting) return;
+    this.isWriting = true;
+    setTimeout(() => {
+      this.saveImmediate(this.data);
+      this.isWriting = false;
+    }, 100);
+  }
+
+  // --- USERS ---
+  public getUsers(): User[] {
+    return this.data.users;
+  }
+
+  public getUserById(id: string): User | undefined {
+    return this.data.users.find(u => u.id === id);
+  }
+
+  public getUserByUsername(username: string): User | undefined {
+    return this.data.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+  }
+
+  public createUser(user: User): User {
+    this.data.users.push(user);
+    this.save();
+    return user;
+  }
+
+  public updateUser(id: string, update: Partial<User>): User | undefined {
+    const idx = this.data.users.findIndex(u => u.id === id);
+    if (idx === -1) return undefined;
+    this.data.users[idx] = { ...this.data.users[idx], ...update, updatedAt: new Date().toISOString() };
+    this.save();
+    return this.data.users[idx];
+  }
+
+  public deleteUser(id: string): boolean {
+    const len = this.data.users.length;
+    this.data.users = this.data.users.filter(u => u.id !== id);
+    if (this.data.users.length !== len) {
+      this.save();
+      return true;
+    }
+    return false;
+  }
+
+  // --- SERVICES ---
+  public getServices(): Service[] {
+    return this.data.services.sort((a, b) => a.order - b.order);
+  }
+
+  public getServiceById(id: string): Service | undefined {
+    return this.data.services.find(s => s.id === id);
+  }
+
+  public createService(service: Service): Service {
+    this.data.services.push(service);
+    this.save();
+    return service;
+  }
+
+  public updateService(id: string, update: Partial<Service>): Service | undefined {
+    const idx = this.data.services.findIndex(s => s.id === id);
+    if (idx === -1) return undefined;
+    this.data.services[idx] = { ...this.data.services[idx], ...update };
+    this.save();
+    return this.data.services[idx];
+  }
+
+  public deleteService(id: string): boolean {
+    const len = this.data.services.length;
+    this.data.services = this.data.services.filter(s => s.id !== id);
+    if (this.data.services.length !== len) {
+      this.save();
+      return true;
+    }
+    return false;
+  }
+
+  // --- COUNTERS ---
+  public getCounters(): Counter[] {
+    return this.data.counters.sort((a, b) => a.number - b.number);
+  }
+
+  public getCounterById(id: string): Counter | undefined {
+    return this.data.counters.find(c => c.id === id);
+  }
+
+  public getCounterByNumber(num: number): Counter | undefined {
+    return this.data.counters.find(c => c.number === num);
+  }
+
+  public createCounter(counter: Counter): Counter {
+    this.data.counters.push(counter);
+    this.save();
+    return counter;
+  }
+
+  public updateCounter(id: string, update: Partial<Counter>): Counter | undefined {
+    const idx = this.data.counters.findIndex(c => c.id === id);
+    if (idx === -1) return undefined;
+    this.data.counters[idx] = { ...this.data.counters[idx], ...update, updatedAt: new Date().toISOString() };
+    this.save();
+    return this.data.counters[idx];
+  }
+
+  public deleteCounter(id: string): boolean {
+    const len = this.data.counters.length;
+    this.data.counters = this.data.counters.filter(c => c.id !== id);
+    if (this.data.counters.length !== len) {
+      this.save();
+      return true;
+    }
+    return false;
+  }
+
+  // --- TRANSACTIONAL QUEUE TICKETS ---
+  public getTickets(filters?: { dateKey?: string; status?: string }): QueueTicket[] {
+    let list = this.data.tickets;
+    if (filters?.dateKey) {
+      list = list.filter(t => t.dateKey === filters.dateKey);
+    }
+    if (filters?.status) {
+      list = list.filter(t => t.status === filters.status);
+    }
+    return list;
+  }
+
+  public getTicketById(id: string): QueueTicket | undefined {
+    return this.data.tickets.find(t => t.id === id);
+  }
+
+  public getTicketByNumber(ticketNumber: string, dateKey?: string): QueueTicket | undefined {
+    const targetDate = dateKey || getTodayKey();
+    return this.data.tickets.find(
+      t => t.ticketNumber.toUpperCase() === ticketNumber.toUpperCase() && t.dateKey === targetDate
+    ) || this.data.tickets.find(
+      t => t.ticketNumber.toUpperCase() === ticketNumber.toUpperCase()
+    );
+  }
+
+  /**
+   * Transactional sequential ticket generator with atomic daily increment
+   */
+  public generateTicket(serviceId: string, priority: 'NORMAL' | 'PRIORITY' = 'NORMAL'): QueueTicket {
+    const service = this.getServiceById(serviceId);
+    if (!service) {
+      throw new Error(`Service with ID ${serviceId} not found`);
+    }
+
+    const today = getTodayKey();
+    const prefix = service.prefix.toUpperCase();
+
+    // Find highest sequence number for this prefix today
+    const ticketsForPrefixToday = this.data.tickets.filter(
+      t => t.dateKey === today && t.prefix === prefix
+    );
+
+    const nextSeq = ticketsForPrefixToday.reduce((max, t) => Math.max(max, t.sequenceNumber), 0) + 1;
+    const formattedNum = `${prefix}-${String(nextSeq).padStart(3, '0')}`;
+
+    const newTicket: QueueTicket = {
+      id: `tkt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      ticketNumber: formattedNum,
+      sequenceNumber: nextSeq,
+      prefix,
+      serviceId: service.id,
+      serviceName: service.name,
+      serviceNameAmharic: service.nameAmharic,
+      status: 'WAITING',
+      priority,
+      issuedAt: new Date().toISOString(),
+      dateKey: today
+    };
+
+    this.data.tickets.push(newTicket);
+    this.addEvent({
+      ticketId: newTicket.id,
+      ticketNumber: newTicket.ticketNumber,
+      eventType: 'CREATED',
+      metadata: { priority, serviceId, serviceName: service.name }
+    });
+
+    this.save();
+    return newTicket;
+  }
+
+  /**
+   * Transactional atomic call next ticket
+   */
+  public async callNextTicket(counterId: string, officerId: string, specificTicketId?: string): Promise<QueueTicket | null> {
+    // Acquire mutex lock
+    while (this.queueLock) {
+      await new Promise(r => setTimeout(r, 20));
+    }
+    this.queueLock = true;
+
+    try {
+      const counter = this.getCounterById(counterId);
+      if (!counter) {
+        throw new Error('Counter not found');
+      }
+
+      const officer = this.getUserById(officerId);
+      const officerName = officer ? officer.name : 'Officer';
+      const today = getTodayKey();
+
+      let targetTicket: QueueTicket | undefined;
+
+      if (specificTicketId) {
+        targetTicket = this.data.tickets.find(
+          t => t.id === specificTicketId && t.status === 'WAITING'
+        );
+      } else {
+        // FIFO queue with Priority first
+        // 1. Check priority WAITING tickets
+        const priorityWaiting = this.data.tickets
+          .filter(t => t.dateKey === today && t.status === 'WAITING' && t.priority === 'PRIORITY')
+          .sort((a, b) => new Date(a.issuedAt).getTime() - new Date(b.issuedAt).getTime());
+
+        if (priorityWaiting.length > 0) {
+          targetTicket = priorityWaiting[0];
+        } else {
+          // 2. Normal WAITING tickets
+          const normalWaiting = this.data.tickets
+            .filter(t => t.dateKey === today && t.status === 'WAITING')
+            .sort((a, b) => new Date(a.issuedAt).getTime() - new Date(b.issuedAt).getTime());
+
+          if (normalWaiting.length > 0) {
+            targetTicket = normalWaiting[0];
+          }
+        }
+      }
+
+      if (!targetTicket) {
+        return null; // No waiting tickets
+      }
+
+      const now = new Date().toISOString();
+      const waitingDuration = Math.round((new Date(now).getTime() - new Date(targetTicket.issuedAt).getTime()) / 1000);
+
+      targetTicket.status = 'CALLED';
+      targetTicket.calledAt = now;
+      targetTicket.counterId = counter.id;
+      targetTicket.counterNumber = counter.number;
+      targetTicket.officerId = officerId;
+      targetTicket.officerName = officerName;
+      targetTicket.waitingDurationSeconds = waitingDuration;
+
+      // Update counter state
+      counter.status = 'SERVING';
+      counter.currentTicketId = targetTicket.id;
+      counter.currentTicketNumber = targetTicket.ticketNumber;
+      counter.currentOfficerId = officerId;
+      counter.currentOfficerName = officerName;
+      counter.updatedAt = now;
+
+      this.addEvent({
+        ticketId: targetTicket.id,
+        ticketNumber: targetTicket.ticketNumber,
+        eventType: 'CALLED',
+        counterId: counter.id,
+        counterNumber: counter.number,
+        userId: officerId,
+        userName: officerName,
+        metadata: { waitingDuration }
+      });
+
+      this.save();
+      return targetTicket;
+    } finally {
+      this.queueLock = false;
+    }
+  }
+
+  public updateTicketStatus(
+    ticketId: string, 
+    newStatus: QueueTicket['status'], 
+    officerId?: string,
+    metadata?: Record<string, any>
+  ): QueueTicket {
+    const ticket = this.getTicketById(ticketId);
+    if (!ticket) {
+      throw new Error(`Ticket ${ticketId} not found`);
+    }
+
+    const now = new Date().toISOString();
+    ticket.status = newStatus;
+
+    if (newStatus === 'SERVING') {
+      ticket.serviceStartedAt = now;
+    } else if (newStatus === 'COMPLETED') {
+      ticket.completedAt = now;
+      if (ticket.serviceStartedAt) {
+        ticket.serviceDurationSeconds = Math.round((new Date(now).getTime() - new Date(ticket.serviceStartedAt).getTime()) / 1000);
+      } else if (ticket.calledAt) {
+        ticket.serviceDurationSeconds = Math.round((new Date(now).getTime() - new Date(ticket.calledAt).getTime()) / 1000);
+      }
+    }
+
+    // If completed/no_show/cancelled, free the counter
+    if (['COMPLETED', 'NO_SHOW', 'CANCELLED'].includes(newStatus) && ticket.counterId) {
+      const counter = this.getCounterById(ticket.counterId);
+      if (counter && counter.currentTicketId === ticket.id) {
+        counter.currentTicketId = undefined;
+        counter.currentTicketNumber = undefined;
+        counter.status = 'AVAILABLE';
+        counter.updatedAt = now;
+      }
+    }
+
+    let eventType: QueueEvent['eventType'] = 'COMPLETED';
+    if (newStatus === 'SERVING') eventType = 'STARTED';
+    else if (newStatus === 'CALLED') eventType = 'RECALLED';
+    else if (newStatus === 'NO_SHOW') eventType = 'NO_SHOW';
+    else if (newStatus === 'CANCELLED') eventType = 'CANCELLED';
+    else if (newStatus === 'TRANSFERRED') eventType = 'TRANSFERRED';
+
+    const officer = officerId ? this.getUserById(officerId) : undefined;
+    this.addEvent({
+      ticketId: ticket.id,
+      ticketNumber: ticket.ticketNumber,
+      eventType,
+      counterId: ticket.counterId,
+      counterNumber: ticket.counterNumber,
+      userId: officerId,
+      userName: officer?.name,
+      metadata
+    });
+
+    this.save();
+    return ticket;
+  }
+
+  public transferTicket(ticketId: string, targetServiceId: string, officerId?: string): QueueTicket {
+    const ticket = this.getTicketById(ticketId);
+    if (!ticket) throw new Error('Ticket not found');
+    const targetService = this.getServiceById(targetServiceId);
+    if (!targetService) throw new Error('Target service not found');
+
+    const previousServiceName = ticket.serviceName;
+    ticket.serviceId = targetService.id;
+    ticket.serviceName = targetService.name;
+    ticket.serviceNameAmharic = targetService.nameAmharic;
+    ticket.status = 'WAITING';
+    ticket.priority = 'PRIORITY'; // Give transferred customer priority
+
+    // Free previous counter
+    if (ticket.counterId) {
+      const counter = this.getCounterById(ticket.counterId);
+      if (counter && counter.currentTicketId === ticket.id) {
+        counter.currentTicketId = undefined;
+        counter.currentTicketNumber = undefined;
+        counter.status = 'AVAILABLE';
+      }
+    }
+    ticket.counterId = undefined;
+    ticket.counterNumber = undefined;
+
+    const officer = officerId ? this.getUserById(officerId) : undefined;
+    this.addEvent({
+      ticketId: ticket.id,
+      ticketNumber: ticket.ticketNumber,
+      eventType: 'TRANSFERRED',
+      userId: officerId,
+      userName: officer?.name,
+      metadata: { fromService: previousServiceName, toService: targetService.name }
+    });
+
+    this.save();
+    return ticket;
+  }
+
+  // --- EVENTS & AUDIT ---
+  public addEvent(event: Omit<QueueEvent, 'id' | 'timestamp'>): QueueEvent {
+    const fullEvent: QueueEvent = {
+      ...event,
+      id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      timestamp: new Date().toISOString()
+    };
+    this.data.events.push(fullEvent);
+    return fullEvent;
+  }
+
+  public getEvents(limit = 100): QueueEvent[] {
+    return this.data.events.slice(-limit).reverse();
+  }
+
+  public addAuditLog(log: Omit<AuditLog, 'id' | 'createdAt'>): AuditLog {
+    const fullLog: AuditLog = {
+      ...log,
+      id: `aud-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: new Date().toISOString()
+    };
+    this.data.auditLogs.push(fullLog);
+    this.save();
+    return fullLog;
+  }
+
+  public getAuditLogs(limit = 200): AuditLog[] {
+    return this.data.auditLogs.slice(-limit).reverse();
+  }
+
+  // --- SETTINGS ---
+  public getOfficeSetting(): OfficeSetting {
+    return this.data.officeSetting;
+  }
+
+  public updateOfficeSetting(update: Partial<OfficeSetting>): OfficeSetting {
+    this.data.officeSetting = { ...this.data.officeSetting, ...update };
+    this.save();
+    return this.data.officeSetting;
+  }
+
+  public getAudioSetting(): AudioSetting {
+    return this.data.audioSetting;
+  }
+
+  public updateAudioSetting(update: Partial<AudioSetting>): AudioSetting {
+    this.data.audioSetting = { ...this.data.audioSetting, ...update };
+    this.save();
+    return this.data.audioSetting;
+  }
+
+  public getAudioAssets(): AudioAsset[] {
+    return this.data.audioAssets;
+  }
+
+  public addAudioAsset(asset: AudioAsset): AudioAsset {
+    this.data.audioAssets.push(asset);
+    this.save();
+    return asset;
+  }
+
+  public deleteAudioAsset(id: string): boolean {
+    const len = this.data.audioAssets.length;
+    this.data.audioAssets = this.data.audioAssets.filter(a => a.id !== id);
+    if (this.data.audioAssets.length !== len) {
+      this.save();
+      return true;
+    }
+    return false;
+  }
+
+  // --- STATS & REPORTS ---
+  public getQueueStats(dateKey?: string) {
+    const targetDate = dateKey || getTodayKey();
+    const todayTickets = this.data.tickets.filter(t => t.dateKey === targetDate);
+
+    const waiting = todayTickets.filter(t => t.status === 'WAITING').length;
+    const serving = todayTickets.filter(t => t.status === 'SERVING' || t.status === 'CALLED').length;
+    const completed = todayTickets.filter(t => t.status === 'COMPLETED').length;
+    const noShow = todayTickets.filter(t => t.status === 'NO_SHOW').length;
+    const cancelled = todayTickets.filter(t => t.status === 'CANCELLED').length;
+    const total = todayTickets.length;
+
+    // Calculate averages
+    const completedWithWait = todayTickets.filter(t => t.waitingDurationSeconds !== undefined && t.waitingDurationSeconds > 0);
+    const avgWaitSeconds = completedWithWait.length > 0 
+      ? Math.round(completedWithWait.reduce((acc, t) => acc + (t.waitingDurationSeconds || 0), 0) / completedWithWait.length)
+      : 0;
+
+    const completedWithService = todayTickets.filter(t => t.serviceDurationSeconds !== undefined && t.serviceDurationSeconds > 0);
+    const avgServiceSeconds = completedWithService.length > 0
+      ? Math.round(completedWithService.reduce((acc, t) => acc + (t.serviceDurationSeconds || 0), 0) / completedWithService.length)
+      : 0;
+
+    // By Service
+    const serviceBreakdown = this.data.services.map(srv => {
+      const srvTickets = todayTickets.filter(t => t.serviceId === srv.id);
+      const srvCompleted = srvTickets.filter(t => t.status === 'COMPLETED');
+      const srvWaitAvg = srvCompleted.length > 0
+        ? Math.round(srvCompleted.reduce((acc, t) => acc + (t.waitingDurationSeconds || 0), 0) / srvCompleted.length)
+        : 0;
+      const srvServiceAvg = srvCompleted.length > 0
+        ? Math.round(srvCompleted.reduce((acc, t) => acc + (t.serviceDurationSeconds || 0), 0) / srvCompleted.length)
+        : 0;
+
+      return {
+        serviceId: srv.id,
+        serviceName: srv.name,
+        serviceNameAmharic: srv.nameAmharic,
+        prefix: srv.prefix,
+        color: srv.color,
+        total: srvTickets.length,
+        waiting: srvTickets.filter(t => t.status === 'WAITING').length,
+        completed: srvCompleted.length,
+        avgWaitMinutes: Math.round(srvWaitAvg / 60),
+        avgServiceMinutes: Math.round(srvServiceAvg / 60)
+      };
+    });
+
+    // By Counter
+    const counterBreakdown = this.data.counters.map(cnt => {
+      const cntTickets = todayTickets.filter(t => t.counterId === cnt.id);
+      const cntCompleted = cntTickets.filter(t => t.status === 'COMPLETED');
+      const cntServiceAvg = cntCompleted.length > 0
+        ? Math.round(cntCompleted.reduce((acc, t) => acc + (t.serviceDurationSeconds || 0), 0) / cntCompleted.length)
+        : 0;
+
+      return {
+        counterId: cnt.id,
+        counterNumber: cnt.number,
+        counterName: cnt.name,
+        counterNameAmharic: cnt.nameAmharic,
+        status: cnt.status,
+        currentTicketNumber: cnt.currentTicketNumber,
+        officerName: cnt.currentOfficerName,
+        totalServed: cntCompleted.length,
+        avgServiceMinutes: Math.round(cntServiceAvg / 60)
+      };
+    });
+
+    return {
+      dateKey: targetDate,
+      total,
+      waiting,
+      serving,
+      completed,
+      noShow,
+      cancelled,
+      avgWaitSeconds,
+      avgWaitMinutes: Math.round(avgWaitSeconds / 60),
+      avgServiceSeconds,
+      avgServiceMinutes: Math.round(avgServiceSeconds / 60),
+      serviceBreakdown,
+      counterBreakdown
+    };
+  }
+
+  public resetTodayQueue(): void {
+    const today = getTodayKey();
+    this.data.tickets = this.data.tickets.filter(t => t.dateKey !== today);
+    this.data.counters.forEach(c => {
+      c.currentTicketId = undefined;
+      c.currentTicketNumber = undefined;
+      if (c.status === 'SERVING') c.status = 'AVAILABLE';
+    });
+    this.save();
+  }
+}
+
+export const db = new Database();
