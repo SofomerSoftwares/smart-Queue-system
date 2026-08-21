@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../db.js';
-import { authenticate, authorize, AuthenticatedRequest } from '../middleware/auth.js';
+import { authenticate, authorize, requireAdmin, AuthenticatedRequest } from '../middleware/auth.js';
 import { broadcaster } from '../websocket.js';
 import { User, Service, Counter } from '../types.js';
 
@@ -9,8 +9,8 @@ const router = Router();
 
 // ==================== USERS & STAFF ====================
 
-// GET /api/users
-router.get('/users', authenticate, authorize('staff.view'), (req: Request, res: Response) => {
+// GET /api/users (Strict Admin only)
+router.get('/users', authenticate, requireAdmin, (req: Request, res: Response) => {
   const users = db.getUsers().map(u => ({
     id: u.id,
     name: u.name,
@@ -24,8 +24,8 @@ router.get('/users', authenticate, authorize('staff.view'), (req: Request, res: 
   res.json({ success: true, users });
 });
 
-// POST /api/users
-router.post('/users', authenticate, authorize('staff.create'), (req: AuthenticatedRequest, res: Response) => {
+// POST /api/users (Strict Admin only)
+router.post('/users', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { name, username, password, role, assignedCounterId } = req.body;
 
@@ -73,7 +73,7 @@ router.post('/users', authenticate, authorize('staff.create'), (req: Authenticat
 });
 
 // PUT /api/users/:id
-router.put('/users/:id', authenticate, authorize('staff.update'), (req: AuthenticatedRequest, res: Response) => {
+router.put('/users/:id', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { name, role, status, assignedCounterId, password } = req.body;
@@ -114,7 +114,7 @@ router.put('/users/:id', authenticate, authorize('staff.update'), (req: Authenti
 });
 
 // DELETE /api/users/:id
-router.delete('/users/:id', authenticate, authorize('staff.delete'), (req: AuthenticatedRequest, res: Response) => {
+router.delete('/users/:id', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     if (id === req.user?.id) {
@@ -148,12 +148,22 @@ router.get('/services', (req: Request, res: Response) => {
   res.json({ success: true, services });
 });
 
-// POST /api/services
-router.post('/services', authenticate, authorize('services.create'), (req: AuthenticatedRequest, res: Response) => {
+// POST /api/services (Admin only)
+router.post('/services', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { name, nameAmharic, prefix, description, estimatedDurationMinutes, color } = req.body;
-    if (!name || !nameAmharic || !prefix) {
-      return res.status(400).json({ success: false, message: 'Name, Amharic name, and Prefix are required.' });
+    let { name, nameAmharic, prefix, description, estimatedDurationMinutes, color } = req.body;
+    
+    name = (name || '').trim();
+    nameAmharic = (nameAmharic || '').trim();
+    
+    // Auto fallback if only one language name is provided
+    if (!name && nameAmharic) name = nameAmharic;
+    if (!nameAmharic && name) nameAmharic = name;
+    
+    prefix = (prefix || 'S').trim().toUpperCase().charAt(0) || 'S';
+
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Service name is required.' });
     }
 
     const services = db.getServices();
@@ -161,10 +171,10 @@ router.post('/services', authenticate, authorize('services.create'), (req: Authe
       id: `srv-${Date.now()}`,
       name,
       nameAmharic,
-      prefix: prefix.toUpperCase().trim().charAt(0),
-      description: description || '',
-      estimatedDurationMinutes: Number(estimatedDurationMinutes) || 5,
-      color: color || '#2563eb',
+      prefix,
+      description: description ? String(description).trim() : '',
+      estimatedDurationMinutes: Number(estimatedDurationMinutes) > 0 ? Number(estimatedDurationMinutes) : 5,
+      color: color || '#4f46e5',
       isActive: true,
       order: services.length + 1
     };
@@ -177,21 +187,46 @@ router.post('/services', authenticate, authorize('services.create'), (req: Authe
       action: 'CREATE_SERVICE',
       entity: 'Service',
       entityId: newService.id,
-      metadata: { name, prefix: newService.prefix }
+      metadata: { name: newService.name, prefix: newService.prefix }
     });
 
     broadcaster.broadcast('queue:updated', { action: 'SERVICES_CHANGED' });
     res.status(201).json({ success: true, service: newService });
   } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: err.message || 'Failed to create service' });
   }
 });
 
-// PUT /api/services/:id
-router.put('/services/:id', authenticate, authorize('services.update'), (req: AuthenticatedRequest, res: Response) => {
+// PUT /api/services/:id (Admin only)
+router.put('/services/:id', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const updated = db.updateService(id, req.body);
+    let { name, nameAmharic, prefix, description, estimatedDurationMinutes, color, isActive } = req.body;
+
+    const updates: Partial<Service> = {};
+    if (name !== undefined) {
+      const trimmed = String(name).trim();
+      if (trimmed) updates.name = trimmed;
+    }
+    if (nameAmharic !== undefined) {
+      const trimmed = String(nameAmharic).trim();
+      if (trimmed) updates.nameAmharic = trimmed;
+    }
+    if (updates.name && !updates.nameAmharic) updates.nameAmharic = updates.name;
+    if (updates.nameAmharic && !updates.name) updates.name = updates.nameAmharic;
+
+    if (prefix !== undefined) {
+      updates.prefix = String(prefix).trim().toUpperCase().charAt(0) || 'S';
+    }
+    if (description !== undefined) updates.description = String(description).trim();
+    if (estimatedDurationMinutes !== undefined) {
+      const num = Number(estimatedDurationMinutes);
+      if (num > 0) updates.estimatedDurationMinutes = num;
+    }
+    if (color !== undefined) updates.color = color;
+    if (isActive !== undefined) updates.isActive = Boolean(isActive);
+
+    const updated = db.updateService(id, updates);
     if (!updated) {
       return res.status(404).json({ success: false, message: 'Service not found.' });
     }
@@ -202,18 +237,18 @@ router.put('/services/:id', authenticate, authorize('services.update'), (req: Au
       action: 'UPDATE_SERVICE',
       entity: 'Service',
       entityId: id,
-      metadata: req.body
+      metadata: updates
     });
 
     broadcaster.broadcast('queue:updated', { action: 'SERVICES_CHANGED' });
     res.json({ success: true, service: updated });
   } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: err.message || 'Failed to update service' });
   }
 });
 
-// DELETE /api/services/:id
-router.delete('/services/:id', authenticate, authorize('services.delete'), (req: AuthenticatedRequest, res: Response) => {
+// DELETE /api/services/:id (Admin only)
+router.delete('/services/:id', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const ok = db.deleteService(id);
@@ -244,8 +279,8 @@ router.get('/counters', (req: Request, res: Response) => {
   res.json({ success: true, counters });
 });
 
-// POST /api/counters
-router.post('/counters', authenticate, authorize('counters.create'), (req: AuthenticatedRequest, res: Response) => {
+// POST /api/counters (Admin only)
+router.post('/counters', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { number, name, nameAmharic } = req.body;
     const countNum = Number(number);
@@ -285,8 +320,8 @@ router.post('/counters', authenticate, authorize('counters.create'), (req: Authe
   }
 });
 
-// PUT /api/counters/:id
-router.put('/counters/:id', authenticate, authorize('counters.update'), (req: AuthenticatedRequest, res: Response) => {
+// PUT /api/counters/:id (Admin only)
+router.put('/counters/:id', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const updated = db.updateCounter(id, req.body);
@@ -310,8 +345,8 @@ router.put('/counters/:id', authenticate, authorize('counters.update'), (req: Au
   }
 });
 
-// DELETE /api/counters/:id
-router.delete('/counters/:id', authenticate, authorize('counters.delete'), (req: AuthenticatedRequest, res: Response) => {
+// DELETE /api/counters/:id (Admin only)
+router.delete('/counters/:id', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const ok = db.deleteCounter(id);
@@ -335,8 +370,8 @@ router.delete('/counters/:id', authenticate, authorize('counters.delete'), (req:
 
 // ==================== REPORTS & AUDIT ====================
 
-// GET /api/reports/summary
-router.get('/reports/summary', authenticate, authorize('reports.view'), (req: Request, res: Response) => {
+// GET /api/reports/summary (Admin only)
+router.get('/reports/summary', authenticate, requireAdmin, (req: Request, res: Response) => {
   try {
     const { date } = req.query;
     const stats = db.getQueueStats(date as string);
@@ -346,8 +381,8 @@ router.get('/reports/summary', authenticate, authorize('reports.view'), (req: Re
   }
 });
 
-// GET /api/audit-logs
-router.get('/audit-logs', authenticate, authorize('reports.view'), (req: Request, res: Response) => {
+// GET /api/audit-logs (Admin only)
+router.get('/audit-logs', authenticate, requireAdmin, (req: Request, res: Response) => {
   try {
     const logs = db.getAuditLogs(150);
     res.json({ success: true, logs });
@@ -364,8 +399,8 @@ router.get('/settings', (req: Request, res: Response) => {
   res.json({ success: true, setting });
 });
 
-// PUT /api/settings
-router.put('/settings', authenticate, authorize('settings.update'), (req: AuthenticatedRequest, res: Response) => {
+// PUT /api/settings (Admin only)
+router.put('/settings', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const updated = db.updateOfficeSetting(req.body);
     db.addAuditLog({
@@ -378,6 +413,42 @@ router.put('/settings', authenticate, authorize('settings.update'), (req: Authen
 
     broadcaster.broadcast('settings:updated', { officeSetting: updated });
     res.json({ success: true, setting: updated });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ==================== DATABASE / MONGODB ATLAS ====================
+
+// GET /api/database/status
+router.get('/database/status', (req: Request, res: Response) => {
+  const status = db.getMongoStatus();
+  res.json({ success: true, ...status });
+});
+
+// POST /api/database/connect (Admin only)
+router.post('/database/connect', authenticate, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { uri } = req.body;
+    const status = await db.connectMongo(uri);
+    db.addAuditLog({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      action: 'CONNECT_MONGODB_ATLAS',
+      entity: 'Database',
+      metadata: { connected: status.connected, database: status.database }
+    });
+    res.json({ success: true, ...status });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/database/sync (Admin only)
+router.post('/database/sync', authenticate, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await db.syncMongoNow();
+    res.json(result);
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }

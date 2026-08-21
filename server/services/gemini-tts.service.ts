@@ -101,6 +101,7 @@ function pcmToWavBase64(pcmBase64: string, sampleRate: number = 24000, channels:
 class GeminiVoiceProvider implements VoiceProvider {
   private cache = new Map<string, { audioBase64: string; mimeType: string; timestamp: number }>();
   private aiClient: GoogleGenAI | null = null;
+  private rateLimitCooldownUntil: number = 0;
 
   private getClient(): GoogleGenAI | null {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -126,15 +127,31 @@ class GeminiVoiceProvider implements VoiceProvider {
     voice: string = 'Kore',
     model: string = 'gemini-3.1-flash-tts-preview'
   ): Promise<AudioResult> {
-    const cacheKey = `${language}:${voice}:${text.trim().toLowerCase()}`;
+    const cleanText = text.trim();
+    const cacheKey = `${language}:${voice}:${cleanText.toLowerCase()}`;
+    
+    // 1. Check in-memory persistent cache
     const cached = this.cache.get(cacheKey);
     if (cached) {
       return {
         audioBase64: cached.audioBase64,
         mimeType: cached.mimeType,
-        text,
+        text: cleanText,
         source: 'CACHE',
         durationEstimateSeconds: 4
+      };
+    }
+
+    // 2. Check if we are in a rate-limit / 429 quota cooldown period
+    const now = Date.now();
+    if (now < this.rateLimitCooldownUntil) {
+      const remainingSeconds = Math.ceil((this.rateLimitCooldownUntil - now) / 1000);
+      console.warn(`[Gemini TTS] Rate limit cooldown active (${remainingSeconds}s remaining). Using local voice synthesis fallback.`);
+      return {
+        mimeType: 'audio/wav',
+        text: cleanText,
+        source: 'FALLBACK_SYNTHESIS',
+        durationEstimateSeconds: 3
       };
     }
 
@@ -143,7 +160,7 @@ class GeminiVoiceProvider implements VoiceProvider {
       console.warn('Gemini API Key is not configured in environment. Using fallback voice synthesis.');
       return {
         mimeType: 'audio/wav',
-        text,
+        text: cleanText,
         source: 'FALLBACK_SYNTHESIS',
         durationEstimateSeconds: 3
       };
@@ -151,11 +168,11 @@ class GeminiVoiceProvider implements VoiceProvider {
 
     try {
       // Formulate prompt for Gemini TTS
-      let ttsPrompt = text;
+      let ttsPrompt = cleanText;
       if (language === 'AMHARIC') {
-        ttsPrompt = `Please read the following Ethiopian Amharic queue announcement clearly, calmly, and professionally:\n"${text}"`;
+        ttsPrompt = `Please read the following Ethiopian Amharic queue announcement clearly, calmly, and professionally:\n"${cleanText}"`;
       } else {
-        ttsPrompt = `Say clearly in a professional office queue tone: "${text}"`;
+        ttsPrompt = `Say clearly in a professional office queue tone: "${cleanText}"`;
       }
 
       const response = await ai.models.generateContent({
@@ -196,8 +213,8 @@ class GeminiVoiceProvider implements VoiceProvider {
           timestamp: Date.now()
         });
 
-        // Limit cache size to 100 entries
-        if (this.cache.size > 100) {
+        // Limit cache size to 500 entries
+        if (this.cache.size > 500) {
           const firstKey = this.cache.keys().next().value;
           if (firstKey) this.cache.delete(firstKey);
         }
@@ -205,25 +222,40 @@ class GeminiVoiceProvider implements VoiceProvider {
         return {
           audioBase64,
           mimeType,
-          text,
+          text: cleanText,
           source: 'GEMINI_TTS',
           durationEstimateSeconds: 4
         };
       }
 
-      console.warn('No inline audio data in Gemini TTS response, falling back to client synthesis');
       return {
         mimeType: 'audio/wav',
-        text,
+        text: cleanText,
         source: 'FALLBACK_SYNTHESIS'
       };
     } catch (err: any) {
-      console.error('Error in Gemini TTS generation:', err?.message || err);
-      // Crucial: Failure in Gemini TTS must never prevent queue operations!
+      const errMsg = err?.message || String(err);
+      
+      // Handle 429 Quota Exceeded / RESOURCE_EXHAUSTED smoothly
+      if (errMsg.includes('429') || errMsg.includes('quota') || errMsg.includes('RESOURCE_EXHAUSTED')) {
+        // Extract retryDelay or default to 40 seconds cooldown
+        let retrySeconds = 40;
+        const match = errMsg.match(/retry in ([\d\.]+)s/i) || errMsg.match(/retryDelay":"(\d+)s"/i);
+        if (match && match[1]) {
+          retrySeconds = Math.ceil(parseFloat(match[1])) + 2;
+        }
+        this.rateLimitCooldownUntil = Date.now() + (retrySeconds * 1000);
+        console.warn(`[Gemini TTS] Quota limit reached (Free tier RPM limit). Activating ${retrySeconds}s cooldown with seamless local speech fallback.`);
+      } else {
+        console.warn('[Gemini TTS] Announcement synthesis notice:', errMsg);
+      }
+
+      // Safe, resilient fallback ensuring zero interruption to queue flow
       return {
         mimeType: 'audio/wav',
-        text,
-        source: 'FALLBACK_SYNTHESIS'
+        text: cleanText,
+        source: 'FALLBACK_SYNTHESIS',
+        durationEstimateSeconds: 3
       };
     }
   }

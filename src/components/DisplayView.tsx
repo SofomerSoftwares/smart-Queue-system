@@ -70,7 +70,7 @@ export const DisplayView: React.FC = () => {
               <span className="text-slate-500 font-normal ml-3 hidden sm:inline text-sm">| {isAmharic ? 'የቀጥታ ስክሪን' : 'LIVE DISPLAY'}</span>
             </h1>
             <p className="text-xs text-indigo-400 font-semibold tracking-wide">
-              {isAmharic ? 'የቀጥታ የወረፋ መከታተያ ስክሪን • በጀሚኒ AI ድምፅ የተደገፈ' : 'Live Official Queue Display • Powered by Gemini AI Voice'}
+              {isAmharic ? 'የቀጥታ የወረፋ መከታተያ ስክሪን • በአዲስ AI (Addis AI Voice) ድምፅ የተደገፈ' : 'Live Official Queue Display • Powered by Addis AI Voice'}
             </p>
           </div>
         </div>
@@ -135,7 +135,7 @@ export const DisplayView: React.FC = () => {
                 <div className="w-0.5 h-3 bg-indigo-400 rounded-full animate-pulse"></div>
               </div>
               <span className="text-[10px] text-slate-300 font-mono">
-                {isAmharic ? 'Gemini AI ድምፅ' : 'Gemini AI Voice'}
+                {isAmharic ? 'Addis AI ድምፅ' : 'Addis AI Voice'}
               </span>
             </div>
           </div>

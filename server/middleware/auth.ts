@@ -36,41 +36,86 @@ export function authenticate(req: AuthenticatedRequest, res: Response, next: Nex
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Authentication required. Please log in.',
+        message: 'Authentication required. Please sign in with an authorized account to call tickets or perform counter actions.',
         code: 'UNAUTHORIZED'
       });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    const user = db.getUserById(decoded.id);
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      const user = db.getUserById(decoded.id);
 
-    if (!user || user.status !== 'ACTIVE') {
+      if (!user || user.status !== 'ACTIVE') {
+        return res.status(401).json({
+          success: false,
+          message: 'User session is invalid, expired, or account deactivated.',
+          code: 'UNAUTHORIZED'
+        });
+      }
+
+      const roleInfo = ROLES[user.role];
+      const permissions = roleInfo ? roleInfo.permissions : [];
+
+      req.user = {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        role: user.role,
+        assignedCounterId: user.assignedCounterId,
+        permissions
+      };
+
+      next();
+    } catch (err: any) {
       return res.status(401).json({
         success: false,
-        message: 'User session invalid or deactivated.',
-        code: 'UNAUTHORIZED'
+        message: 'Invalid or expired token. Please sign in again.',
+        code: 'TOKEN_EXPIRED'
       });
     }
-
-    const roleInfo = ROLES[user.role];
-    const permissions = roleInfo ? roleInfo.permissions : [];
-
-    req.user = {
-      id: user.id,
-      name: user.name,
-      username: user.username,
-      role: user.role,
-      assignedCounterId: user.assignedCounterId,
-      permissions
-    };
-
-    next();
   } catch (err: any) {
-    return res.status(401).json({
+    return res.status(500).json({
       success: false,
-      message: 'Invalid or expired token.',
-      code: 'TOKEN_EXPIRED'
+      message: 'Authentication error occurred.'
     });
+  }
+}
+
+/**
+ * Optional authentication middleware for public kiosk customer ticket dispensing
+ */
+export function optionalAuthenticate(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  try {
+    let token: string | undefined;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    }
+    if (!token && req.cookies && req.cookies.queue_access_token) {
+      token = req.cookies.queue_access_token;
+    }
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        const user = db.getUserById(decoded.id);
+        if (user && user.status === 'ACTIVE') {
+          const roleInfo = ROLES[user.role];
+          req.user = {
+            id: user.id,
+            name: user.name,
+            username: user.username,
+            role: user.role,
+            assignedCounterId: user.assignedCounterId,
+            permissions: roleInfo ? roleInfo.permissions : []
+          };
+        }
+      } catch {
+        // ignore invalid token for optional auth
+      }
+    }
+    next();
+  } catch {
+    next();
   }
 }
 
@@ -102,4 +147,27 @@ export function authorize(requiredPermission: string) {
 
     next();
   };
+}
+
+/**
+ * Strict Administrator-only authorization middleware
+ */
+export function requireAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required. Please sign in as an Administrator.',
+      code: 'UNAUTHORIZED'
+    });
+  }
+
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied: Management portal and administrative actions are restricted exclusively to Administrators.',
+      code: 'FORBIDDEN'
+    });
+  }
+
+  next();
 }

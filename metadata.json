@@ -1,6 +1,6 @@
 {
   "name": "Small Office Queue Management System",
-  "description": "Production-ready queue management system with anonymous customer tickets, real-time counter assignment, Google Gemini Amharic and English voice announcements, background audio, and role-based staff operations.",
+  "description": "Production-ready queue management system with anonymous customer tickets, real-time counter assignment, Addis AI Amharic voice announcements, MongoDB Atlas cloud storage, and role-based staff operations.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

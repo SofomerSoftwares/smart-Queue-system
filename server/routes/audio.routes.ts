@@ -1,16 +1,27 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db.js';
-import { authenticate, authorize, AuthenticatedRequest } from '../middleware/auth.js';
+import { authenticate, authorize, requireAdmin, AuthenticatedRequest } from '../middleware/auth.js';
 import { 
-  geminiVoiceProvider, 
+  addisVoiceProvider,
+  ADDIS_AI_VOICES, 
   buildAmharicAnnouncementText, 
   buildEnglishAnnouncementText 
-} from '../services/gemini-tts.service.js';
+} from '../services/addis-voice.service.js';
+import { geminiVoiceProvider } from '../services/gemini-tts.service.js';
 import { geminiMusicProvider } from '../services/music.service.js';
 import { AudioAsset } from '../types.js';
 import { broadcaster } from '../websocket.js';
 
 const router = Router();
+
+// GET /api/audio/voices - List all Addis AI Voices
+router.get('/voices', (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    provider: 'Addis AI Voice',
+    voices: ADDIS_AI_VOICES
+  });
+});
 
 // GET /api/audio/settings
 router.get('/settings', (req: Request, res: Response) => {
@@ -18,8 +29,8 @@ router.get('/settings', (req: Request, res: Response) => {
   res.json({ success: true, settings });
 });
 
-// PUT /api/audio/settings
-router.put('/settings', authenticate, authorize('audio.manage'), (req: AuthenticatedRequest, res: Response) => {
+// PUT /api/audio/settings (Admin only)
+router.put('/settings', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const updated = db.updateAudioSetting(req.body);
     db.addAuditLog({
@@ -37,10 +48,17 @@ router.put('/settings', authenticate, authorize('audio.manage'), (req: Authentic
   }
 });
 
-// POST /api/audio/test-voice
-router.post('/test-voice', authenticate, authorize('audio.manage'), async (req: Request, res: Response) => {
+// POST /api/audio/test-voice - Test announcement using Addis AI Voice (Admin only)
+router.post('/test-voice', authenticate, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { text, language = 'AMHARIC', voice = 'Kore', model = 'gemini-3.1-flash-tts-preview' } = req.body;
+    const { 
+      text, 
+      language = 'AMHARIC', 
+      voice = 'aster', 
+      provider = 'ADDIS_AI',
+      speed = 1.0,
+      model = 'gemini-3.1-flash-tts-preview' 
+    } = req.body;
     
     let phrase = text;
     if (!phrase) {
@@ -49,7 +67,13 @@ router.post('/test-voice', authenticate, authorize('audio.manage'), async (req: 
         : buildEnglishAnnouncementText('A-024', 2, 'New Application');
     }
 
-    const audioResult = await geminiVoiceProvider.generateSpeech(phrase, language, voice, model);
+    let audioResult;
+    if (provider === 'GEMINI_TTS') {
+      audioResult = await geminiVoiceProvider.generateSpeech(phrase, language, voice, model);
+    } else {
+      // Primary: Addis AI Voice
+      audioResult = await addisVoiceProvider.generateSpeech(phrase, language, voice, speed);
+    }
 
     res.json({
       success: true,
@@ -64,12 +88,18 @@ router.post('/test-voice', authenticate, authorize('audio.manage'), async (req: 
 // POST /api/audio/generate
 router.post('/generate', authenticate, authorize('audio.manage'), async (req: Request, res: Response) => {
   try {
-    const { text, language = 'AMHARIC', voice, model } = req.body;
+    const { text, language = 'AMHARIC', voice = 'aster', provider = 'ADDIS_AI', speed = 1.0, model } = req.body;
     if (!text) {
       return res.status(400).json({ success: false, message: 'Text is required.' });
     }
 
-    const audioResult = await geminiVoiceProvider.generateSpeech(text, language, voice, model);
+    let audioResult;
+    if (provider === 'GEMINI_TTS') {
+      audioResult = await geminiVoiceProvider.generateSpeech(text, language, voice, model);
+    } else {
+      audioResult = await addisVoiceProvider.generateSpeech(text, language, voice, speed);
+    }
+
     res.json({ success: true, audioResult });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });

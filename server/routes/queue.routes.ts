@@ -1,13 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db.js';
-import { authenticate, authorize, AuthenticatedRequest } from '../middleware/auth.js';
+import { authenticate, authorize, optionalAuthenticate, AuthenticatedRequest } from '../middleware/auth.js';
 import { broadcaster } from '../websocket.js';
 import { 
-  geminiVoiceProvider, 
+  addisVoiceProvider, 
   buildAmharicAnnouncementText, 
   buildEnglishAnnouncementText,
   getAmharicTicketNumber 
-} from '../services/gemini-tts.service.js';
+} from '../services/addis-voice.service.js';
+import { geminiVoiceProvider } from '../services/gemini-tts.service.js';
 import { AnnouncementPayload } from '../types.js';
 
 const router = Router();
@@ -42,16 +43,28 @@ async function triggerVoiceAnnouncement(
       timestamp: new Date().toISOString()
     };
 
-    // Asynchronous AI voice generation
+    // Asynchronous Voice generation via Addis AI Voice (or configured provider)
     const speechText = audioSettings.language === 'ENGLISH' ? textEnglish : textAmharic;
-    const audioResult = await geminiVoiceProvider.generateSpeech(
-      speechText,
-      audioSettings.language,
-      audioSettings.ttsVoice,
-      audioSettings.ttsModel
-    );
+    let audioResult;
 
-    if (audioResult.audioBase64) {
+    if (audioSettings.ttsProvider === 'GEMINI_TTS') {
+      audioResult = await geminiVoiceProvider.generateSpeech(
+        speechText,
+        audioSettings.language,
+        audioSettings.ttsVoice,
+        audioSettings.ttsModel
+      );
+    } else {
+      // Primary: Addis AI Voice
+      audioResult = await addisVoiceProvider.generateSpeech(
+        speechText,
+        audioSettings.language,
+        audioSettings.addisVoice || 'aster',
+        audioSettings.addisAiSpeed || 1.0
+      );
+    }
+
+    if (audioResult && audioResult.audioBase64) {
       payload.audioBase64 = audioResult.audioBase64;
       payload.audioMimeType = audioResult.mimeType;
     }
@@ -173,8 +186,8 @@ router.get('/ticket/:ticketNumber', (req: Request, res: Response) => {
   }
 });
 
-// 3. POST /api/queue/ticket - Receptionist / Kiosk ticket creation (Anonymous)
-router.post('/ticket', authenticate, authorize('ticket.create'), (req: AuthenticatedRequest, res: Response) => {
+// 3. POST /api/queue/ticket - Receptionist / Kiosk ticket creation (Anonymous self-service or staff logged)
+router.post('/ticket', optionalAuthenticate, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { serviceId, priority } = req.body;
 
@@ -240,12 +253,30 @@ router.post('/ticket/call-next', authenticate, authorize('ticket.call'), async (
   try {
     const { counterId, specificTicketId } = req.body;
     const officerId = req.user!.id;
+    const currentUser = db.getUserById(officerId);
 
     if (!counterId) {
       return res.status(400).json({
         success: false,
         message: 'counterId is required to call next ticket.'
       });
+    }
+
+    // STRICT OFFICER ACCESS ENFORCEMENT:
+    // If the user is a SERVICE_OFFICER and has an assigned counter, strictly limit to that counter!
+    if (currentUser && currentUser.role === 'SERVICE_OFFICER') {
+      if (currentUser.assignedCounterId && currentUser.assignedCounterId !== counterId) {
+        const assignedCounter = db.getCounterById(currentUser.assignedCounterId);
+        return res.status(403).json({
+          success: false,
+          message: `Access denied: You are assigned and limited to Counter ${assignedCounter ? assignedCounter.number : currentUser.assignedCounterId}. (ለእርስዎ የተመደበው ቆጣሪ ብቻ ነው የሚፈቀደው)`
+        });
+      }
+
+      // If officer didn't have an assigned counter yet, bind this counter to the officer
+      if (!currentUser.assignedCounterId) {
+        db.updateUser(officerId, { assignedCounterId: counterId });
+      }
     }
 
     // Call next ticket transactionally
@@ -306,6 +337,17 @@ router.post('/ticket/:id/recall', authenticate, authorize('ticket.recall'), (req
       return res.status(404).json({ success: false, message: 'Ticket not found.' });
     }
 
+    // Enforce officer counter check if assigned
+    const currentUser = db.getUserById(req.user!.id);
+    if (currentUser?.role === 'SERVICE_OFFICER' && currentUser.assignedCounterId) {
+      if (ticket.counterId && ticket.counterId !== currentUser.assignedCounterId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: You can only manage tickets called at your assigned counter.'
+        });
+      }
+    }
+
     const counter = ticket.counterId ? db.getCounterById(ticket.counterId) : undefined;
     const counterNumber = counter ? counter.number : (ticket.counterNumber || 1);
 
@@ -339,6 +381,21 @@ router.post('/ticket/:id/recall', authenticate, authorize('ticket.recall'), (req
 router.post('/ticket/:id/start', authenticate, authorize('ticket.start'), (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const existingTicket = db.getTicketById(id);
+    if (!existingTicket) {
+      return res.status(404).json({ success: false, message: 'Ticket not found.' });
+    }
+
+    const currentUser = db.getUserById(req.user!.id);
+    if (currentUser?.role === 'SERVICE_OFFICER' && currentUser.assignedCounterId) {
+      if (existingTicket.counterId && existingTicket.counterId !== currentUser.assignedCounterId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: You can only manage tickets called at your assigned counter.'
+        });
+      }
+    }
+
     const ticket = db.updateTicketStatus(id, 'SERVING', req.user?.id);
 
     db.addAuditLog({
@@ -377,6 +434,16 @@ router.post('/ticket/:id/complete', authenticate, authorize('ticket.complete'), 
       });
     }
 
+    const currentUser = db.getUserById(req.user!.id);
+    if (currentUser?.role === 'SERVICE_OFFICER' && currentUser.assignedCounterId) {
+      if (ticket.counterId && ticket.counterId !== currentUser.assignedCounterId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: You can only complete tickets at your assigned counter.'
+        });
+      }
+    }
+
     const updated = db.updateTicketStatus(id, 'COMPLETED', req.user?.id);
 
     db.addAuditLog({
@@ -404,6 +471,21 @@ router.post('/ticket/:id/complete', authenticate, authorize('ticket.complete'), 
 router.post('/ticket/:id/no-show', authenticate, authorize('ticket.no_show'), (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const ticket = db.getTicketById(id);
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: 'Ticket not found.' });
+    }
+
+    const currentUser = db.getUserById(req.user!.id);
+    if (currentUser?.role === 'SERVICE_OFFICER' && currentUser.assignedCounterId) {
+      if (ticket.counterId && ticket.counterId !== currentUser.assignedCounterId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: You can only update tickets at your assigned counter.'
+        });
+      }
+    }
+
     const updated = db.updateTicketStatus(id, 'NO_SHOW', req.user?.id);
 
     db.addAuditLog({

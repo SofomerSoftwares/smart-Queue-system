@@ -124,10 +124,17 @@ export interface OfficeSetting {
   qrCodeUrlBase?: string;
 }
 
+export type TTSProviderType = 'ADDIS_AI' | 'GEMINI_TTS' | 'BROWSER_SYNTHESIS';
+
 export interface AudioSetting {
   id: string;
   voiceEnabled: boolean;
   language: AnnouncementLanguage;
+  ttsProvider?: TTSProviderType;
+  addisVoice?: string; // 'aster', 'abebe', 'selam', 'dawit'
+  addisAiSpeed?: number;
+  addisAiEndpoint?: string;
+  addisAiApiKey?: string;
   ttsModel: string; // e.g. "gemini-3.1-flash-tts-preview"
   ttsVoice: string; // e.g. "Kore", "Zephyr", "Puck", "Fenrir"
   volume: number; // 0 to 100
@@ -159,6 +166,18 @@ export interface AuditLog {
   metadata?: Record<string, any>;
   ipAddress?: string;
   createdAt: string;
+}
+
+export interface DatabaseSchema {
+  users: User[];
+  services: Service[];
+  counters: Counter[];
+  tickets: QueueTicket[];
+  events: QueueEvent[];
+  officeSetting: OfficeSetting;
+  audioSetting: AudioSetting;
+  audioAssets: AudioAsset[];
+  auditLogs: AuditLog[];
 }
 
 export interface AnnouncementPayload {

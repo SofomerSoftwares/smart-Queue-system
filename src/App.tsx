@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { QueueProvider, useQueue } from './context/QueueContext';
-import { Navbar } from './components/Navbar';
+import { Sidebar } from './components/Sidebar';
+import { TopHeader } from './components/TopHeader';
 import { DisplayView } from './components/DisplayView';
 import { ReceptionView } from './components/ReceptionView';
 import { OfficerStationView } from './components/OfficerStationView';
@@ -15,6 +16,8 @@ const AppContent: React.FC = () => {
   const { user } = useAuth();
   const [currentView, setCurrentView] = useState<string>('display');
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState<boolean>(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
   const renderView = () => {
     switch (currentView) {
@@ -38,16 +41,33 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
-      <Navbar
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex font-sans selection:bg-indigo-500 selection:text-white">
+      {/* Sidebar Navigation */}
+      <Sidebar
         currentView={currentView}
         onNavigate={(v) => setCurrentView(v)}
         onOpenChangePassword={() => setIsChangePasswordOpen(true)}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
-      <main className="flex-1">
-        {renderView()}
-      </main>
+      {/* Main Content Layout */}
+      <div 
+        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
+          isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64'
+        }`}
+      >
+        <TopHeader
+          currentView={currentView}
+          onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+        />
+
+        <main className="flex-1 min-w-0">
+          {renderView()}
+        </main>
+      </div>
 
       <ChangePasswordModal
         isOpen={isChangePasswordOpen}

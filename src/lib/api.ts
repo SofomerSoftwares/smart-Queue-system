@@ -8,7 +8,8 @@ import {
   AudioAsset, 
   AuditLog, 
   QueueStats,
-  PrintTicketData
+  PrintTicketData,
+  AddisVoiceOption
 } from '../types';
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -27,7 +28,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers
   });
 
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data.message || data.error || `HTTP error ${res.status}`);
   }
@@ -146,17 +147,20 @@ export const api = {
   getAudioSettings: () =>
     request<{ success: boolean; settings: AudioSetting }>('/api/audio/settings'),
 
+  getAddisVoices: () =>
+    request<{ success: boolean; provider: string; voices: AddisVoiceOption[] }>('/api/audio/voices'),
+
   updateAudioSettings: (settings: Partial<AudioSetting>) =>
     request<{ success: boolean; settings: AudioSetting }>('/api/audio/settings', {
       method: 'PUT',
       body: JSON.stringify(settings)
     }),
 
-  testVoice: (data: { text?: string; language?: string; voice?: string; model?: string }) =>
+  testVoice: (data: { text?: string; language?: string; voice?: string; provider?: string; speed?: number; model?: string }) =>
     request<{
       success: boolean;
       text: string;
-      audioResult: { audioBase64?: string; mimeType: string; source: string };
+      audioResult: { audioBase64?: string; mimeType: string; source: string; voice?: string; provider?: string };
     }>('/api/audio/test-voice', {
       method: 'POST',
       body: JSON.stringify(data)
@@ -256,5 +260,35 @@ export const api = {
     request<{ success: boolean; setting: OfficeSetting }>('/api/settings', {
       method: 'PUT',
       body: JSON.stringify(data)
+    }),
+
+  // --- DATABASE & MONGODB ATLAS ---
+  getDatabaseStatus: () =>
+    request<{
+      success: boolean;
+      connected: boolean;
+      configured: boolean;
+      database: string;
+      clusterUri: string | null;
+      error: string | null;
+      provider: string;
+    }>('/api/database/status'),
+
+  connectDatabase: (uri?: string) =>
+    request<{
+      success: boolean;
+      connected: boolean;
+      configured: boolean;
+      database: string;
+      clusterUri: string | null;
+      error: string | null;
+    }>('/api/database/connect', {
+      method: 'POST',
+      body: JSON.stringify({ uri })
+    }),
+
+  syncDatabase: () =>
+    request<{ success: boolean; message: string }>('/api/database/sync', {
+      method: 'POST'
     })
 };

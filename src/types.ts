@@ -87,10 +87,26 @@ export interface OfficeSetting {
   qrCodeUrlBase?: string;
 }
 
+export type TTSProviderType = 'ADDIS_AI' | 'GEMINI_TTS' | 'BROWSER_SYNTHESIS';
+
+export interface AddisVoiceOption {
+  id: string;
+  name: string;
+  nameAmharic: string;
+  gender: 'FEMALE' | 'MALE';
+  description: string;
+  descriptionAmharic: string;
+}
+
 export interface AudioSetting {
   id: string;
   voiceEnabled: boolean;
   language: AnnouncementLanguage;
+  ttsProvider?: TTSProviderType;
+  addisVoice?: string;
+  addisAiSpeed?: number;
+  addisAiEndpoint?: string;
+  addisAiApiKey?: string;
   ttsModel: string;
   ttsVoice: string;
   volume: number;

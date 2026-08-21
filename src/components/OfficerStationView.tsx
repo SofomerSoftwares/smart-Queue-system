@@ -12,14 +12,16 @@ import {
   Users,
   Volume2,
   Tv,
-  CheckCircle
+  CheckCircle,
+  Lock,
+  ShieldCheck
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
 import { useAuth } from '../context/AuthContext';
 import { Service, QueueTicket } from '../types';
 
 export const OfficerStationView: React.FC = () => {
-  const { user } = useAuth();
+  const { user, login, demoLogin, logout, hasPermission, isLoading: isAuthLoading } = useAuth();
   const { 
     counters, 
     waitingTickets, 
@@ -35,24 +37,35 @@ export const OfficerStationView: React.FC = () => {
     uiLanguage 
   } = useQueue();
 
-  const [selectedCounterId, setSelectedCounterId] = useState<string>('');
+  const isAmharic = uiLanguage === 'AMHARIC';
+  const isAuthorized = user && (user.role === 'ADMIN' || user.role === 'SERVICE_OFFICER' || hasPermission('ticket.call'));
+  const isOfficer = user?.role === 'SERVICE_OFFICER';
+  const assignedCounterId = user?.assignedCounterId;
+
+  // Local login state for station login gate
+  const [loginUsername, setLoginUsername] = useState<string>('');
+  const [loginPassword, setLoginPassword] = useState<string>('');
+  const [loginError, setLoginError] = useState<string>('');
+  const [isSubmittingLogin, setIsSubmittingLogin] = useState<boolean>(false);
+
+  // Initialize counter from assigned counter if officer, or first counter
+  const [selectedCounterId, setSelectedCounterId] = useState<string>(assignedCounterId || '');
   const [isCalling, setIsCalling] = useState<boolean>(false);
   const [showTransferModal, setShowTransferModal] = useState<boolean>(false);
   const [transferTargetServiceId, setTransferTargetServiceId] = useState<string>('');
   const [serviceTimerSeconds, setServiceTimerSeconds] = useState<number>(0);
+  const [stationNotice, setStationNotice] = useState<string>('');
 
-  const isAmharic = uiLanguage === 'AMHARIC';
-
-  // Initialize counter from assigned counter or first available counter
+  // Keep officer locked to assigned counter whenever user or counters change
   useEffect(() => {
-    if (!selectedCounterId && counters.length > 0) {
-      if (user?.assignedCounterId) {
-        setSelectedCounterId(user.assignedCounterId);
-      } else {
-        setSelectedCounterId(counters[0].id);
+    if (isOfficer && assignedCounterId) {
+      if (selectedCounterId !== assignedCounterId) {
+        setSelectedCounterId(assignedCounterId);
       }
+    } else if (!selectedCounterId && counters.length > 0) {
+      setSelectedCounterId(counters[0].id);
     }
-  }, [counters, user, selectedCounterId]);
+  }, [counters, user, isOfficer, assignedCounterId, selectedCounterId]);
 
   const activeCounter = counters.find(c => c.id === selectedCounterId);
 
@@ -86,15 +99,57 @@ export const OfficerStationView: React.FC = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleInlineLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsSubmittingLogin(true);
+      setLoginError('');
+      await login(loginUsername, loginPassword);
+    } catch (err: any) {
+      setLoginError(err.message || 'Login failed. Please check credentials.');
+    } finally {
+      setIsSubmittingLogin(false);
+    }
+  };
+
+  const handleDemoSignIn = async (roleName: 'SERVICE_OFFICER' | 'ADMIN', userCreds?: { u: string; p: string }) => {
+    try {
+      setIsSubmittingLogin(true);
+      setLoginError('');
+      if (userCreds) {
+        await login(userCreds.u, userCreds.p);
+      } else {
+        await demoLogin(roleName);
+      }
+    } catch (err: any) {
+      setLoginError(err.message || 'Quick sign-in failed');
+    } finally {
+      setIsSubmittingLogin(false);
+    }
+  };
+
   // Actions
   const handleCallNext = async (specificTicketId?: string) => {
+    if (!user) {
+      setStationNotice(isAmharic ? 'ቲኬት ለመጥራት እባክዎ መጀመሪያ ይግቡ።' : 'Authentication required. Please sign in to call tickets.');
+      return;
+    }
+    if (!isAuthorized) {
+      setStationNotice(isAmharic ? 'ይቅርታ፡ ቲኬት የመጥራት ፈቃድ የለዎትም።' : 'Access denied: You do not have permission to call tickets.');
+      return;
+    }
     if (!selectedCounterId) return;
     try {
       setIsCalling(true);
+      setStationNotice('');
       const res = await callNextTicket(selectedCounterId, specificTicketId);
       if (!res.success && res.message) {
-        alert(res.message);
+        setStationNotice(res.message);
+        setTimeout(() => setStationNotice(''), 4000);
       }
+    } catch (err: any) {
+      setStationNotice(err.message || 'Failed to call next ticket');
+      setTimeout(() => setStationNotice(''), 5000);
     } finally {
       setIsCalling(false);
     }
@@ -102,37 +157,224 @@ export const OfficerStationView: React.FC = () => {
 
   const handleRecall = async () => {
     if (!currentTicket) return;
-    await recallTicket(currentTicket.id);
+    try {
+      await recallTicket(currentTicket.id);
+    } catch (err: any) {
+      setStationNotice(err.message || 'Failed to recall ticket');
+      setTimeout(() => setStationNotice(''), 5000);
+    }
   };
 
   const handleStart = async () => {
     if (!currentTicket) return;
-    await startService(currentTicket.id);
+    try {
+      await startService(currentTicket.id);
+    } catch (err: any) {
+      setStationNotice(err.message || 'Failed to start service');
+      setTimeout(() => setStationNotice(''), 5000);
+    }
   };
 
   const handleComplete = async () => {
     if (!currentTicket) return;
-    await completeTicket(currentTicket.id);
+    try {
+      await completeTicket(currentTicket.id);
+    } catch (err: any) {
+      setStationNotice(err.message || 'Failed to complete ticket');
+      setTimeout(() => setStationNotice(''), 5000);
+    }
   };
 
   const handleNoShow = async () => {
     if (!currentTicket) return;
     if (confirm(isAmharic ? 'ደንበኛው አልቀረበም ተብሎ ይመዝገብ?' : 'Mark customer as No-Show?')) {
-      await markNoShow(currentTicket.id);
+      try {
+        await markNoShow(currentTicket.id);
+      } catch (err: any) {
+        setStationNotice(err.message || 'Failed to mark no-show');
+        setTimeout(() => setStationNotice(''), 5000);
+      }
     }
   };
 
   const handleTransfer = async () => {
     if (!currentTicket || !transferTargetServiceId) return;
-    await transferTicket(currentTicket.id, transferTargetServiceId);
-    setShowTransferModal(false);
-    setTransferTargetServiceId('');
+    try {
+      await transferTicket(currentTicket.id, transferTargetServiceId);
+      setShowTransferModal(false);
+      setTransferTargetServiceId('');
+    } catch (err: any) {
+      setStationNotice(err.message || 'Failed to transfer ticket');
+      setTimeout(() => setStationNotice(''), 5000);
+    }
   };
+
+  // 1. Unauthenticated Gate: User must sign in first
+  if (!user) {
+    return (
+      <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-sm space-y-8">
+          <div className="text-center max-w-xl mx-auto space-y-3">
+            <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-md shadow-indigo-200">
+              <Lock className="w-7 h-7" />
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              {isAmharic ? 'የአገልግሎት ሰጪ ጣቢያ መግቢያ' : 'Officer Station Authentication'}
+            </h1>
+            <p className="text-sm text-slate-500 leading-relaxed font-medium">
+              {isAmharic 
+                ? 'ቲኬቶችን ለመጥራት፣ ወረፋዎችን ለማስተዳደር እና የድምፅ ማስታወቂያዎችን ለማሰማት የተፈቀደላቸው አገልግሎት ሰጪዎች እና አስተዳዳሪዎች ብቻ ናቸው የሚችሉት።' 
+                : 'Only authorized and authenticated Service Officers and Administrators are permitted to call tickets, operate counter queues, and broadcast announcements.'}
+            </p>
+          </div>
+
+          {loginError && (
+            <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-2xl font-bold flex items-center space-x-2 max-w-md mx-auto animate-in fade-in">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{loginError}</span>
+            </div>
+          )}
+
+          {/* Quick 1-Click Authorized Officer Sign-In */}
+          <div className="max-w-md mx-auto space-y-3">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 text-center">
+              {isAmharic ? 'የተፈቀደላቸው አገልግሎት ሰጪዎች ፈጣን መግቢያ:' : 'Quick Sign-In as Authorized Officer:'}
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                id="btn-login-officer-1"
+                disabled={isSubmittingLogin}
+                onClick={() => handleDemoSignIn('SERVICE_OFFICER', { u: 'officer1', p: 'Officer@123' })}
+                className="p-3.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-2xl text-left transition group cursor-pointer"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-600">Dawit Mengistu</span>
+                  <span className="text-[10px] font-mono font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Counter 01</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Role: SERVICE_OFFICER</p>
+              </button>
+
+              <button
+                type="button"
+                id="btn-login-officer-2"
+                disabled={isSubmittingLogin}
+                onClick={() => handleDemoSignIn('SERVICE_OFFICER', { u: 'officer2', p: 'Officer@123' })}
+                className="p-3.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-2xl text-left transition group cursor-pointer"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-600">Samrawit Bekele</span>
+                  <span className="text-[10px] font-mono font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Counter 02</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Role: SERVICE_OFFICER</p>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              id="btn-login-admin"
+              disabled={isSubmittingLogin}
+              onClick={() => handleDemoSignIn('ADMIN', { u: 'admin', p: 'Admin@123' })}
+              className="w-full p-3 bg-slate-900 hover:bg-indigo-900 text-white rounded-2xl text-xs font-bold transition flex items-center justify-center space-x-2 cursor-pointer shadow-xs"
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>{isAmharic ? 'እንደ ሲስተም አስተዳዳሪ ግባ (Alemayehu Tadesse)' : 'Sign In as System Administrator'}</span>
+            </button>
+          </div>
+
+          {/* Standard Credentials Form */}
+          <div className="max-w-md mx-auto pt-4 border-t border-slate-100">
+            <p className="text-[11px] font-bold text-slate-400 text-center uppercase tracking-wider mb-3">
+              {isAmharic ? 'ወይም የተጠቃሚ ስም እና የይለፍ ቃል ያስገቡ' : 'Or Sign In with Credentials'}
+            </p>
+            <form onSubmit={handleInlineLogin} className="space-y-3">
+              <input
+                type="text"
+                placeholder={isAmharic ? 'የተጠቃሚ ስም (e.g. officer1)' : 'Username (e.g. officer1)'}
+                value={loginUsername}
+                onChange={(e) => setLoginUsername(e.target.value)}
+                required
+                className="w-full px-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-medium"
+              />
+              <input
+                type="password"
+                placeholder={isAmharic ? 'የይለፍ ቃል (Password)' : 'Password'}
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                required
+                className="w-full px-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-medium"
+              />
+              <button
+                type="submit"
+                disabled={isSubmittingLogin}
+                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                {isSubmittingLogin ? (isAmharic ? 'በመግባት ላይ...' : 'Signing In...') : (isAmharic ? 'ግባ' : 'Sign In to Station')}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Unauthorized Role Gate: User is authenticated, but not authorized for ticket.call
+  if (!isAuthorized) {
+    return (
+      <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-sm text-center space-y-6">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto shadow-xs">
+            <Lock className="w-7 h-7" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+              {isAmharic ? 'ይቅርታ፡ ቲኬት የመጥራት ፈቃድ የለዎትም' : 'Access Restricted: Unauthorized Account'}
+            </h1>
+            <p className="text-sm text-slate-500 mt-2 max-w-lg mx-auto leading-relaxed">
+              {isAmharic 
+                ? `በአሁኑ ሰዓት እንደ "${user.name}" (${user.role}) ገብተዋል። ይህ ሚና ደንበኞችን የመጥራት ፈቃድ የለውም። እባክዎ እንደ አገልግሎት ሰጪ ወይም አስተዳዳሪ ይግቡ።`
+                : `You are signed in as "${user.name}" with the role "${user.role}". Calling and serving tickets is exclusively permitted for Service Officers and Administrators.`}
+            </p>
+          </div>
+
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 max-w-md mx-auto space-y-3">
+            <p className="text-xs font-bold text-slate-700">
+              {isAmharic ? 'የተፈቀደላቸው አገልግሎት ሰጪዎች መለያ ይቀይሩ:' : 'Switch to an Authorized Officer Account:'}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleDemoSignIn('SERVICE_OFFICER', { u: 'officer1', p: 'Officer@123' })}
+                className="p-2.5 bg-white hover:bg-indigo-50 border border-slate-200 text-xs font-bold text-slate-800 rounded-xl"
+              >
+                Dawit (Counter 01)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoSignIn('SERVICE_OFFICER', { u: 'officer2', p: 'Officer@123' })}
+                className="p-2.5 bg-white hover:bg-indigo-50 border border-slate-200 text-xs font-bold text-slate-800 rounded-xl"
+              >
+                Samrawit (Counter 02)
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={logout}
+              className="w-full py-2 text-xs font-bold text-slate-600 hover:text-slate-900"
+            >
+              {isAmharic ? 'ውጣ (Logout)' : 'Log Out Current Account'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
       
-      {/* Top Header Bar with Counter Selector */}
+      {/* Top Header Bar with Counter Selector or Locked Counter Badge */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl shadow-xs border border-slate-200">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
@@ -142,38 +384,76 @@ export const OfficerStationView: React.FC = () => {
             <h1 className="text-xl font-bold text-slate-900">
               {isAmharic ? 'የአገልግሎት ሰጪ ጣቢያ' : 'Service Officer Station'}
             </h1>
-            <p className="text-xs text-slate-500 font-medium">
-              {user ? `${user.name} • ${user.role}` : (isAmharic ? 'አገልግሎት ሰጪ' : 'Counter Officer')}
-            </p>
+            <div className="flex items-center space-x-2 mt-0.5">
+              <span className="text-xs text-slate-600 font-bold">
+                {user ? user.name : (isAmharic ? 'አገልግሎት ሰጪ' : 'Counter Officer')}
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className="text-[11px] px-2 py-0.5 rounded-md font-bold bg-slate-100 text-slate-700 uppercase">
+                {user?.role || 'OFFICER'}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Counter Selection Tabs */}
-        <div className="flex items-center space-x-2">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-            {isAmharic ? 'ቆጣሪ:' : 'Station:'}
-          </span>
-          <div className="flex items-center space-x-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
-            {counters.map((c) => {
-              const active = c.id === selectedCounterId;
-              return (
-                <button
-                  key={c.id}
-                  id={`btn-select-counter-${c.number}`}
-                  onClick={() => setSelectedCounterId(c.id)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    active
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                  }`}
-                >
-                  {isAmharic ? `ቆጣሪ 0${c.number}` : `COUNTER 0${c.number}`}
-                </button>
-              );
-            })}
+        {/* Counter Station Control Area */}
+        {isOfficer && assignedCounterId ? (
+          // LOCKED STATION BADGE FOR OFFICERS WITH ASSIGNED COUNTER
+          <div className="flex items-center space-x-3 bg-indigo-50/90 border border-indigo-200 px-4 py-2.5 rounded-xl shadow-xs">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+              <Lock className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-1.5">
+                <span className="text-[10px] uppercase tracking-wider font-extrabold text-indigo-600">
+                  {isAmharic ? 'የተመደበ ቆጣሪ (የተገደበ)' : 'Assigned Station (Limited Access)'}
+                </span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              </div>
+              <p className="text-sm font-black text-slate-900 font-mono">
+                {isAmharic ? `ቆጣሪ 0${activeCounter?.number || 1}` : `COUNTER 0${activeCounter?.number || 1}`}
+                <span className="font-sans font-medium text-slate-500 text-xs ml-1.5">
+                  ({activeCounter?.name || `Counter ${activeCounter?.number}`})
+                </span>
+              </p>
+            </div>
           </div>
-        </div>
+        ) : (
+          // SUPERVISOR / UNRESTRICTED COUNTER SELECTOR
+          <div className="flex items-center space-x-2">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              {isAmharic ? 'ቆጣሪ ምረጥ:' : 'Select Station:'}
+            </span>
+            <div className="flex items-center space-x-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200 flex-wrap">
+              {counters.map((c) => {
+                const active = c.id === selectedCounterId;
+                return (
+                  <button
+                    key={c.id}
+                    id={`btn-select-counter-${c.number}`}
+                    onClick={() => setSelectedCounterId(c.id)}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      active
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                    }`}
+                  >
+                    {isAmharic ? `ቆጣሪ 0${c.number}` : `COUNTER 0${c.number}`}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Notice Banner */}
+      {stationNotice && (
+        <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl font-bold flex items-center space-x-2 animate-in fade-in">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+          <span>{stationNotice}</span>
+        </div>
+      )}
 
       {/* Main Grid: Officer Station Left & Live Preview / Upcoming Queue Right */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -186,10 +466,13 @@ export const OfficerStationView: React.FC = () => {
             
             {/* Top Right Counter Pill */}
             <div className="absolute top-0 right-0 p-6">
-              <span className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-bold text-base border border-indigo-100">
-                {isAmharic 
-                  ? `ቆጣሪ 0${activeCounter?.number || 1}` 
-                  : `COUNTER 0${activeCounter?.number || 1}`}
+              <span className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-bold text-base border border-indigo-100 flex items-center space-x-1.5">
+                {isOfficer && <Lock className="w-3.5 h-3.5 text-indigo-500" />}
+                <span>
+                  {isAmharic 
+                    ? `ቆጣሪ 0${activeCounter?.number || 1}` 
+                    : `COUNTER 0${activeCounter?.number || 1}`}
+                </span>
               </span>
             </div>
 
@@ -399,7 +682,7 @@ export const OfficerStationView: React.FC = () => {
               </div>
             </div>
 
-            {/* Audio Waveform / Gemini Synthesis Indicator */}
+            {/* Audio Waveform / Addis Voice Synthesis Indicator */}
             <div className="mt-auto pt-4 border-t border-slate-800 flex items-center justify-between text-xs">
               <div className="flex items-center gap-3">
                 <div className="flex gap-1 items-end h-5">
@@ -409,7 +692,7 @@ export const OfficerStationView: React.FC = () => {
                   <div className="w-1 h-4 bg-indigo-400 rounded-full animate-pulse"></div>
                 </div>
                 <p className="text-[10px] text-slate-400 font-medium">
-                  {isAmharic ? 'Gemini AI የአማርኛ ድምፅ ማስታወቂያ ዝግጁ' : 'Gemini AI Amharic Audio Active...'}
+                  {isAmharic ? 'Addis AI የአማርኛ ድምፅ ማስታወቂያ ዝግጁ' : 'Addis AI Voice Engine Active...'}
                 </p>
               </div>
             </div>
@@ -428,7 +711,7 @@ export const OfficerStationView: React.FC = () => {
 
             <div className="flex-1 p-3 overflow-y-auto space-y-2">
               {waitingTickets.length > 0 ? (
-                waitingTickets.map((ticket, idx) => (
+                waitingTickets.map((ticket) => (
                   <div 
                     key={ticket.id}
                     className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-100 transition"
@@ -517,3 +800,4 @@ export const OfficerStationView: React.FC = () => {
     </div>
   );
 };
+

@@ -15,6 +15,7 @@ import {
   AuditLog,
   RoleName
 } from './types.js';
+import { mongoService } from './mongodb.js';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DATA_FILE = path.join(DATA_DIR, 'queue_db.json');
@@ -300,6 +301,10 @@ function seedDatabase(): DatabaseSchema {
     id: 'audio-setting-1',
     voiceEnabled: true,
     language: 'AMHARIC',
+    ttsProvider: 'ADDIS_AI',
+    addisVoice: process.env.ADDIS_AI_DEFAULT_VOICE || 'aster',
+    addisAiSpeed: 1.0,
+    addisAiEndpoint: process.env.ADDIS_AI_ENDPOINT || 'https://api.addis.ai/v1/tts',
     ttsModel: process.env.GEMINI_TTS_MODEL || 'gemini-3.1-flash-tts-preview',
     ttsVoice: process.env.GEMINI_TTS_VOICE || 'Kore',
     volume: 85,
@@ -450,6 +455,33 @@ class Database {
 
   constructor() {
     this.data = this.load();
+    this.initMongoSync().catch(err => {
+      console.warn('Initial MongoDB Atlas sync background notice:', err);
+    });
+  }
+
+  private async initMongoSync(): Promise<void> {
+    // If a valid MONGODB_URI is provided, attempt connection and sync
+    if (mongoService.getStatus().configured) {
+      try {
+        const connected = await mongoService.connect();
+        if (connected) {
+          const mongoData = await mongoService.loadAll();
+          if (mongoData && mongoData.users && mongoData.users.length > 0) {
+            // MongoDB Atlas has existing data; hydrate our in-memory cache
+            this.data = mongoData;
+            this.saveImmediate(this.data);
+            console.log(`🚀 [MongoDB Atlas] Synchronized and loaded ${mongoData.tickets?.length || 0} tickets, ${mongoData.services?.length || 0} services from Atlas`);
+          } else {
+            // MongoDB Atlas is freshly connected and empty; push initial seed to Atlas
+            await mongoService.saveAll(this.data);
+            console.log(`📦 [MongoDB Atlas] Successfully seeded initial schema and data to Atlas collections`);
+          }
+        }
+      } catch (err: any) {
+        console.log(`ℹ️ [MongoDB Atlas] Startup note: ${err?.message || 'Using resilient local storage'}`);
+      }
+    }
   }
 
   private load(): DatabaseSchema {
@@ -469,6 +501,12 @@ class Database {
   private saveImmediate(snapshot: DatabaseSchema) {
     try {
       fs.writeFileSync(DATA_FILE, JSON.stringify(snapshot, null, 2), 'utf-8');
+      // Asynchronously mirror snapshot to MongoDB Atlas in background
+      if (mongoService.isReady()) {
+        mongoService.saveAll(snapshot).catch(err => {
+          console.warn('MongoDB Atlas async save warning:', err.message);
+        });
+      }
     } catch (err) {
       console.error('Failed to write database file:', err);
     }
@@ -481,6 +519,32 @@ class Database {
       this.saveImmediate(this.data);
       this.isWriting = false;
     }, 100);
+  }
+
+  public getMongoStatus() {
+    return mongoService.getStatus();
+  }
+
+  public async connectMongo(uri?: string) {
+    const success = await mongoService.connect(uri);
+    if (success) {
+      const mongoData = await mongoService.loadAll();
+      if (mongoData && mongoData.users && mongoData.users.length > 0) {
+        this.data = mongoData;
+        this.saveImmediate(this.data);
+      } else {
+        await mongoService.saveAll(this.data);
+      }
+    }
+    return mongoService.getStatus();
+  }
+
+  public async syncMongoNow(): Promise<{ success: boolean; message: string }> {
+    if (!mongoService.isReady()) {
+      return { success: false, message: 'MongoDB Atlas is not connected.' };
+    }
+    await mongoService.saveAll(this.data);
+    return { success: true, message: 'Successfully synced all data to MongoDB Atlas collections.' };
   }
 
   // --- USERS ---
@@ -498,6 +562,14 @@ class Database {
 
   public createUser(user: User): User {
     this.data.users.push(user);
+    if (user.assignedCounterId) {
+      const counter = this.data.counters.find(c => c.id === user.assignedCounterId);
+      if (counter) {
+        counter.currentOfficerId = user.id;
+        counter.currentOfficerName = user.name;
+        counter.updatedAt = new Date().toISOString();
+      }
+    }
     this.save();
     return user;
   }
@@ -505,7 +577,42 @@ class Database {
   public updateUser(id: string, update: Partial<User>): User | undefined {
     const idx = this.data.users.findIndex(u => u.id === id);
     if (idx === -1) return undefined;
-    this.data.users[idx] = { ...this.data.users[idx], ...update, updatedAt: new Date().toISOString() };
+    const oldUser = this.data.users[idx];
+    const updatedUser = { ...oldUser, ...update, updatedAt: new Date().toISOString() };
+    this.data.users[idx] = updatedUser;
+
+    // Synchronize counter assignment
+    if ('assignedCounterId' in update) {
+      const oldCounterId = oldUser.assignedCounterId;
+      const newCounterId = update.assignedCounterId;
+
+      if (oldCounterId && oldCounterId !== newCounterId) {
+        const oldCounter = this.data.counters.find(c => c.id === oldCounterId);
+        if (oldCounter && oldCounter.currentOfficerId === id) {
+          oldCounter.currentOfficerId = undefined;
+          oldCounter.currentOfficerName = undefined;
+          oldCounter.updatedAt = new Date().toISOString();
+        }
+      }
+
+      if (newCounterId) {
+        const newCounter = this.data.counters.find(c => c.id === newCounterId);
+        if (newCounter) {
+          newCounter.currentOfficerId = updatedUser.id;
+          newCounter.currentOfficerName = updatedUser.name;
+          newCounter.updatedAt = new Date().toISOString();
+        }
+      }
+    } else if (update.name) {
+      // Update officer name if name was changed
+      if (updatedUser.assignedCounterId) {
+        const counter = this.data.counters.find(c => c.id === updatedUser.assignedCounterId);
+        if (counter && counter.currentOfficerId === id) {
+          counter.currentOfficerName = update.name;
+        }
+      }
+    }
+
     this.save();
     return this.data.users[idx];
   }
@@ -514,6 +621,14 @@ class Database {
     const len = this.data.users.length;
     this.data.users = this.data.users.filter(u => u.id !== id);
     if (this.data.users.length !== len) {
+      // Clear counter references
+      this.data.counters.forEach(c => {
+        if (c.currentOfficerId === id) {
+          c.currentOfficerId = undefined;
+          c.currentOfficerName = undefined;
+          c.updatedAt = new Date().toISOString();
+        }
+      });
       this.save();
       return true;
     }
