@@ -87,7 +87,7 @@ export interface OfficeSetting {
   qrCodeUrlBase?: string;
 }
 
-export type TTSProviderType = 'ADDIS_AI' | 'GEMINI_TTS' | 'BROWSER_SYNTHESIS';
+export type TTSProviderType = 'ADDIS_AI' | 'BROWSER_SYNTHESIS';
 
 export interface AddisVoiceOption {
   id: string;
@@ -107,15 +107,12 @@ export interface AudioSetting {
   addisAiSpeed?: number;
   addisAiEndpoint?: string;
   addisAiApiKey?: string;
-  ttsModel: string;
-  ttsVoice: string;
   volume: number;
   repeatCount: number;
   announcementDelaySeconds: number;
   backgroundMusicEnabled: boolean;
   backgroundMusicVolume: number;
   currentMusicAssetId?: string;
-  musicModel?: string;
 }
 
 export interface AudioAsset {

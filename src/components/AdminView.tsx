@@ -27,7 +27,10 @@ import {
   RefreshCw,
   Cpu,
   Lock,
-  UserCheck
+  UserCheck,
+  KeyRound,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
 import { useAuth } from '../context/AuthContext';
@@ -96,6 +99,7 @@ export const AdminView: React.FC = () => {
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [isSavingUser, setIsSavingUser] = useState<boolean>(false);
   const [userModalError, setUserModalError] = useState<string>('');
+  const [showUserPassword, setShowUserPassword] = useState<boolean>(false);
 
   // Audio Testing State
   const [testVoiceText, setTestVoiceText] = useState<string>('ቁጥር ሀ ሃያ አራት ያላችሁ ደንበኛ ወደ ቆጣሪ ሁለት ይሂዱ');
@@ -162,10 +166,9 @@ export const AdminView: React.FC = () => {
       const res = await api.testVoice({
         text: testVoiceText,
         language: testLanguage,
-        provider: selectedTtsProvider,
-        voice: selectedTtsProvider === 'ADDIS_AI' ? selectedAddisVoice : selectedVoice,
-        speed: voiceSpeed,
-        model: audioForm.ttsModel || 'gemini-3.1-flash-tts-preview'
+        provider: 'ADDIS_AI',
+        voice: selectedAddisVoice,
+        speed: voiceSpeed
       });
 
       if (res.success) {
@@ -199,10 +202,9 @@ export const AdminView: React.FC = () => {
 
       const payload: Partial<AudioSetting> = {
         ...audioForm,
-        ttsProvider: selectedTtsProvider,
+        ttsProvider: 'ADDIS_AI',
         addisVoice: selectedAddisVoice,
         addisAiSpeed: Number(voiceSpeed) || 1.0,
-        ttsVoice: selectedVoice,
         addisAiEndpoint: (audioForm.addisAiEndpoint || '').trim() || 'https://api.addis.ai/v1/tts',
         addisAiApiKey: (audioForm.addisAiApiKey || '').trim(),
         language: audioForm.language || 'AMHARIC',
@@ -210,7 +212,6 @@ export const AdminView: React.FC = () => {
         volume: Number(audioForm.volume) || 85,
         repeatCount: Number(audioForm.repeatCount) || 1,
         announcementDelaySeconds: Number(audioForm.announcementDelaySeconds) || 0,
-        ttsModel: audioForm.ttsModel || 'gemini-3.1-flash-tts-preview',
         backgroundMusicEnabled: audioForm.backgroundMusicEnabled ?? false,
         backgroundMusicVolume: Number(audioForm.backgroundMusicVolume) || 12,
         currentMusicAssetId: audioForm.currentMusicAssetId
@@ -219,9 +220,8 @@ export const AdminView: React.FC = () => {
       const res = await api.updateAudioSettings(payload);
       if (res.success && res.settings) {
         setAudioForm(res.settings);
-        setSelectedVoice(res.settings.ttsVoice || 'Kore');
         setSelectedAddisVoice(res.settings.addisVoice || 'aster');
-        setSelectedTtsProvider(res.settings.ttsProvider || 'ADDIS_AI');
+        setSelectedTtsProvider('ADDIS_AI');
         setVoiceSpeed(res.settings.addisAiSpeed || 1.0);
       }
 
@@ -348,11 +348,16 @@ export const AdminView: React.FC = () => {
       return;
     }
 
+    if (editingUser.id && editingUser.password && editingUser.password.trim().length > 0 && editingUser.password.trim().length < 6) {
+      setUserModalError(isAmharic ? 'አዲሱ የይለፍ ቃል ቢያንስ 6 ፊደላት መሆን አለበት' : 'New password must be at least 6 characters long');
+      return;
+    }
+
     try {
       setIsSavingUser(true);
       if (editingUser.id) {
         await api.updateUser(editingUser.id, editingUser);
-        setSaveSuccessMsg(isAmharic ? 'የሰራተኛ መረጃ በተሳካ ሁኔታ ተሻሽሏል!' : 'Staff updated successfully!');
+        setSaveSuccessMsg(isAmharic ? 'የሰራተኛ መረጃ እና የይለፍ ቃል በተሳካ ሁኔታ ተሻሽሏል!' : 'Staff details & password updated successfully!');
       } else {
         await api.createUser(editingUser);
         setSaveSuccessMsg(isAmharic ? 'አዲስ ሰራተኛ በተሳካ ሁኔታ ተመዝግቧል!' : 'New staff user created successfully!');
@@ -953,11 +958,36 @@ export const AdminView: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-4 text-right space-x-2">
                         <button
+                          onClick={async () => {
+                            const newPass = prompt(
+                              isAmharic 
+                                ? `ለ ${u.name} አዲስ የይለፍ ቃል ያስገቡ (ቢያንስ 6 ፊደላት):` 
+                                : `Enter new password for ${u.name} (min 6 characters):`
+                            );
+                            if (newPass && newPass.trim().length >= 6) {
+                              try {
+                                const res = await api.adminResetUserPassword(u.id, newPass.trim());
+                                setSaveSuccessMsg(res.message || (isAmharic ? 'የይለፍ ቃል ተቀይሯል' : 'Password reset successfully'));
+                                setTimeout(() => setSaveSuccessMsg(''), 3500);
+                              } catch (err: any) {
+                                alert(err.message || 'Failed to reset password');
+                              }
+                            } else if (newPass !== null) {
+                              alert(isAmharic ? 'የይለፍ ቃል ቢያንስ 6 ፊደላት መሆን አለበት' : 'Password must be at least 6 characters');
+                            }
+                          }}
+                          className="text-indigo-600 hover:text-indigo-800 font-bold inline-flex items-center space-x-1"
+                        >
+                          <KeyRound className="w-3 h-3" />
+                          <span>{isAmharic ? 'ይለፍ ቃል ቀይር' : 'Reset Pass'}</span>
+                        </button>
+                        <button
                           onClick={() => {
                             setEditingUser(u);
+                            setShowUserPassword(false);
                             setIsUserModalOpen(true);
                           }}
-                          className="text-slate-600 hover:text-slate-900 font-bold"
+                          className="text-slate-600 hover:text-slate-900 font-bold ml-2"
                         >
                           Edit
                         </button>
@@ -1021,159 +1051,101 @@ export const AdminView: React.FC = () => {
               </div>
             )}
 
-            {/* Provider Switcher */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                {isAmharic ? 'ዋና የድምፅ ቴክኖሎጂ (Voice Engine)' : 'Primary TTS Voice Provider'}
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setSelectedTtsProvider('ADDIS_AI')}
-                  className={`p-3 rounded-xl border text-left transition ${
-                    selectedTtsProvider === 'ADDIS_AI'
-                      ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-500/20'
-                      : 'border-slate-200 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-slate-900">Addis AI Voice (አዲስ AI)</span>
-                    {selectedTtsProvider === 'ADDIS_AI' && <CheckCircle2 className="w-4 h-4 text-indigo-600" />}
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    {isAmharic ? 'ለአማርኛ ቋንቋ ጥሪዎች የተመቻቸ ተፈጥሮአዊ ድምፅ' : 'Native Amharic natural accent & intonation'}
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedTtsProvider('GEMINI_TTS')}
-                  className={`p-3 rounded-xl border text-left transition ${
-                    selectedTtsProvider === 'GEMINI_TTS'
-                      ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-500/20'
-                      : 'border-slate-200 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-slate-900">Gemini AI Voice</span>
-                    {selectedTtsProvider === 'GEMINI_TTS' && <CheckCircle2 className="w-4 h-4 text-indigo-600" />}
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    {isAmharic ? 'አማራጭ የድምፅ ሞዴል (Fallback Provider)' : 'Secondary multi-language fallback model'}
-                  </p>
-                </button>
-              </div>
-            </div>
-
             {/* Addis AI Voice Persona Selection */}
-            {selectedTtsProvider === 'ADDIS_AI' ? (
-              <div className="space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+            <div className="space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+              <div className="flex items-center justify-between">
                 <label className="block text-xs font-bold text-slate-800">
                   {isAmharic ? 'የአዲስ AI ድምፅ ምርጫ (Addis Voice Persona)' : 'Select Addis AI Voice Persona'}
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {addisVoices.map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => setSelectedAddisVoice(v.id)}
-                      className={`p-3 rounded-xl border text-left transition flex flex-col justify-between ${
-                        selectedAddisVoice === v.id
-                          ? 'border-indigo-600 bg-white shadow-xs ring-1 ring-indigo-500'
-                          : 'border-slate-200 bg-white/70 hover:bg-white'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-900">
-                          {isAmharic ? v.nameAmharic : v.name}
-                        </span>
-                        <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
-                          {v.gender}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-1">
-                        {isAmharic ? v.descriptionAmharic : v.description}
-                      </p>
-                    </button>
-                  ))}
-                </div>
+                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                  Addis AI Engine
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {addisVoices.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setSelectedAddisVoice(v.id)}
+                    className={`p-3 rounded-xl border text-left transition flex flex-col justify-between ${
+                      selectedAddisVoice === v.id
+                        ? 'border-indigo-600 bg-white shadow-xs ring-1 ring-indigo-500'
+                        : 'border-slate-200 bg-white/70 hover:bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900">
+                        {isAmharic ? v.nameAmharic : v.name}
+                      </span>
+                      <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                        {v.gender}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      {isAmharic ? v.descriptionAmharic : v.description}
+                    </p>
+                  </button>
+                ))}
+              </div>
 
-                {/* Voice Speed Multiplier */}
-                <div className="pt-2">
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-slate-700">
-                      {isAmharic ? 'የንግግር ፍጥነት (Speed)' : 'Speech Rate Speed'}
-                    </label>
-                    <span className="text-xs font-mono font-bold text-indigo-600">{voiceSpeed}x</span>
-                  </div>
+              {/* Voice Speed Multiplier */}
+              <div className="pt-2">
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-xs font-bold text-slate-700">
+                    {isAmharic ? 'የንግግር ፍጥነት (Speed)' : 'Speech Rate Speed'}
+                  </label>
+                  <span className="text-xs font-mono font-bold text-indigo-600">{voiceSpeed}x</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.8"
+                  max="1.3"
+                  step="0.05"
+                  value={voiceSpeed}
+                  onChange={(e) => setVoiceSpeed(parseFloat(e.target.value))}
+                  className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-1">
+                  <span>0.8x (Slower)</span>
+                  <span>1.0x (Normal)</span>
+                  <span>1.3x (Faster)</span>
+                </div>
+              </div>
+
+              {/* Addis Voice API Endpoint & API Key */}
+              <div className="pt-2 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {isAmharic ? 'የአዲስ AI ድምፅ API Endpoint' : 'Addis AI Voice API Endpoint'}
+                  </label>
                   <input
-                    type="range"
-                    min="0.8"
-                    max="1.3"
-                    step="0.05"
-                    value={voiceSpeed}
-                    onChange={(e) => setVoiceSpeed(parseFloat(e.target.value))}
-                    className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    type="text"
+                    value={audioForm.addisAiEndpoint || ''}
+                    onChange={(e) => setAudioForm({ ...audioForm, addisAiEndpoint: e.target.value })}
+                    placeholder="https://api.addis.ai/v1/tts"
+                    className="w-full p-2 text-xs bg-white border border-slate-200 rounded-xl font-mono text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
-                  <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-1">
-                    <span>0.8x (Slower)</span>
-                    <span>1.0x (Normal)</span>
-                    <span>1.3x (Faster)</span>
-                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    {isAmharic ? 'ነባሪ አድራሻ፡ https://api.addis.ai/v1/tts' : 'Default endpoint: https://api.addis.ai/v1/tts'}
+                  </p>
                 </div>
-
-                {/* Addis Voice API Endpoint & API Key */}
-                <div className="pt-2 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      {isAmharic ? 'የአዲስ AI ድምፅ API Endpoint' : 'Addis AI Voice API Endpoint'}
-                    </label>
-                    <input
-                      type="text"
-                      value={audioForm.addisAiEndpoint || ''}
-                      onChange={(e) => setAudioForm({ ...audioForm, addisAiEndpoint: e.target.value })}
-                      placeholder="https://api.addis.ai/v1/tts"
-                      className="w-full p-2 text-xs bg-white border border-slate-200 rounded-xl font-mono text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    />
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      {isAmharic ? 'ነባሪ አድራሻ፡ https://api.addis.ai/v1/tts' : 'Default endpoint: https://api.addis.ai/v1/tts'}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      {isAmharic ? 'የአዲስ AI API ቁልፍ (API Key)' : 'Addis AI API Key'}
-                    </label>
-                    <input
-                      type="password"
-                      value={audioForm.addisAiApiKey || ''}
-                      onChange={(e) => setAudioForm({ ...audioForm, addisAiApiKey: e.target.value })}
-                      placeholder="sk-addis-ai-..."
-                      className="w-full p-2 text-xs bg-white border border-slate-200 rounded-xl font-mono text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    />
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      {isAmharic ? 'ወይም በ .env ውስጥ ADDIS_AI_API_KEY ተጠቀም' : 'Or configure ADDIS_AI_API_KEY in environment'}
-                    </p>
-                  </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {isAmharic ? 'የአዲስ AI API ቁልፍ (API Key)' : 'Addis AI API Key'}
+                  </label>
+                  <input
+                    type="password"
+                    value={audioForm.addisAiApiKey || ''}
+                    onChange={(e) => setAudioForm({ ...audioForm, addisAiApiKey: e.target.value })}
+                    placeholder="sk-addis-ai-..."
+                    className="w-full p-2 text-xs bg-white border border-slate-200 rounded-xl font-mono text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    {isAmharic ? 'ወይም በ .env ውስጥ ADDIS_AI_API_KEY ተጠቀም' : 'Or configure ADDIS_AI_API_KEY in environment'}
+                  </p>
                 </div>
               </div>
-            ) : (
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  {isAmharic ? 'የድምፅ ሞዴል (Gemini Voice)' : 'Gemini Voice Preset'}
-                </label>
-                <select
-                  value={selectedVoice}
-                  onChange={(e) => setSelectedVoice(e.target.value)}
-                  className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono text-slate-900"
-                >
-                  <option value="Kore">Kore (Clear & Calm - Recommended)</option>
-                  <option value="Zephyr">Zephyr (Warm & Professional)</option>
-                  <option value="Puck">Puck (Energetic & Sharp)</option>
-                  <option value="Fenrir">Fenrir (Authoritative)</option>
-                  <option value="Aoede">Aoede (Gentle & Smooth)</option>
-                </select>
-              </div>
-            )}
+            </div>
 
             {/* Volume, Repeat, and Language Controls */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1236,7 +1208,7 @@ export const AdminView: React.FC = () => {
                   {isAmharic ? 'የድምፅ መሞከሪያ (Live Addis AI Voice Preview)' : 'Test Voice Output'}
                 </span>
                 <span className="text-[10px] text-indigo-600 font-mono font-bold">
-                  {selectedTtsProvider === 'ADDIS_AI' ? `Addis AI (${selectedAddisVoice})` : `Gemini (${selectedVoice})`}
+                  Addis AI ({selectedAddisVoice})
                 </span>
               </div>
 
@@ -1806,13 +1778,27 @@ export const AdminView: React.FC = () => {
               <label className="block text-[11px] font-bold text-slate-600 mb-1">
                 {isAmharic ? 'የይለፍ ቃል (Password)' : 'Password'}
               </label>
-              <input
-                type="password"
-                placeholder={editingUser.id ? (isAmharic ? 'ሳይቀየር እንዲቆይ ባዶ ይተዉ' : 'Leave blank to keep password') : '******'}
-                value={editingUser.password || ''}
-                onChange={(e) => setEditingUser({ ...editingUser, password: e.target.value })}
-                className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              />
+              <div className="relative">
+                <input
+                  type={showUserPassword ? 'text' : 'password'}
+                  placeholder={editingUser.id ? (isAmharic ? 'ሳይቀየር እንዲቆይ ባዶ ይተዉ (ወይም አዲስ ይፃፉ)' : 'Leave blank to keep password or type new') : 'At least 6 chars'}
+                  value={editingUser.password || ''}
+                  onChange={(e) => setEditingUser({ ...editingUser, password: e.target.value })}
+                  className="w-full p-2.5 pr-9 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowUserPassword(!showUserPassword)}
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  {showUserPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">
+                {editingUser.id 
+                  ? (isAmharic ? 'የይለፍ ቃል ለመቀየር ቢያንስ 6 ፊደላት ይፃፉ' : 'Enter 6+ characters to change password') 
+                  : (isAmharic ? 'ቢያንስ 6 ፊደላት መሆን አለበት' : 'Must be at least 6 characters')}
+              </p>
             </div>
 
             <div>

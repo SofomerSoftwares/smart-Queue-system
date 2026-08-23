@@ -305,14 +305,11 @@ function seedDatabase(): DatabaseSchema {
     addisVoice: process.env.ADDIS_AI_DEFAULT_VOICE || 'aster',
     addisAiSpeed: 1.0,
     addisAiEndpoint: process.env.ADDIS_AI_ENDPOINT || 'https://api.addis.ai/v1/tts',
-    ttsModel: process.env.GEMINI_TTS_MODEL || 'gemini-3.1-flash-tts-preview',
-    ttsVoice: process.env.GEMINI_TTS_VOICE || 'Kore',
     volume: 85,
     repeatCount: 1,
     announcementDelaySeconds: 1,
     backgroundMusicEnabled: true,
-    backgroundMusicVolume: 12,
-    musicModel: process.env.GEMINI_MUSIC_MODEL || 'gemini-2.5-flash'
+    backgroundMusicVolume: 12
   };
 
   const audioAssets: AudioAsset[] = [

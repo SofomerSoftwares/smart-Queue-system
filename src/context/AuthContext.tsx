@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, RoleName } from '../types';
+import { User } from '../types';
 import { api } from '../lib/api';
 
 interface AuthContextType {
@@ -8,7 +8,6 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
-  demoLogin: (role: RoleName) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,22 +25,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const res = await api.getMe();
             if (res.success && res.user) {
               setUser(res.user);
-              setIsLoading(false);
-              return;
             }
           } catch {
             localStorage.removeItem('queue_access_token');
+            setUser(null);
           }
         }
-        
-        // Auto-bootstrap active Admin session so administrative and operational actions work out of the box
-        const adminRes = await api.login({ username: 'admin', password: 'Admin@123' });
-        if (adminRes.success && adminRes.user) {
-          localStorage.setItem('queue_access_token', adminRes.accessToken);
-          setUser(adminRes.user);
-        }
       } catch (err) {
-        console.warn('Auto auth session init error:', err);
+        console.warn('Auth session check error:', err);
       } finally {
         setIsLoading(false);
       }
@@ -70,18 +61,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
-  const demoLogin = async (role: RoleName) => {
-    const creds: Record<RoleName, { u: string; p: string }> = {
-      ADMIN: { u: 'admin', p: 'Admin@123' },
-      RECEPTIONIST: { u: 'reception', p: 'Reception@123' },
-      SERVICE_OFFICER: { u: 'officer1', p: 'Officer@123' }
-    };
-    const c = creds[role];
-    if (c) {
-      await login(c.u, c.p);
-    }
-  };
-
   const hasPermission = (permission: string): boolean => {
     if (!user) return false;
     if (user.role === 'ADMIN') return true;
@@ -89,7 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, hasPermission, demoLogin }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

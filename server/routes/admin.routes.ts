@@ -76,10 +76,24 @@ router.post('/users', authenticate, requireAdmin, (req: AuthenticatedRequest, re
 router.put('/users/:id', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, role, status, assignedCounterId, password } = req.body;
+    const { name, username, role, status, assignedCounterId, password } = req.body;
+
+    const existingUser = db.getUserById(id);
+    if (!existingUser) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
 
     const updates: Partial<User> = {};
-    if (name) updates.name = name;
+    if (name && name.trim()) updates.name = name.trim();
+    if (username && username.trim() && username.trim() !== existingUser.username) {
+      const cleanUsername = username.trim().toLowerCase();
+      const conflict = db.getUserByUsername(cleanUsername);
+      if (conflict && conflict.id !== id) {
+        return res.status(400).json({ success: false, message: 'Username is already taken by another user.' });
+      }
+      updates.username = cleanUsername;
+    }
+
     if (role) {
       updates.role = role;
       updates.roleId = `role-${role.toLowerCase().replace('_', '-')}`;
@@ -87,9 +101,12 @@ router.put('/users/:id', authenticate, requireAdmin, (req: AuthenticatedRequest,
     if (status) updates.status = status;
     if (assignedCounterId !== undefined) updates.assignedCounterId = assignedCounterId;
 
-    if (password && password.trim().length >= 6) {
+    if (password && password.trim()) {
+      if (password.trim().length < 6) {
+        return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long.' });
+      }
       const salt = bcrypt.genSaltSync(10);
-      updates.passwordHash = bcrypt.hashSync(password, salt);
+      updates.passwordHash = bcrypt.hashSync(password.trim(), salt);
     }
 
     const updated = db.updateUser(id, updates);
@@ -103,11 +120,44 @@ router.put('/users/:id', authenticate, requireAdmin, (req: AuthenticatedRequest,
       action: 'UPDATE_USER',
       entity: 'User',
       entityId: id,
-      metadata: updates
+      metadata: { ...updates, passwordHash: updates.passwordHash ? '[UPDATED]' : undefined }
     });
 
     const { passwordHash: _, ...safeUser } = updated;
     res.json({ success: true, user: safeUser });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/users/:id/reset-password (Admin direct reset)
+router.post('/users/:id/reset-password', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.trim().length < 6) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters long.' });
+    }
+
+    const user = db.getUserById(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const salt = bcrypt.genSaltSync(10);
+    const passwordHash = bcrypt.hashSync(newPassword.trim(), salt);
+    db.updateUser(id, { passwordHash });
+
+    db.addAuditLog({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      action: 'ADMIN_RESET_PASSWORD',
+      entity: 'User',
+      entityId: id
+    });
+
+    res.json({ success: true, message: `Password for ${user.name} has been reset successfully.` });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }

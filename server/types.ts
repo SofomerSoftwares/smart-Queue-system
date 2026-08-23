@@ -124,7 +124,7 @@ export interface OfficeSetting {
   qrCodeUrlBase?: string;
 }
 
-export type TTSProviderType = 'ADDIS_AI' | 'GEMINI_TTS' | 'BROWSER_SYNTHESIS';
+export type TTSProviderType = 'ADDIS_AI' | 'BROWSER_SYNTHESIS';
 
 export interface AudioSetting {
   id: string;
@@ -135,15 +135,12 @@ export interface AudioSetting {
   addisAiSpeed?: number;
   addisAiEndpoint?: string;
   addisAiApiKey?: string;
-  ttsModel: string; // e.g. "gemini-3.1-flash-tts-preview"
-  ttsVoice: string; // e.g. "Kore", "Zephyr", "Puck", "Fenrir"
   volume: number; // 0 to 100
   repeatCount: number; // 1 or 2
   announcementDelaySeconds: number;
   backgroundMusicEnabled: boolean;
   backgroundMusicVolume: number; // 0 to 100
   currentMusicAssetId?: string;
-  musicModel?: string; // e.g. "lyria-3-clip-preview"
 }
 
 export interface AudioAsset {

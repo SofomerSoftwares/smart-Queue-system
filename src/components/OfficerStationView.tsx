@@ -9,19 +9,26 @@ import {
   Clock, 
   Timer, 
   AlertCircle, 
-  Users,
-  Volume2,
-  Tv,
-  CheckCircle,
-  Lock,
-  ShieldCheck
+  Users, 
+  Volume2, 
+  Tv, 
+  CheckCircle, 
+  Lock, 
+  ShieldCheck, 
+  KeyRound, 
+  ArrowLeft, 
+  ArrowRight, 
+  Eye, 
+  EyeOff, 
+  ShieldAlert 
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../lib/api';
 import { Service, QueueTicket } from '../types';
 
 export const OfficerStationView: React.FC = () => {
-  const { user, login, demoLogin, logout, hasPermission, isLoading: isAuthLoading } = useAuth();
+  const { user, login, logout, hasPermission, isLoading: isAuthLoading } = useAuth();
   const { 
     counters, 
     waitingTickets, 
@@ -47,6 +54,17 @@ export const OfficerStationView: React.FC = () => {
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
   const [isSubmittingLogin, setIsSubmittingLogin] = useState<boolean>(false);
+
+  // Forgot password state for station
+  const [stationAuthMode, setStationAuthMode] = useState<'LOGIN' | 'FORGOT_REQUEST' | 'FORGOT_VERIFY'>('LOGIN');
+  const [forgotUsername, setForgotUsername] = useState<string>('');
+  const [forgotCode, setForgotCode] = useState<string>('');
+  const [generatedNotice, setGeneratedNotice] = useState<string>('');
+  const [officerNewPassword, setOfficerNewPassword] = useState<string>('');
+  const [officerConfirmPassword, setOfficerConfirmPassword] = useState<string>('');
+  const [showOfficerNewPassword, setShowOfficerNewPassword] = useState<boolean>(false);
+  const [isProcessingForgot, setIsProcessingForgot] = useState<boolean>(false);
+  const [forgotSuccessMessage, setForgotSuccessMessage] = useState<string>('');
 
   // Initialize counter from assigned counter if officer, or first counter
   const [selectedCounterId, setSelectedCounterId] = useState<string>(assignedCounterId || '');
@@ -104,27 +122,86 @@ export const OfficerStationView: React.FC = () => {
     try {
       setIsSubmittingLogin(true);
       setLoginError('');
+      setForgotSuccessMessage('');
       await login(loginUsername, loginPassword);
     } catch (err: any) {
-      setLoginError(err.message || 'Login failed. Please check credentials.');
+      setLoginError(err.message || (isAmharic ? 'የመግቢያ መረጃ የተሳሳተ ነው። እባክዎ እንደገና ይሞክሩ።' : 'Login failed. Please check credentials.'));
     } finally {
       setIsSubmittingLogin(false);
     }
   };
 
-  const handleDemoSignIn = async (roleName: 'SERVICE_OFFICER' | 'ADMIN', userCreds?: { u: string; p: string }) => {
+  const handleStationRequestResetCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotUsername.trim()) {
+      setLoginError(isAmharic ? 'እባክዎ የተጠቃሚ ስም ያስገቡ' : 'Please enter your username');
+      return;
+    }
     try {
-      setIsSubmittingLogin(true);
+      setIsProcessingForgot(true);
       setLoginError('');
-      if (userCreds) {
-        await login(userCreds.u, userCreds.p);
-      } else {
-        await demoLogin(roleName);
+      setForgotSuccessMessage('');
+      const res = await api.forgotPassword({ username: forgotUsername.trim() });
+      if (res.success) {
+        if (res.resetCode) {
+          setForgotCode(res.resetCode);
+          setGeneratedNotice(res.resetCode);
+        }
+        setForgotSuccessMessage(
+          isAmharic 
+            ? `የ6-አሃዝ ማረጋገጫ ኮድ ተፈጥሯል (ለ${res.expiresInMinutes || 15} ደቂቃ የሚሰራ)`
+            : `6-digit reset code generated (valid for ${res.expiresInMinutes || 15} minutes).`
+        );
+        setStationAuthMode('FORGOT_VERIFY');
       }
     } catch (err: any) {
-      setLoginError(err.message || 'Quick sign-in failed');
+      setLoginError(err.message || (isAmharic ? 'ኮድ መጠየቅ አልተሳካም' : 'Failed to request reset code'));
     } finally {
-      setIsSubmittingLogin(false);
+      setIsProcessingForgot(false);
+    }
+  };
+
+  const handleStationResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotCode.trim()) {
+      setLoginError(isAmharic ? 'እባክዎ የ6-አሃዝ ማረጋገጫ ኮድ ያስገቡ' : 'Please enter the 6-digit reset code');
+      return;
+    }
+    if (officerNewPassword.length < 6) {
+      setLoginError(isAmharic ? 'አዲሱ የይለፍ ቃል ቢያንስ 6 ፊደላት/ቁጥሮች መሆን አለበት' : 'New password must be at least 6 characters');
+      return;
+    }
+    if (officerNewPassword !== officerConfirmPassword) {
+      setLoginError(isAmharic ? 'የይለፍ ቃሎቹ አይመሳሰሉም' : 'Passwords do not match');
+      return;
+    }
+    try {
+      setIsProcessingForgot(true);
+      setLoginError('');
+      setForgotSuccessMessage('');
+      const res = await api.resetPassword({
+        username: forgotUsername.trim(),
+        resetCode: forgotCode.trim(),
+        newPassword: officerNewPassword
+      });
+      if (res.success) {
+        setForgotSuccessMessage(
+          isAmharic 
+            ? 'የይለፍ ቃልዎ ተቀይሯል! አሁን በአዲሱ የይለፍ ቃል መግባት ይችላሉ።'
+            : 'Password successfully updated! You can now sign in.'
+        );
+        setLoginUsername(forgotUsername.trim());
+        setLoginPassword(officerNewPassword);
+        setForgotCode('');
+        setOfficerNewPassword('');
+        setOfficerConfirmPassword('');
+        setGeneratedNotice('');
+        setStationAuthMode('LOGIN');
+      }
+    } catch (err: any) {
+      setLoginError(err.message || (isAmharic ? 'የይለፍ ቃል መቀየር አልተሳካም' : 'Failed to reset password'));
+    } finally {
+      setIsProcessingForgot(false);
     }
   };
 
@@ -216,15 +293,23 @@ export const OfficerStationView: React.FC = () => {
         <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-sm space-y-8">
           <div className="text-center max-w-xl mx-auto space-y-3">
             <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-md shadow-indigo-200">
-              <Lock className="w-7 h-7" />
+              {stationAuthMode === 'LOGIN' ? <Lock className="w-7 h-7" /> : <KeyRound className="w-7 h-7" />}
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {isAmharic ? 'የአገልግሎት ሰጪ ጣቢያ መግቢያ' : 'Officer Station Authentication'}
+              {stationAuthMode === 'LOGIN' && (isAmharic ? 'የአገልግሎት ሰጪ ጣቢያ መግቢያ' : 'Officer Station Authentication')}
+              {stationAuthMode === 'FORGOT_REQUEST' && (isAmharic ? 'የይለፍ ቃል መልሶ ማግኛ' : 'Reset Station Password')}
+              {stationAuthMode === 'FORGOT_VERIFY' && (isAmharic ? 'አዲስ የይለፍ ቃል ማዘጋጃ' : 'Set New Officer Password')}
             </h1>
             <p className="text-sm text-slate-500 leading-relaxed font-medium">
-              {isAmharic 
+              {stationAuthMode === 'LOGIN' && (isAmharic 
                 ? 'ቲኬቶችን ለመጥራት፣ ወረፋዎችን ለማስተዳደር እና የድምፅ ማስታወቂያዎችን ለማሰማት የተፈቀደላቸው አገልግሎት ሰጪዎች እና አስተዳዳሪዎች ብቻ ናቸው የሚችሉት።' 
-                : 'Only authorized and authenticated Service Officers and Administrators are permitted to call tickets, operate counter queues, and broadcast announcements.'}
+                : 'Only authorized and authenticated Service Officers and Administrators are permitted to call tickets, operate counter queues, and broadcast announcements.')}
+              {stationAuthMode === 'FORGOT_REQUEST' && (isAmharic
+                ? 'የማረጋገጫ ኮድ ለመቀበል የአገልግሎት ሰጪ መለያ የተጠቃሚ ስምዎን ያስገቡ።'
+                : 'Enter your officer username to receive a 6-digit verification reset code.')}
+              {stationAuthMode === 'FORGOT_VERIFY' && (isAmharic
+                ? 'የተላከውን 6-አሃዝ ኮድ እና አዲሱን የይለፍ ቃል ያስገቡ።'
+                : 'Enter the verification code and your new password to restore access.')}
             </p>
           </div>
 
@@ -235,85 +320,195 @@ export const OfficerStationView: React.FC = () => {
             </div>
           )}
 
-          {/* Quick 1-Click Authorized Officer Sign-In */}
-          <div className="max-w-md mx-auto space-y-3">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 text-center">
-              {isAmharic ? 'የተፈቀደላቸው አገልግሎት ሰጪዎች ፈጣን መግቢያ:' : 'Quick Sign-In as Authorized Officer:'}
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                type="button"
-                id="btn-login-officer-1"
-                disabled={isSubmittingLogin}
-                onClick={() => handleDemoSignIn('SERVICE_OFFICER', { u: 'officer1', p: 'Officer@123' })}
-                className="p-3.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-2xl text-left transition group cursor-pointer"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-600">Dawit Mengistu</span>
-                  <span className="text-[10px] font-mono font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Counter 01</span>
-                </div>
-                <p className="text-[11px] text-slate-500 mt-1">Role: SERVICE_OFFICER</p>
-              </button>
-
-              <button
-                type="button"
-                id="btn-login-officer-2"
-                disabled={isSubmittingLogin}
-                onClick={() => handleDemoSignIn('SERVICE_OFFICER', { u: 'officer2', p: 'Officer@123' })}
-                className="p-3.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-2xl text-left transition group cursor-pointer"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-600">Samrawit Bekele</span>
-                  <span className="text-[10px] font-mono font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Counter 02</span>
-                </div>
-                <p className="text-[11px] text-slate-500 mt-1">Role: SERVICE_OFFICER</p>
-              </button>
+          {forgotSuccessMessage && (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-2xl font-bold flex items-center space-x-2 max-w-md mx-auto animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+              <span>{forgotSuccessMessage}</span>
             </div>
+          )}
 
-            <button
-              type="button"
-              id="btn-login-admin"
-              disabled={isSubmittingLogin}
-              onClick={() => handleDemoSignIn('ADMIN', { u: 'admin', p: 'Admin@123' })}
-              className="w-full p-3 bg-slate-900 hover:bg-indigo-900 text-white rounded-2xl text-xs font-bold transition flex items-center justify-center space-x-2 cursor-pointer shadow-xs"
-            >
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>{isAmharic ? 'እንደ ሲስተም አስተዳዳሪ ግባ (Alemayehu Tadesse)' : 'Sign In as System Administrator'}</span>
-            </button>
-          </div>
+          {/* MODE 1: Standard Credentials Form */}
+          {stationAuthMode === 'LOGIN' && (
+            <div className="max-w-md mx-auto">
+              <p className="text-[11px] font-bold text-slate-500 text-center uppercase tracking-wider mb-4">
+                {isAmharic ? 'የተጠቃሚ ስም እና የይለፍ ቃል ያስገቡ' : 'Sign In with Authorized Credentials'}
+              </p>
+              <form onSubmit={handleInlineLogin} className="space-y-3">
+                <input
+                  type="text"
+                  placeholder={isAmharic ? 'የተጠቃሚ ስም (e.g. officer1)' : 'Username (e.g. officer1)'}
+                  value={loginUsername}
+                  onChange={(e) => setLoginUsername(e.target.value)}
+                  required
+                  className="w-full px-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-medium"
+                />
+                <div>
+                  <input
+                    type="password"
+                    placeholder={isAmharic ? 'የይለፍ ቃል (Password)' : 'Password'}
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    required
+                    className="w-full px-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-medium"
+                  />
+                  <div className="flex justify-end mt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoginError('');
+                        setForgotSuccessMessage('');
+                        setForgotUsername(loginUsername);
+                        setStationAuthMode('FORGOT_REQUEST');
+                      }}
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition cursor-pointer"
+                    >
+                      {isAmharic ? 'የይለፍ ቃል ረሱ?' : 'Forgot password?'}
+                    </button>
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  disabled={isSubmittingLogin}
+                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs"
+                >
+                  {isSubmittingLogin ? (isAmharic ? 'በመግባት ላይ...' : 'Signing In...') : (isAmharic ? 'ግባ' : 'Sign In to Station')}
+                </button>
+              </form>
+            </div>
+          )}
 
-          {/* Standard Credentials Form */}
-          <div className="max-w-md mx-auto pt-4 border-t border-slate-100">
-            <p className="text-[11px] font-bold text-slate-400 text-center uppercase tracking-wider mb-3">
-              {isAmharic ? 'ወይም የተጠቃሚ ስም እና የይለፍ ቃል ያስገቡ' : 'Or Sign In with Credentials'}
-            </p>
-            <form onSubmit={handleInlineLogin} className="space-y-3">
-              <input
-                type="text"
-                placeholder={isAmharic ? 'የተጠቃሚ ስም (e.g. officer1)' : 'Username (e.g. officer1)'}
-                value={loginUsername}
-                onChange={(e) => setLoginUsername(e.target.value)}
-                required
-                className="w-full px-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-medium"
-              />
-              <input
-                type="password"
-                placeholder={isAmharic ? 'የይለፍ ቃል (Password)' : 'Password'}
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-                required
-                className="w-full px-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-medium"
-              />
-              <button
-                type="submit"
-                disabled={isSubmittingLogin}
-                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer"
-              >
-                {isSubmittingLogin ? (isAmharic ? 'በመግባት ላይ...' : 'Signing In...') : (isAmharic ? 'ግባ' : 'Sign In to Station')}
-              </button>
-            </form>
-          </div>
+          {/* MODE 2: Request Reset Code */}
+          {stationAuthMode === 'FORGOT_REQUEST' && (
+            <div className="max-w-md mx-auto">
+              <form onSubmit={handleStationRequestResetCode} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {isAmharic ? 'የተጠቃሚ ስም (Username)' : 'Officer Username'}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    placeholder="e.g. officer1 or admin"
+                    value={forgotUsername}
+                    onChange={(e) => setForgotUsername(e.target.value)}
+                    className="w-full px-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-medium"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isProcessingForgot}
+                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs flex items-center justify-center space-x-1.5"
+                >
+                  <span>{isProcessingForgot ? (isAmharic ? 'ኮድ በመፍጠር ላይ...' : 'Generating Code...') : (isAmharic ? 'የማረጋገጫ ኮድ ላክ' : 'Get Verification Code')}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginError('');
+                    setForgotSuccessMessage('');
+                    setStationAuthMode('LOGIN');
+                  }}
+                  className="w-full py-2 text-xs font-bold text-slate-600 hover:text-slate-900 transition flex items-center justify-center space-x-1 cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>{isAmharic ? 'ወደ መግቢያ ተመለስ' : 'Back to Sign In'}</span>
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* MODE 3: Verify Code & Update Password */}
+          {stationAuthMode === 'FORGOT_VERIFY' && (
+            <div className="max-w-md mx-auto">
+              <form onSubmit={handleStationResetPassword} className="space-y-3">
+                {generatedNotice && (
+                  <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-2xl text-center space-y-1">
+                    <span className="text-[11px] font-bold text-indigo-900">{isAmharic ? 'የማረጋገጫ ኮድዎ:' : 'Reset Verification Code:'}</span>
+                    <div className="text-xl font-mono font-black text-indigo-700 tracking-widest">{generatedNotice}</div>
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {isAmharic ? 'የ6-አሃዝ ማረጋገጫ ኮድ' : '6-Digit Reset Code'}
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    required
+                    placeholder="123456"
+                    value={forgotCode}
+                    onChange={(e) => setForgotCode(e.target.value.replace(/\D/g, ''))}
+                    className="w-full px-4 py-2.5 text-sm font-mono font-bold tracking-widest text-center bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {isAmharic ? 'አዲስ የይለፍ ቃል' : 'New Password'}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showOfficerNewPassword ? 'text' : 'password'}
+                      required
+                      placeholder="At least 6 characters"
+                      value={officerNewPassword}
+                      onChange={(e) => setOfficerNewPassword(e.target.value)}
+                      className="w-full px-4 pr-10 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-medium"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowOfficerNewPassword(!showOfficerNewPassword)}
+                      className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      {showOfficerNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {isAmharic ? 'አዲሱን የይለፍ ቃል ያረጋግጡ' : 'Confirm New Password'}
+                  </label>
+                  <input
+                    type={showOfficerNewPassword ? 'text' : 'password'}
+                    required
+                    placeholder="••••••••"
+                    value={officerConfirmPassword}
+                    onChange={(e) => setOfficerConfirmPassword(e.target.value)}
+                    className="w-full px-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-medium"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isProcessingForgot}
+                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs flex items-center justify-center space-x-1.5"
+                >
+                  <span>{isProcessingForgot ? (isAmharic ? 'በመቀየር ላይ...' : 'Updating...') : (isAmharic ? 'የይለፍ ቃል ቀይር' : 'Update Password')}</span>
+                  <CheckCircle2 className="w-4 h-4" />
+                </button>
+                <div className="flex justify-between items-center text-xs pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setStationAuthMode('FORGOT_REQUEST')}
+                    className="text-slate-500 hover:text-slate-800 font-medium cursor-pointer"
+                  >
+                    {isAmharic ? 'አዲስ ኮድ ጠይቅ' : 'Request new code'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginError('');
+                      setForgotSuccessMessage('');
+                      setStationAuthMode('LOGIN');
+                    }}
+                    className="text-indigo-600 hover:text-indigo-800 font-bold cursor-pointer"
+                  >
+                    {isAmharic ? 'ወደ መግቢያ ተመለስ' : 'Back to Sign In'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -339,31 +534,15 @@ export const OfficerStationView: React.FC = () => {
           </div>
 
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 max-w-md mx-auto space-y-3">
-            <p className="text-xs font-bold text-slate-700">
-              {isAmharic ? 'የተፈቀደላቸው አገልግሎት ሰጪዎች መለያ ይቀይሩ:' : 'Switch to an Authorized Officer Account:'}
+            <p className="text-xs font-medium text-slate-600 text-center">
+              {isAmharic ? 'ወደ አገልግሎት ሰጪ መለያ ለመግባት እባክዎ መጀመሪያ ይውጡ:' : 'To sign in with an authorized officer account, please log out:'}
             </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemoSignIn('SERVICE_OFFICER', { u: 'officer1', p: 'Officer@123' })}
-                className="p-2.5 bg-white hover:bg-indigo-50 border border-slate-200 text-xs font-bold text-slate-800 rounded-xl"
-              >
-                Dawit (Counter 01)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoSignIn('SERVICE_OFFICER', { u: 'officer2', p: 'Officer@123' })}
-                className="p-2.5 bg-white hover:bg-indigo-50 border border-slate-200 text-xs font-bold text-slate-800 rounded-xl"
-              >
-                Samrawit (Counter 02)
-              </button>
-            </div>
             <button
               type="button"
               onClick={logout}
-              className="w-full py-2 text-xs font-bold text-slate-600 hover:text-slate-900"
+              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
             >
-              {isAmharic ? 'ውጣ (Logout)' : 'Log Out Current Account'}
+              {isAmharic ? 'ውጣና እንደገና ግባ (Log Out)' : 'Log Out Current Account'}
             </button>
           </div>
         </div>

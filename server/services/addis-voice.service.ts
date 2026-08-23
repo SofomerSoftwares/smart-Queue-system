@@ -1,11 +1,10 @@
 import { db } from '../db.js';
-import { geminiVoiceProvider } from './gemini-tts.service.js';
 
 export interface AudioResult {
   audioBase64?: string;
   mimeType: string;
   text: string;
-  source: 'ADDIS_AI' | 'GEMINI_TTS' | 'CACHE' | 'SYNTHESIS_FALLBACK';
+  source: 'ADDIS_AI' | 'CACHE' | 'SYNTHESIS_FALLBACK';
   voice?: string;
   provider?: string;
   durationEstimateSeconds?: number;
@@ -238,38 +237,7 @@ export class AddisAIVoiceProvider {
       }
     }
 
-    // 3. Fallback to Gemini 3.1 Flash TTS Preview
-    const geminiVoice = voice === 'abebe' || voice === 'dawit' ? 'Fenrir' : 'Kore';
-    try {
-      const geminiResult = await geminiVoiceProvider.generateSpeech(
-        cleanText,
-        language,
-        geminiVoice,
-        'gemini-3.1-flash-tts-preview'
-      );
-
-      if (geminiResult && geminiResult.audioBase64 && geminiResult.source !== 'FALLBACK_SYNTHESIS') {
-        this.cache.set(cacheKey, {
-          audioBase64: geminiResult.audioBase64,
-          mimeType: geminiResult.mimeType || 'audio/wav',
-          timestamp: Date.now()
-        });
-
-        return {
-          audioBase64: geminiResult.audioBase64,
-          mimeType: geminiResult.mimeType || 'audio/wav',
-          text: cleanText,
-          source: 'ADDIS_AI',
-          voice,
-          provider: 'Addis AI Voice (Engine)',
-          durationEstimateSeconds: geminiResult.durationEstimateSeconds || 4
-        };
-      }
-    } catch {
-      // Graceful fallback to client-side chime synthesis
-    }
-
-    // 4. Zero-dependency audio chime announcement
+    // 3. Zero-dependency audio chime announcement (with client browser synthesis)
     return {
       audioBase64: this.defaultChimeBase64,
       mimeType: 'audio/wav',

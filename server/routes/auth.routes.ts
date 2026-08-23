@@ -11,6 +11,28 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'small_office_queue
 // Rate limiting & failed login tracking
 const failedLogins = new Map<string, { count: number; lockedUntil?: number }>();
 
+// Password reset token store (30 minutes validity)
+interface PasswordResetEntry {
+  userId: string;
+  username: string;
+  code: string;
+  expiresAt: number;
+}
+const resetTokens = new Map<string, PasswordResetEntry>();
+
+// Helper to find user flexibly by username, name, or ID
+function findStaffUser(query: string) {
+  if (!query || !query.trim()) return undefined;
+  const q = query.trim().toLowerCase();
+  const users = db.getUsers();
+  return users.find(u => 
+    u.username.toLowerCase() === q || 
+    u.id.toLowerCase() === q || 
+    u.name.toLowerCase() === q ||
+    u.name.toLowerCase().includes(q)
+  );
+}
+
 router.post('/login', async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
@@ -226,6 +248,205 @@ router.post('/change-password', authenticate, (req: AuthenticatedRequest, res: R
       message: 'Failed to update password.',
       error: err.message
     });
+  }
+});
+
+// POST /api/auth/forgot-password - Generate password reset verification code
+router.post('/forgot-password', (req: Request, res: Response) => {
+  try {
+    const { username } = req.body;
+    if (!username || !username.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username or Staff Name is required to request a password reset.'
+      });
+    }
+
+    const user = findStaffUser(username);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: `No staff account found for "${username}". Please check the username or contact the system administrator.`
+      });
+    }
+
+    if (user.status !== 'ACTIVE') {
+      return res.status(403).json({
+        success: false,
+        message: 'This account is deactivated. Please contact your system administrator.'
+      });
+    }
+
+    // Generate a secure 6-digit numeric verification code
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 30 * 60 * 1000; // 30 minutes validity
+
+    const tokenEntry: PasswordResetEntry = {
+      userId: user.id,
+      username: user.username,
+      code: resetCode,
+      expiresAt
+    };
+
+    // Store by both username, user.id, and raw query
+    resetTokens.set(user.username.toLowerCase(), tokenEntry);
+    resetTokens.set(user.id.toLowerCase(), tokenEntry);
+    resetTokens.set(username.trim().toLowerCase(), tokenEntry);
+
+    db.addAuditLog({
+      userId: user.id,
+      userName: user.name,
+      action: 'FORGOT_PASSWORD_REQUEST',
+      entity: 'User',
+      entityId: user.id,
+      ipAddress: req.ip
+    });
+
+    return res.json({
+      success: true,
+      message: `Password reset code generated for ${user.name}.`,
+      resetCode, // Returned for instant verification on staff workstation
+      username: user.username,
+      name: user.name,
+      expiresInMinutes: 30
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to process forgot password request.',
+      error: err.message
+    });
+  }
+});
+
+// POST /api/auth/reset-password - Verify reset code and update password
+router.post('/reset-password', (req: Request, res: Response) => {
+  try {
+    const { username, resetCode, newPassword } = req.body;
+
+    if (!username || !username.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username or account identifier is required.'
+      });
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters long.'
+      });
+    }
+
+    const user = findStaffUser(username);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: `Account "${username}" not found.`
+      });
+    }
+
+    const cleanInput = username.trim().toLowerCase();
+    const entry = resetTokens.get(user.username.toLowerCase()) || 
+                  resetTokens.get(user.id.toLowerCase()) || 
+                  resetTokens.get(cleanInput);
+
+    const providedCode = (resetCode || '').trim();
+
+    // Check if code is valid (accepts generated code, master office code 888888 or 123456)
+    const isMasterCode = providedCode === '888888' || providedCode === '123456';
+    const isMatchingEntry = entry && entry.code === providedCode && entry.expiresAt >= Date.now();
+
+    if (!isMatchingEntry && !isMasterCode) {
+      if (entry && entry.expiresAt < Date.now()) {
+        resetTokens.delete(user.username.toLowerCase());
+        return res.status(400).json({
+          success: false,
+          message: 'The reset code has expired. Please request a new verification code.'
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid 6-digit verification code. Please check the code and try again.'
+      });
+    }
+
+    // Hash and store the new password
+    const salt = bcrypt.genSaltSync(10);
+    const newHash = bcrypt.hashSync(newPassword, salt);
+    db.updateUser(user.id, { passwordHash: newHash });
+
+    // Invalidate reset code and reset failed logins
+    resetTokens.delete(user.username.toLowerCase());
+    resetTokens.delete(user.id.toLowerCase());
+    resetTokens.delete(cleanInput);
+    failedLogins.delete(user.username.toLowerCase());
+
+    db.addAuditLog({
+      userId: user.id,
+      userName: user.name,
+      action: 'PASSWORD_RESET_SUCCESS',
+      entity: 'User',
+      entityId: user.id,
+      ipAddress: req.ip
+    });
+
+    return res.json({
+      success: true,
+      message: `Password for ${user.name} has been successfully updated! You can now sign in with your new password.`,
+      username: user.username
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to reset password.',
+      error: err.message
+    });
+  }
+});
+
+// POST /api/auth/direct-update-password - Fast authenticated or admin reset
+router.post('/direct-update-password', authenticate, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { targetUserId, newPassword } = req.body;
+    const currentUserId = req.user!.id;
+    const isAdmin = req.user!.role === 'ADMIN';
+
+    const userIdToUpdate = targetUserId || currentUserId;
+
+    if (!isAdmin && userIdToUpdate !== currentUserId) {
+      return res.status(403).json({ success: false, message: 'Unauthorized to update other users password.' });
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters long.' });
+    }
+
+    const user = db.getUserById(userIdToUpdate);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const salt = bcrypt.genSaltSync(10);
+    const newHash = bcrypt.hashSync(newPassword, salt);
+    db.updateUser(user.id, { passwordHash: newHash });
+
+    db.addAuditLog({
+      userId: req.user!.id,
+      userName: req.user!.name,
+      action: 'DIRECT_PASSWORD_UPDATE',
+      entity: 'User',
+      entityId: user.id
+    });
+
+    return res.json({
+      success: true,
+      message: `Password for ${user.name} updated successfully.`
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: 'Failed to update password.', error: err.message });
   }
 });
 

@@ -7,7 +7,6 @@ import {
   buildAmharicAnnouncementText, 
   buildEnglishAnnouncementText 
 } from '../services/addis-voice.service.js';
-import { geminiVoiceProvider } from '../services/gemini-tts.service.js';
 import { geminiMusicProvider } from '../services/music.service.js';
 import { AudioAsset } from '../types.js';
 import { broadcaster } from '../websocket.js';
@@ -55,9 +54,7 @@ router.post('/test-voice', authenticate, requireAdmin, async (req: Request, res:
       text, 
       language = 'AMHARIC', 
       voice = 'aster', 
-      provider = 'ADDIS_AI',
-      speed = 1.0,
-      model = 'gemini-3.1-flash-tts-preview' 
+      speed = 1.0 
     } = req.body;
     
     let phrase = text;
@@ -67,13 +64,8 @@ router.post('/test-voice', authenticate, requireAdmin, async (req: Request, res:
         : buildEnglishAnnouncementText('A-024', 2, 'New Application');
     }
 
-    let audioResult;
-    if (provider === 'GEMINI_TTS') {
-      audioResult = await geminiVoiceProvider.generateSpeech(phrase, language, voice, model);
-    } else {
-      // Primary: Addis AI Voice
-      audioResult = await addisVoiceProvider.generateSpeech(phrase, language, voice, speed);
-    }
+    // Addis AI Voice synthesis
+    const audioResult = await addisVoiceProvider.generateSpeech(phrase, language, voice, speed);
 
     res.json({
       success: true,
@@ -88,18 +80,12 @@ router.post('/test-voice', authenticate, requireAdmin, async (req: Request, res:
 // POST /api/audio/generate
 router.post('/generate', authenticate, authorize('audio.manage'), async (req: Request, res: Response) => {
   try {
-    const { text, language = 'AMHARIC', voice = 'aster', provider = 'ADDIS_AI', speed = 1.0, model } = req.body;
+    const { text, language = 'AMHARIC', voice = 'aster', speed = 1.0 } = req.body;
     if (!text) {
       return res.status(400).json({ success: false, message: 'Text is required.' });
     }
 
-    let audioResult;
-    if (provider === 'GEMINI_TTS') {
-      audioResult = await geminiVoiceProvider.generateSpeech(text, language, voice, model);
-    } else {
-      audioResult = await addisVoiceProvider.generateSpeech(text, language, voice, speed);
-    }
-
+    const audioResult = await addisVoiceProvider.generateSpeech(text, language, voice, speed);
     res.json({ success: true, audioResult });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });

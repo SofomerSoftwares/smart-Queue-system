@@ -55,6 +55,31 @@ export const api = {
       body: JSON.stringify(passwords)
     }),
 
+  forgotPassword: (data: { username: string }) =>
+    request<{ 
+      success: boolean; 
+      message: string; 
+      resetCode?: string; 
+      username?: string; 
+      name?: string; 
+      expiresInMinutes?: number; 
+    }>('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+
+  resetPassword: (data: { username: string; resetCode: string; newPassword: string }) =>
+    request<{ success: boolean; message: string; username?: string }>('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+
+  directUpdatePassword: (data: { targetUserId?: string; newPassword: string }) =>
+    request<{ success: boolean; message: string }>('/api/auth/direct-update-password', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+
   // --- QUEUE ---
   getQueueStatus: () =>
     request<{
@@ -200,6 +225,12 @@ export const api = {
     request<{ success: boolean; user: User }>(`/api/users/${id}`, {
       method: 'PUT',
       body: JSON.stringify(userData)
+    }),
+
+  adminResetUserPassword: (id: string, newPassword: string) =>
+    request<{ success: boolean; message: string }>(`/api/users/${id}/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({ newPassword })
     }),
 
   deleteUser: (id: string) =>

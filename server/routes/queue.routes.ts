@@ -5,10 +5,9 @@ import { broadcaster } from '../websocket.js';
 import { 
   addisVoiceProvider, 
   buildAmharicAnnouncementText, 
-  buildEnglishAnnouncementText,
+  buildEnglishAnnouncementText, 
   getAmharicTicketNumber 
 } from '../services/addis-voice.service.js';
-import { geminiVoiceProvider } from '../services/gemini-tts.service.js';
 import { AnnouncementPayload } from '../types.js';
 
 const router = Router();
@@ -43,26 +42,14 @@ async function triggerVoiceAnnouncement(
       timestamp: new Date().toISOString()
     };
 
-    // Asynchronous Voice generation via Addis AI Voice (or configured provider)
+    // Asynchronous Voice generation via Addis AI Voice
     const speechText = audioSettings.language === 'ENGLISH' ? textEnglish : textAmharic;
-    let audioResult;
-
-    if (audioSettings.ttsProvider === 'GEMINI_TTS') {
-      audioResult = await geminiVoiceProvider.generateSpeech(
-        speechText,
-        audioSettings.language,
-        audioSettings.ttsVoice,
-        audioSettings.ttsModel
-      );
-    } else {
-      // Primary: Addis AI Voice
-      audioResult = await addisVoiceProvider.generateSpeech(
-        speechText,
-        audioSettings.language,
-        audioSettings.addisVoice || 'aster',
-        audioSettings.addisAiSpeed || 1.0
-      );
-    }
+    const audioResult = await addisVoiceProvider.generateSpeech(
+      speechText,
+      audioSettings.language,
+      audioSettings.addisVoice || 'aster',
+      audioSettings.addisAiSpeed || 1.0
+    );
 
     if (audioResult && audioResult.audioBase64) {
       payload.audioBase64 = audioResult.audioBase64;
