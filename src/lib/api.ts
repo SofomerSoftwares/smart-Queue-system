@@ -185,7 +185,7 @@ export const api = {
     request<{
       success: boolean;
       text: string;
-      audioResult: { audioBase64?: string; mimeType: string; source: string; voice?: string; provider?: string };
+      audioResult: { audioBase64?: string; mimeType: string; source: string; voice?: string; provider?: string; phoneticText?: string };
     }>('/api/audio/test-voice', {
       method: 'POST',
       body: JSON.stringify(data)

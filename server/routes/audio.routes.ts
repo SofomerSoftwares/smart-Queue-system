@@ -5,7 +5,8 @@ import {
   addisVoiceProvider,
   ADDIS_AI_VOICES, 
   buildAmharicAnnouncementText, 
-  buildEnglishAnnouncementText 
+  buildEnglishAnnouncementText,
+  buildPhoneticAnnouncementText
 } from '../services/addis-voice.service.js';
 import { geminiMusicProvider, getLocalPresetTracks } from '../services/music.service.js';
 import { AudioAsset } from '../types.js';

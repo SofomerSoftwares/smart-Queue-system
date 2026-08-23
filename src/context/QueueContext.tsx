@@ -210,7 +210,8 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 textToSpeak,
                 announcement.audioBase64,
                 announcement.audioMimeType || 'audio/wav',
-                audioSettingRef.current?.volume || 85
+                audioSettingRef.current?.volume || 85,
+                announcement.phoneticText
               );
             }
           }

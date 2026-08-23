@@ -190,6 +190,7 @@ export const AdminView: React.FC = () => {
   const handleTestVoice = async () => {
     try {
       setIsTestingVoice(true);
+      audioManager.initContext();
       setTestVoiceStatus(isAmharic ? 'በአዲስ AI (Addis AI) ድምፅ በማመንጨት ላይ...' : 'Synthesizing with Addis AI Voice...');
       const res = await api.testVoice({
         text: testVoiceText,
@@ -205,7 +206,8 @@ export const AdminView: React.FC = () => {
           testVoiceText,
           res.audioResult?.audioBase64,
           res.audioResult?.mimeType || 'audio/wav',
-          audioForm.volume || 85
+          audioForm.volume || 85,
+          res.audioResult?.phoneticText
         );
         setTestVoiceStatus(isAmharic ? 'ድምፅ ተጠናቅቋል' : 'Voice playback finished');
         setTimeout(() => setTestVoiceStatus(''), 2500);

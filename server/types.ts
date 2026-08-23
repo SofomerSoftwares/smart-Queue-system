@@ -186,7 +186,9 @@ export interface AnnouncementPayload {
   language: AnnouncementLanguage;
   textAmharic: string;
   textEnglish: string;
+  phoneticText?: string;
   audioBase64?: string;
   audioMimeType?: string;
+  source?: 'ADDIS_AI' | 'GEMINI_TTS' | 'CACHE' | 'SYNTHESIS_FALLBACK';
   timestamp: string;
 }

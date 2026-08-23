@@ -6,6 +6,7 @@ import {
   addisVoiceProvider, 
   buildAmharicAnnouncementText, 
   buildEnglishAnnouncementText, 
+  buildPhoneticAnnouncementText,
   getAmharicTicketNumber 
 } from '../services/addis-voice.service.js';
 import { AnnouncementPayload } from '../types.js';
@@ -27,9 +28,10 @@ async function triggerVoiceAnnouncement(
 
     const textAmharic = buildAmharicAnnouncementText(ticketNumber, counterNumber, serviceNameAmharic);
     const textEnglish = buildEnglishAnnouncementText(ticketNumber, counterNumber, serviceName);
+    const phoneticText = buildPhoneticAnnouncementText(ticketNumber, counterNumber, serviceName);
     const ticketAmharic = getAmharicTicketNumber(ticketNumber);
 
-    // Initial announcement broadcast immediately so display shows visual highlight
+    // Initial announcement payload
     const payload: AnnouncementPayload = {
       ticketNumber,
       ticketNumberAmharic: ticketAmharic,
@@ -39,10 +41,11 @@ async function triggerVoiceAnnouncement(
       language: audioSettings.language,
       textAmharic,
       textEnglish,
+      phoneticText,
       timestamp: new Date().toISOString()
     };
 
-    // Asynchronous Voice generation via Addis AI Voice
+    // Asynchronous Voice generation via Addis AI Voice / Gemini TTS
     const speechText = audioSettings.language === 'ENGLISH' ? textEnglish : textAmharic;
     const audioResult = await addisVoiceProvider.generateSpeech(
       speechText,
@@ -51,9 +54,12 @@ async function triggerVoiceAnnouncement(
       audioSettings.addisAiSpeed || 1.0
     );
 
-    if (audioResult && audioResult.audioBase64) {
-      payload.audioBase64 = audioResult.audioBase64;
-      payload.audioMimeType = audioResult.mimeType;
+    if (audioResult) {
+      if (audioResult.audioBase64) {
+        payload.audioBase64 = audioResult.audioBase64;
+        payload.audioMimeType = audioResult.mimeType;
+      }
+      payload.source = audioResult.source;
     }
 
     // Broadcast announcement to all listening displays and staff

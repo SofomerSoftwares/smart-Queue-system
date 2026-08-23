@@ -1,10 +1,12 @@
+import { GoogleGenAI, Modality } from '@google/genai';
 import { db } from '../db.js';
 
 export interface AudioResult {
   audioBase64?: string;
   mimeType: string;
   text: string;
-  source: 'ADDIS_AI' | 'CACHE' | 'SYNTHESIS_FALLBACK';
+  phoneticText?: string;
+  source: 'ADDIS_AI' | 'GEMINI_TTS' | 'CACHE' | 'SYNTHESIS_FALLBACK';
   voice?: string;
   provider?: string;
   durationEstimateSeconds?: number;
@@ -15,6 +17,7 @@ export interface AddisVoiceOption {
   name: string;
   nameAmharic: string;
   gender: 'FEMALE' | 'MALE';
+  geminiVoice: string;
   description: string;
   descriptionAmharic: string;
 }
@@ -25,6 +28,7 @@ export const ADDIS_AI_VOICES: AddisVoiceOption[] = [
     name: 'Aster (Natural Amharic)',
     nameAmharic: 'አስቴር (የተረጋጋ የሴት ድምፅ)',
     gender: 'FEMALE',
+    geminiVoice: 'Kore',
     description: 'Crisp, calm female Amharic voice optimized for public halls and counters',
     descriptionAmharic: 'ለአዳራሽ እና ለቆጣሪ ጥሪዎች የተዘጋጀ የሴት ድምፅ'
   },
@@ -33,6 +37,7 @@ export const ADDIS_AI_VOICES: AddisVoiceOption[] = [
     name: 'Abebe (Clear Amharic)',
     nameAmharic: 'አበበ (ግልፅ የወንድ ድምፅ)',
     gender: 'MALE',
+    geminiVoice: 'Charon',
     description: 'Deep and clear male Amharic voice with high speech intelligibility',
     descriptionAmharic: 'ግልፅ እና ጎላ ያለ ይፋዊ የወንድ ድምፅ'
   },
@@ -41,6 +46,7 @@ export const ADDIS_AI_VOICES: AddisVoiceOption[] = [
     name: 'Selam (Expressive Amharic)',
     nameAmharic: 'ሰላም (ደማቅ የሴት ድምፅ)',
     gender: 'FEMALE',
+    geminiVoice: 'Zephyr',
     description: 'Warm and welcoming female voice for customer service desks',
     descriptionAmharic: 'ሞቅ ያለ እና እንግዳ ተቀባይ የሴት ድምፅ'
   },
@@ -49,6 +55,7 @@ export const ADDIS_AI_VOICES: AddisVoiceOption[] = [
     name: 'Dawit (Official Amharic)',
     nameAmharic: 'ዳዊት (ይፋዊ የወንድ ድምፅ)',
     gender: 'MALE',
+    geminiVoice: 'Puck',
     description: 'Authoritative and formal male voice suitable for government and banking',
     descriptionAmharic: 'ለመንግስት እና ለባንክ ተቋማት የሚመጥን የወንድ ድምፅ'
   }
@@ -70,6 +77,37 @@ export const PREFIX_TO_AMHARIC: Record<string, string> = {
   T: 'ተ',
   W: 'ወ',
   Z: 'ዘ'
+};
+
+export const PREFIX_TO_PHONETIC: Record<string, string> = {
+  A: 'Ha',
+  B: 'Le',
+  C: 'Che',
+  D: 'De',
+  E: 'Ah',
+  F: 'Fe',
+  G: 'Ge',
+  H: 'Hha',
+  P: 'Pa',
+  R: 'Re',
+  S: 'Se',
+  T: 'Te',
+  W: 'We',
+  Z: 'Ze',
+  'ሀ': 'Ha',
+  'ለ': 'Le',
+  'ቸ': 'Che',
+  'ደ': 'De',
+  'አ': 'Ah',
+  'ፈ': 'Fe',
+  'ገ': 'Ge',
+  'ሐ': 'Hha',
+  'ፓ': 'Pa',
+  'ረ': 'Re',
+  'ሰ': 'Se',
+  'ተ': 'Te',
+  'ወ': 'We',
+  'ዘ': 'Ze'
 };
 
 export function getAmharicTicketNumber(ticketNumber: string): string {
@@ -98,46 +136,46 @@ export function buildEnglishAnnouncementText(ticketNumber: string, counterNumber
   return `Ticket number ${ticketNumber}, please proceed to Counter ${counterNumber}.`;
 }
 
-/**
- * Generates an audio chime + acoustic notification WAV buffer
- */
-function createChimeWavBase64(sampleRate: number = 22050): string {
-  const duration = 1.2;
-  const numSamples = Math.floor(sampleRate * duration);
-  const buffer = Buffer.alloc(44 + numSamples * 2);
-
-  // RIFF header
-  buffer.write('RIFF', 0);
-  buffer.writeUInt32LE(36 + numSamples * 2, 4);
-  buffer.write('WAVE', 8);
-  buffer.write('fmt ', 12);
-  buffer.writeUInt32LE(16, 16);
-  buffer.writeUInt16LE(1, 20); // PCM
-  buffer.writeUInt16LE(1, 22); // mono
-  buffer.writeUInt32LE(sampleRate, 24);
-  buffer.writeUInt32LE(sampleRate * 2, 28);
-  buffer.writeUInt16LE(2, 32);
-  buffer.writeUInt16LE(16, 34);
-  buffer.write('data', 36);
-  buffer.writeUInt32LE(numSamples * 2, 40);
-
-  // Two-tone chime: 587.33 Hz (D5) then 880 Hz (A5)
-  for (let i = 0; i < numSamples; i++) {
-    const t = i / sampleRate;
-    let sample = 0;
-    if (t < 0.45) {
-      const decay = Math.exp(-t * 5.0);
-      sample = Math.sin(2 * Math.PI * 587.33 * t) * decay * 0.7;
-    } else {
-      const t2 = t - 0.45;
-      const decay = Math.exp(-t2 * 4.0);
-      sample = Math.sin(2 * Math.PI * 880.0 * t2) * decay * 0.85;
-    }
-    const intSample = Math.max(-32768, Math.min(32767, Math.floor(sample * 30000)));
-    buffer.writeInt16LE(intSample, 44 + i * 2);
+export function buildPhoneticAnnouncementText(ticketNumber: string, counterNumber: number, serviceName?: string): string {
+  const parts = ticketNumber.split('-');
+  let prefixPhonetic = parts[0];
+  let numPart = parts[1] || '';
+  if (parts.length === 2) {
+    prefixPhonetic = PREFIX_TO_PHONETIC[parts[0].toUpperCase()] || parts[0];
   }
 
-  return buffer.toString('base64');
+  // Spaced digits for clarity in speech (e.g. 024 -> 0 2 4)
+  const spacedDigits = numPart.split('').join(' ');
+  const serviceText = serviceName ? ` for ${serviceName}` : '';
+
+  return `Kutir ${prefixPhonetic} ${spacedDigits} yalachu denbenya, ibakiwo wode kotari ${counterNumber} yihidu. Ticket number ${parts[0]}-${numPart}${serviceText}, please proceed to counter ${counterNumber}.`;
+}
+
+/**
+ * Wraps raw 16-bit PCM audio samples in a standard 44-byte RIFF/WAVE header
+ */
+function pcmToWavBase64(pcmBuffer: Buffer, sampleRate: number = 24000, channels: number = 1, bitsPerSample: number = 16): string {
+  const byteRate = (sampleRate * channels * bitsPerSample) / 8;
+  const blockAlign = (channels * bitsPerSample) / 8;
+  const dataSize = pcmBuffer.length;
+  const chunkSize = 36 + dataSize;
+
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(chunkSize, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20); // PCM format
+  header.writeUInt16LE(channels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(dataSize, 40);
+
+  return Buffer.concat([header, pcmBuffer]).toString('base64');
 }
 
 /**
@@ -146,10 +184,13 @@ function createChimeWavBase64(sampleRate: number = 22050): string {
  */
 export class AddisAIVoiceProvider {
   private cache = new Map<string, { audioBase64: string; mimeType: string; timestamp: number }>();
-  private defaultChimeBase64: string;
+  private aiClient: GoogleGenAI | null = null;
 
-  constructor() {
-    this.defaultChimeBase64 = createChimeWavBase64();
+  private getGenAI(): GoogleGenAI | null {
+    if (!this.aiClient && process.env.GEMINI_API_KEY) {
+      this.aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    }
+    return this.aiClient;
   }
 
   /**
@@ -158,11 +199,11 @@ export class AddisAIVoiceProvider {
   public async generateSpeech(
     text: string,
     language: string = 'AMHARIC',
-    voice: string = 'aster',
+    voiceId: string = 'aster',
     speed: number = 1.0
   ): Promise<AudioResult> {
     const cleanText = text.trim();
-    const cacheKey = `ADDIS_AI:${language}:${voice}:${speed}:${cleanText.toLowerCase()}`;
+    const cacheKey = `ADDIS_VOICE:${language}:${voiceId}:${speed}:${cleanText.toLowerCase()}`;
 
     // 1. Check in-memory persistent cache
     const cached = this.cache.get(cacheKey);
@@ -172,22 +213,24 @@ export class AddisAIVoiceProvider {
         mimeType: cached.mimeType,
         text: cleanText,
         source: 'CACHE',
-        voice,
-        provider: 'Addis AI Voice',
+        voice: voiceId,
+        provider: 'Addis AI Voice Engine (Cached)',
         durationEstimateSeconds: 4
       };
     }
 
-    // 2. Try calling Addis AI Voice API if API key or endpoint is configured
+    const matchedVoice = ADDIS_AI_VOICES.find(v => v.id === voiceId) || ADDIS_AI_VOICES[0];
+
+    // 2. Try calling Addis AI Voice API if API key or custom endpoint is configured
     const setting = db.getAudioSetting();
     const apiKey = (setting as any)?.addisAiApiKey || process.env.ADDIS_AI_API_KEY;
     const endpoint = setting?.addisAiEndpoint || process.env.ADDIS_AI_ENDPOINT || 'https://api.addis.ai/v1/tts';
 
     if (apiKey && apiKey !== 'MY_ADDIS_AI_API_KEY' && apiKey.trim().length > 0) {
       try {
-        console.log(`🎙️ [Addis AI Voice] Requesting Amharic speech from ${endpoint} (voice: ${voice})...`);
+        console.log(`🎙️ [Addis AI Voice] Requesting Amharic speech from ${endpoint} (voice: ${voiceId})...`);
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 7000);
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
 
         const response = await fetch(endpoint, {
           method: 'POST',
@@ -197,7 +240,7 @@ export class AddisAIVoiceProvider {
           },
           body: JSON.stringify({
             text: cleanText,
-            voice: voice || 'aster',
+            voice: voiceId || 'aster',
             language: language === 'AMHARIC' ? 'am' : 'en',
             speed: speed || 1.0,
             format: 'mp3'
@@ -223,28 +266,82 @@ export class AddisAIVoiceProvider {
               mimeType,
               text: cleanText,
               source: 'ADDIS_AI',
-              voice,
-              provider: 'Addis AI Voice',
+              voice: voiceId,
+              provider: `Addis AI (${matchedVoice.name})`,
               durationEstimateSeconds: 5
             };
           }
-        } else {
-          const errText = await response.text().catch(() => '');
-          console.warn(`⚠️ [Addis AI Voice] API returned status ${response.status}: ${errText.slice(0, 100)}`);
         }
       } catch (err: any) {
-        console.warn(`⚠️ [Addis AI Voice] Remote API response notice (${err.message}). Using fallback speech generation.`);
+        console.warn(`⚠️ [Addis AI Voice] Remote API response notice (${err.message}). Trying Gemini TTS engine.`);
       }
     }
 
-    // 3. Zero-dependency audio chime announcement (with client browser synthesis)
+    // 3. Try Gemini Text-to-Speech API
+    const ai = this.getGenAI();
+    if (ai) {
+      try {
+        console.log(`🎙️ [Gemini TTS Engine] Synthesizing announcement voice (${matchedVoice.geminiVoice})...`);
+        const promptInstruction = language === 'AMHARIC'
+          ? `Read the following queue announcement clearly in a professional public service announcement tone: "${cleanText}"`
+          : `Read the following queue announcement clearly and politely: "${cleanText}"`;
+
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.1-flash-tts-preview',
+          contents: [{ parts: [{ text: promptInstruction }] }],
+          config: {
+            responseModalities: [Modality.AUDIO],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: matchedVoice.geminiVoice }
+              }
+            }
+          }
+        });
+
+        const part = response.candidates?.[0]?.content?.parts?.[0];
+        const rawAudioBase64 = part?.inlineData?.data;
+        const responseMime = part?.inlineData?.mimeType || 'audio/pcm;rate=24000';
+
+        if (rawAudioBase64 && rawAudioBase64.length > 0) {
+          let playableBase64 = rawAudioBase64;
+          let finalMime = responseMime;
+
+          // Convert raw PCM into standard WAV container if needed
+          if (responseMime.includes('pcm') || !responseMime.includes('wav') && !responseMime.includes('mp3')) {
+            const rawPcm = Buffer.from(rawAudioBase64, 'base64');
+            playableBase64 = pcmToWavBase64(rawPcm, 24000, 1, 16);
+            finalMime = 'audio/wav';
+          }
+
+          this.cache.set(cacheKey, {
+            audioBase64: playableBase64,
+            mimeType: finalMime,
+            timestamp: Date.now()
+          });
+
+          return {
+            audioBase64: playableBase64,
+            mimeType: finalMime,
+            text: cleanText,
+            source: 'GEMINI_TTS',
+            voice: voiceId,
+            provider: `Addis AI Voice • Powered by Gemini (${matchedVoice.name})`,
+            durationEstimateSeconds: 4
+          };
+        }
+      } catch (err: any) {
+        console.warn(`⚠️ [Gemini TTS Engine] Notice (${err.message}). Using client speech synthesis fallback.`);
+      }
+    }
+
+    // 4. Fallback for client-side browser speech synthesis & acoustic announcement
     return {
-      audioBase64: this.defaultChimeBase64,
-      mimeType: 'audio/wav',
       text: cleanText,
+      mimeType: 'audio/wav',
       source: 'SYNTHESIS_FALLBACK',
-      voice,
-      provider: 'Addis AI Voice',
+      voice: voiceId,
+      provider: 'Addis AI Voice (Browser Synthesis)',
       durationEstimateSeconds: 3
     };
   }

@@ -1,4 +1,55 @@
-// Audio Manager coordinating Background Music and Gemini Voice Announcements
+// Audio Manager coordinating Background Music and Addis AI Voice Announcements
+
+// Amharic to phonetic pronunciation dictionary for browsers without native Amharic TTS
+const AMHARIC_PHONETIC_MAP: Record<string, string> = {
+  'ቁጥር': 'Kutir',
+  'ያላችሁ': 'yalachu',
+  'ደንበኛ': 'denbenya',
+  'እባክዎ': 'ibakiwo',
+  'ወደ': 'wode',
+  'ቆጣሪ': 'kotari',
+  'ይሂዱ': 'yihidu',
+  'አዲስ': 'Addis',
+  'ማመልከቻ': 'mamelkecha',
+  'ክፍያ': 'kifiya',
+  'ምዝገባ': 'mizgeba',
+  'ማረጋገጫ': 'maregagecha',
+  'ፈጣን': 'fetan',
+  'አገልግሎት': 'ageliglot',
+  'ሀ': 'Ha',
+  'ለ': 'Le',
+  'ሐ': 'Hha',
+  'መ': 'Me',
+  'ረ': 'Re',
+  'ሰ': 'Se',
+  'ቀ': 'Ke',
+  'በ': 'Be',
+  'ተ': 'Te',
+  'ቸ': 'Che',
+  'ነ': 'Ne',
+  'አ': 'Ah',
+  'ከ': 'Ke',
+  'ወ': 'We',
+  'ዘ': 'Ze',
+  'የ': 'Ye',
+  'ደ': 'De',
+  'ገ': 'Ge',
+  'ጠ': 'Te',
+  'ጨ': 'Che',
+  'ጰ': 'Pe',
+  'ጸ': 'Tse',
+  'ፈ': 'Fe',
+  'ፓ': 'Pa'
+};
+
+export function transliterateAmharicToPhonetic(text: string): string {
+  let result = text;
+  // Replace full keywords first
+  Object.keys(AMHARIC_PHONETIC_MAP).forEach((key) => {
+    result = result.split(key).join(AMHARIC_PHONETIC_MAP[key]);
+  });
+  return result;
+}
 
 class AudioManager {
   private audioCtx: AudioContext | null = null;
@@ -8,8 +59,10 @@ class AudioManager {
   private ambientOscillatorNodes: OscillatorNode[] = [];
   private ambientGainNode: GainNode | null = null;
   private isAmbientSynthRunning = false;
+  private previewAudioEl: HTMLAudioElement | null = null;
+  private currentMusicUrl: string | null = null;
 
-  private initContext(): AudioContext {
+  public initContext(): AudioContext {
     if (!this.audioCtx) {
       const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
       this.audioCtx = new AudioCtxClass();
@@ -47,18 +100,19 @@ class AudioManager {
         osc.stop(now + idx * 0.12 + 0.85);
       });
 
-      await new Promise(r => setTimeout(r, 600));
+      await new Promise(r => setTimeout(r, 650));
     } catch (err) {
       console.warn('Chime audio error:', err);
     }
   }
 
-  // Play announcement with music ducking (pause music -> play voice -> wait -> resume music)
+  // Play announcement with music ducking (pause music -> play chime -> play voice -> resume music)
   public async playAnnouncement(
     text: string, 
     audioBase64?: string, 
     mimeType: string = 'audio/wav',
-    volume: number = 85
+    volume: number = 85,
+    phoneticText?: string
   ): Promise<void> {
     // 1. Pause background music if active
     const wasMusicPlaying = this.isMusicPlaying;
@@ -67,18 +121,21 @@ class AudioManager {
     }
 
     try {
-      // 2. Play chime
+      // 2. Play lobby chime
       await this.playChime();
 
       // 3. Play voice
+      let playedSuccessfully = false;
       if (audioBase64 && audioBase64.trim().length > 0) {
-        await this.playBase64Audio(audioBase64, mimeType, volume);
-      } else {
-        // Fallback to browser Web Speech API
-        await this.playBrowserSpeech(text, volume);
+        playedSuccessfully = await this.playBase64Audio(audioBase64, mimeType, volume);
+      }
+      
+      if (!playedSuccessfully) {
+        // Fallback to browser Web Speech API with Amharic / Phonetic handling
+        await this.playBrowserSpeech(text, volume, phoneticText);
       }
     } catch (err) {
-      console.warn('Announcement playback error:', err);
+      console.warn('Announcement playback notice:', err);
     } finally {
       // 4. Smoothly resume background music after short pause
       if (wasMusicPlaying) {
@@ -89,10 +146,10 @@ class AudioManager {
     }
   }
 
-  private playBase64Audio(base64Data: string, mimeType: string, volume: number): Promise<void> {
+  private playBase64Audio(base64Data: string, mimeType: string, volume: number): Promise<boolean> {
     return new Promise((resolve) => {
       if (!base64Data || base64Data.trim() === '') {
-        return resolve();
+        return resolve(false);
       }
 
       try {
@@ -113,61 +170,123 @@ class AudioManager {
         this.currentVoiceAudioEl = audio;
         audio.volume = Math.max(0.1, Math.min(1.0, volume / 100));
 
-        let isFinished = false;
-        const finish = () => {
-          if (!isFinished) {
-            isFinished = true;
+        let isSettled = false;
+        const cleanup = (success: boolean) => {
+          if (!isSettled) {
+            isSettled = true;
             this.currentVoiceAudioEl = null;
-            resolve();
+            resolve(success);
           }
         };
 
-        audio.onended = finish;
+        // Timeout safety
+        const timeout = setTimeout(() => {
+          cleanup(true);
+        }, 15000);
+
+        audio.onended = () => {
+          clearTimeout(timeout);
+          cleanup(true);
+        };
         audio.onerror = () => {
-          finish();
+          clearTimeout(timeout);
+          cleanup(false);
         };
 
         audio.src = audioSrc;
         const playPromise = audio.play();
         if (playPromise !== undefined) {
-          playPromise.catch(() => {
-            finish();
+          playPromise.catch((err) => {
+            clearTimeout(timeout);
+            console.warn('Audio element play catch:', err);
+            cleanup(false);
           });
         }
       } catch (err) {
-        resolve();
+        console.warn('playBase64Audio exception:', err);
+        resolve(false);
       }
     });
   }
 
-  private playBrowserSpeech(text: string, volume: number): Promise<void> {
+  public playBrowserSpeech(text: string, volume: number, phoneticText?: string): Promise<void> {
     return new Promise((resolve) => {
       if (!('speechSynthesis' in window)) {
         return resolve();
       }
 
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.volume = Math.max(0.1, Math.min(1.0, volume / 100));
-      utterance.rate = 0.92; // Slightly calm pace for announcements
-      utterance.pitch = 1.0;
+      try {
+        window.speechSynthesis.cancel();
 
-      // Try to find an Amharic voice or English fallback
-      const voices = window.speechSynthesis.getVoices();
-      const amVoice = voices.find(v => v.lang.startsWith('am'));
-      if (amVoice) {
-        utterance.voice = amVoice;
+        const getBestVoices = () => {
+          return window.speechSynthesis.getVoices();
+        };
+
+        let voices = getBestVoices();
+
+        const doSpeak = () => {
+          voices = getBestVoices();
+          const amVoice = voices.find(v => v.lang.toLowerCase().startsWith('am'));
+          
+          let textToSpeak = text;
+          let voiceToUse = amVoice;
+
+          if (!amVoice) {
+            // If no Amharic voice is installed on OS, use phonetic transliterated text with natural English voice
+            textToSpeak = phoneticText || transliterateAmharicToPhonetic(text);
+            
+            // Prefer high-quality English voice
+            voiceToUse = voices.find(v => 
+              v.name.includes('Google') || 
+              v.name.includes('Natural') || 
+              v.name.includes('Zira') || 
+              v.name.includes('Samantha') || 
+              v.lang.startsWith('en')
+            ) || voices[0];
+          }
+
+          const utterance = new SpeechSynthesisUtterance(textToSpeak);
+          utterance.volume = Math.max(0.1, Math.min(1.0, volume / 100));
+          utterance.rate = 0.88; // Professional announcement pace
+          utterance.pitch = 1.0;
+
+          if (voiceToUse) {
+            utterance.voice = voiceToUse;
+          }
+
+          let done = false;
+          const finish = () => {
+            if (!done) {
+              done = true;
+              resolve();
+            }
+          };
+
+          utterance.onend = finish;
+          utterance.onerror = finish;
+
+          // Timeout safety in case synthesis hangs
+          setTimeout(finish, 12000);
+
+          window.speechSynthesis.speak(utterance);
+        };
+
+        if (voices.length === 0 && 'onvoiceschanged' in window.speechSynthesis) {
+          window.speechSynthesis.onvoiceschanged = () => {
+            window.speechSynthesis.onvoiceschanged = null;
+            doSpeak();
+          };
+          // Fallback timer if onvoiceschanged doesn't fire
+          setTimeout(doSpeak, 250);
+        } else {
+          doSpeak();
+        }
+      } catch (err) {
+        console.warn('playBrowserSpeech error:', err);
+        resolve();
       }
-
-      utterance.onend = () => resolve();
-      utterance.onerror = () => resolve();
-
-      window.speechSynthesis.speak(utterance);
     });
   }
-
-  private previewAudioEl: HTMLAudioElement | null = null;
-  private currentMusicUrl: string | null = null;
 
   // --- Background Music Handling ---
   public startBackgroundMusic(urlOrPreset?: string, volume: number = 14): void {
