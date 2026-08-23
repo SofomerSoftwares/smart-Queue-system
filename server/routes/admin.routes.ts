@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { db } from '../db.js';
 import { authenticate, authorize, requireAdmin, AuthenticatedRequest } from '../middleware/auth.js';
 import { broadcaster } from '../websocket.js';
-import { User, Service, Counter } from '../types.js';
+import { User, Service, Counter, OfficeSetting } from '../types.js';
 
 const router = Router();
 
@@ -452,16 +452,63 @@ router.get('/settings', (req: Request, res: Response) => {
 // PUT /api/settings (Admin only)
 router.put('/settings', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const updated = db.updateOfficeSetting(req.body);
+    let { 
+      officeName, 
+      officeNameAmharic, 
+      displayNoticeAmharic, 
+      displayNoticeEnglish, 
+      estimatedWaitPerPersonMinutes,
+      ticketNumberResetDaily,
+      themeColor
+    } = req.body;
+
+    const updates: Partial<OfficeSetting> = {};
+
+    if (officeName !== undefined) {
+      const trimmed = String(officeName).trim();
+      if (trimmed) updates.officeName = trimmed;
+    }
+
+    if (officeNameAmharic !== undefined) {
+      const trimmedAm = String(officeNameAmharic).trim();
+      if (trimmedAm) updates.officeNameAmharic = trimmedAm;
+    }
+
+    // If only one language name was provided and the other is empty in current setting, fallback
+    const current = db.getOfficeSetting();
+    if (updates.officeName && !updates.officeNameAmharic && !current.officeNameAmharic) {
+      updates.officeNameAmharic = updates.officeName;
+    }
+    if (updates.officeNameAmharic && !updates.officeName && !current.officeName) {
+      updates.officeName = updates.officeNameAmharic;
+    }
+
+    if (displayNoticeAmharic !== undefined) {
+      updates.displayNoticeAmharic = String(displayNoticeAmharic).trim();
+    }
+    if (displayNoticeEnglish !== undefined) {
+      updates.displayNotice = String(displayNoticeEnglish).trim();
+    } else if (req.body.displayNotice !== undefined) {
+      updates.displayNotice = String(req.body.displayNotice).trim();
+    }
+    if (estimatedWaitPerPersonMinutes !== undefined) {
+      const num = Number(estimatedWaitPerPersonMinutes);
+      if (!isNaN(num) && num >= 1 && num <= 120) {
+        updates.estimatedWaitPerPersonMinutes = num;
+      }
+    }
+
+    const updated = db.updateOfficeSetting(updates);
     db.addAuditLog({
       userId: req.user?.id,
       userName: req.user?.name,
       action: 'UPDATE_OFFICE_SETTINGS',
       entity: 'OfficeSetting',
-      metadata: req.body
+      metadata: updates
     });
 
     broadcaster.broadcast('settings:updated', { officeSetting: updated });
+    broadcaster.broadcast('queue:updated', { action: 'SETTINGS_CHANGED' });
     res.json({ success: true, setting: updated });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });

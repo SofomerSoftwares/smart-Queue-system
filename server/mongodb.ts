@@ -74,6 +74,18 @@ class MongoDBService {
       this.isConnected = true;
       this.activeUri = connectionUri!;
       this.lastError = null;
+
+      // Ensure MongoDB collection indexes
+      try {
+        await this.db.collection('users').createIndex({ username: 1 }, { unique: true, sparse: true });
+        await this.db.collection('tickets').createIndex({ dateKey: 1, ticketNumber: 1 });
+        await this.db.collection('tickets').createIndex({ status: 1 });
+        await this.db.collection('services').createIndex({ id: 1 }, { unique: true });
+        await this.db.collection('counters').createIndex({ id: 1 }, { unique: true });
+      } catch (indexErr) {
+        // Indexes might already exist
+      }
+
       console.log(`✅ [MongoDB Atlas] Connected successfully to cluster database: "${this.dbName}"`);
       return true;
     } catch (err: any) {
@@ -90,7 +102,7 @@ class MongoDBService {
         this.lastError = rawMsg;
       }
 
-      console.log(`ℹ️ [MongoDB Atlas] Note: ${this.lastError} (System running on resilient local storage)`);
+      console.log(`ℹ️ [MongoDB Atlas] Connection status: ${this.lastError}`);
       return false;
     } finally {
       this.isConnecting = false;

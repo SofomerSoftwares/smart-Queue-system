@@ -3,17 +3,20 @@ import {
   Shield, 
   Settings, 
   Volume2, 
+  VolumeX,
   Users, 
   Layers, 
   Tv, 
   FileText, 
   Play, 
+  Pause,
   Plus, 
   Trash2, 
   Edit3, 
   Check, 
   RotateCcw, 
   Music, 
+  Disc,
   Sparkles, 
   Upload, 
   Activity,
@@ -30,13 +33,17 @@ import {
   UserCheck,
   KeyRound,
   Eye,
-  EyeOff
+  EyeOff,
+  Building2,
+  X,
+  Printer,
+  Smartphone
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { audioManager } from '../lib/audioManager';
-import { Service, Counter, User, AudioSetting, OfficeSetting, AuditLog, AddisVoiceOption } from '../types';
+import { Service, Counter, User, AudioSetting, OfficeSetting, AuditLog, AddisVoiceOption, AudioAsset } from '../types';
 
 export const AdminView: React.FC = () => {
   const { 
@@ -44,6 +51,9 @@ export const AdminView: React.FC = () => {
     counters, 
     officeSetting, 
     audioSetting, 
+    audioAssets: contextAudioAssets,
+    changeBackgroundMusicTrack,
+    setBackgroundVolume,
     stats, 
     uiLanguage, 
     resetDailyQueue,
@@ -108,12 +118,17 @@ export const AdminView: React.FC = () => {
   const [isTestingVoice, setIsTestingVoice] = useState<boolean>(false);
   const [testVoiceStatus, setTestVoiceStatus] = useState<string>('');
 
-  // AI Music Generator State
-  const [musicPrompt, setMusicPrompt] = useState<string>('Gentle calm ambient office lounge background chords relaxing');
+  // AI & Local Music Library State
+  const [musicPrompt, setMusicPrompt] = useState<string>('Gentle calm Addis Krar ambient office lounge background relaxing');
   const [isGeneratingMusic, setIsGeneratingMusic] = useState<boolean>(false);
+  const [currentlyPreviewingId, setCurrentlyPreviewingId] = useState<string | null>(null);
+  const [isRestoringDefaults, setIsRestoringDefaults] = useState<boolean>(false);
+  const [isUploadingMusic, setIsUploadingMusic] = useState<boolean>(false);
+  const [musicActionMessage, setMusicActionMessage] = useState<string>('');
 
   // Office & Audio Settings Form
   const [officeForm, setOfficeForm] = useState<Partial<OfficeSetting>>({});
+  const [isOfficeFormDirty, setIsOfficeFormDirty] = useState<boolean>(false);
   const [audioForm, setAudioForm] = useState<Partial<AudioSetting>>({});
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>('');
   const [isSavingAudio, setIsSavingAudio] = useState<boolean>(false);
@@ -123,8 +138,21 @@ export const AdminView: React.FC = () => {
   const [officeSaveSuccess, setOfficeSaveSuccess] = useState<string>('');
   const [officeSaveError, setOfficeSaveError] = useState<string>('');
 
+  // Quick Rename Modal State
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState<boolean>(false);
+  const [renameAmharic, setRenameAmharic] = useState<string>('');
+  const [renameEnglish, setRenameEnglish] = useState<string>('');
+  const [isSavingRenameModal, setIsSavingRenameModal] = useState<boolean>(false);
+  const [renameModalError, setRenameModalError] = useState<string>('');
+
   useEffect(() => {
-    if (officeSetting) setOfficeForm(officeSetting);
+    if (officeSetting) {
+      if (!isOfficeFormDirty) {
+        setOfficeForm(officeSetting);
+      }
+      setRenameAmharic(officeSetting.officeNameAmharic || '');
+      setRenameEnglish(officeSetting.officeName || '');
+    }
     if (audioSetting) {
       setAudioForm(audioSetting);
       setSelectedVoice(audioSetting.ttsVoice || 'Kore');
@@ -132,7 +160,7 @@ export const AdminView: React.FC = () => {
       setSelectedTtsProvider(audioSetting.ttsProvider || 'ADDIS_AI');
       setVoiceSpeed(audioSetting.addisAiSpeed || 1.0);
     }
-  }, [officeSetting, audioSetting]);
+  }, [officeSetting, audioSetting, isOfficeFormDirty]);
 
   const loadAdminData = async () => {
     try {
@@ -242,6 +270,132 @@ export const AdminView: React.FC = () => {
       setAudioSaveError(errMsg);
     } finally {
       setIsSavingAudio(false);
+    }
+  };
+
+  // Generate Local / AI Music
+  const handleGenerateAIMusic = async (customPrompt?: string) => {
+    const promptToUse = customPrompt || musicPrompt;
+    try {
+      setIsGeneratingMusic(true);
+      setMusicActionMessage(isAmharic ? 'የዳራ ሙዚቃ በ AI / በአካባቢ ዳታቤዝ እየተፈጠረ ነው...' : 'Generating ambient music track into database...');
+      const res = await api.generateAIMusic(promptToUse);
+      if (res.success && res.result) {
+        setMusicActionMessage(isAmharic ? 'አዲስ ሙዚቃ በዳታቤዝ ውስጥ በተሳካ ሁኔታ ተቀምጧል!' : 'New music track generated and saved to database!');
+        await loadAdminData();
+        await refreshQueue();
+        setTimeout(() => setMusicActionMessage(''), 4000);
+      }
+    } catch (err: any) {
+      setMusicActionMessage(`Generation error: ${err.message}`);
+    } finally {
+      setIsGeneratingMusic(false);
+    }
+  };
+
+  // Upload Local Music File to Database
+  const handleUploadMusicFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploadingMusic(true);
+      setMusicActionMessage(isAmharic ? 'ሙዚቃ ወደ ዳታቤዝ በመጫን ላይ...' : 'Uploading music file to database storage...');
+      
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64Data = reader.result as string;
+          const title = file.name.replace(/\.[^/.]+$/, '');
+          const res = await api.uploadMusic({
+            title,
+            base64Data,
+            mimeType: file.type || 'audio/mp3',
+            durationSeconds: 180
+          });
+
+          if (res.success) {
+            setMusicActionMessage(isAmharic ? 'የሙዚቃ ፋይሉ በዳታቤዝ ውስጥ ተቀምጧል!' : 'Music file successfully saved to database storage!');
+            await loadAdminData();
+            await refreshQueue();
+            setTimeout(() => setMusicActionMessage(''), 4000);
+          }
+        } catch (err: any) {
+          setMusicActionMessage(`Upload failed: ${err.message}`);
+        } finally {
+          setIsUploadingMusic(false);
+        }
+      };
+      reader.onerror = () => {
+        setMusicActionMessage('Failed to read audio file.');
+        setIsUploadingMusic(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setMusicActionMessage(`Upload error: ${err.message}`);
+      setIsUploadingMusic(false);
+    }
+  };
+
+  // Restore Default Ethiopian Ambient Tracks
+  const handleRestoreDefaultTracks = async () => {
+    try {
+      setIsRestoringDefaults(true);
+      setMusicActionMessage(isAmharic ? 'ነባሪ የዳራ ሙዚቃዎች ወደ ዳታቤዝ እየተመለሱ ነው...' : 'Restoring default ambient tracks to database...');
+      const res = await api.restoreDefaultAudioAssets();
+      if (res.success) {
+        setMusicActionMessage(isAmharic ? 'ነባሪ የኢትዮጵያ እና የቢሮ ዳራ ሙዚቃዎች ተመልሰዋል!' : 'Default ambient tracks restored to database!');
+        await loadAdminData();
+        await refreshQueue();
+        setTimeout(() => setMusicActionMessage(''), 4000);
+      }
+    } catch (err: any) {
+      setMusicActionMessage(`Restore error: ${err.message}`);
+    } finally {
+      setIsRestoringDefaults(false);
+    }
+  };
+
+  // Track Preview Toggle
+  const handleTogglePreviewTrack = (asset: any) => {
+    if (currentlyPreviewingId === asset.id) {
+      audioManager.stopPreview();
+      setCurrentlyPreviewingId(null);
+    } else {
+      audioManager.previewTrack(asset.url, 30);
+      setCurrentlyPreviewingId(asset.id);
+    }
+  };
+
+  // Delete Track from Database
+  const handleDeleteTrack = async (assetId: string) => {
+    try {
+      if (currentlyPreviewingId === assetId) {
+        audioManager.stopPreview();
+        setCurrentlyPreviewingId(null);
+      }
+      await api.deleteAudioAsset(assetId);
+      await loadAdminData();
+      await refreshQueue();
+      setMusicActionMessage(isAmharic ? 'ሙዚቃው ከዳታቤዝ ተሰርዟል' : 'Music track deleted from database');
+      setTimeout(() => setMusicActionMessage(''), 3000);
+    } catch (err: any) {
+      setMusicActionMessage(`Delete error: ${err.message}`);
+    }
+  };
+
+  // Select Active Background Music Track
+  const handleSelectActiveTrack = async (assetId: string) => {
+    setAudioForm(prev => ({ ...prev, currentMusicAssetId: assetId }));
+    try {
+      await api.updateAudioSettings({ currentMusicAssetId: assetId });
+      if (changeBackgroundMusicTrack) {
+        await changeBackgroundMusicTrack(assetId);
+      }
+      setMusicActionMessage(isAmharic ? 'የቢሮ ዳራ ሙዚቃ ተቀይሯል!' : 'Active background track updated!');
+      setTimeout(() => setMusicActionMessage(''), 3000);
+    } catch (err: any) {
+      console.warn('Error selecting track:', err);
     }
   };
 
@@ -381,11 +535,25 @@ export const AdminView: React.FC = () => {
       setIsSavingOffice(true);
       setOfficeSaveError('');
       setOfficeSaveSuccess('');
-      const res = await api.updateOfficeSettings(officeForm);
+
+      // Validation
+      const amName = (officeForm.officeNameAmharic || '').trim();
+      const enName = (officeForm.officeName || '').trim();
+      if (!amName && !enName) {
+        throw new Error(isAmharic ? 'እባክዎ ቢያንስ የአማርኛ ወይም የእንግሊዝኛ የቢሮ ስም ያስገቡ' : 'Please provide at least an Amharic or English office name');
+      }
+
+      const res = await api.updateOfficeSettings({
+        ...officeForm,
+        officeNameAmharic: amName || enName,
+        officeName: enName || amName
+      });
+
       if (res.success && res.setting) {
         setOfficeForm(res.setting);
+        setIsOfficeFormDirty(false);
       }
-      const msg = isAmharic ? 'የቢሮ ቅንብሮች በተሳካ ሁኔታ ተቀምጠዋል!' : 'Office settings saved successfully!';
+      const msg = isAmharic ? 'የቢሮ ስም እና ቅንብሮች በተሳካ ሁኔታ ተቀምጠዋል!' : 'Office name & settings saved successfully!';
       setOfficeSaveSuccess(msg);
       setSaveSuccessMsg(msg);
       setTimeout(() => {
@@ -402,19 +570,37 @@ export const AdminView: React.FC = () => {
     }
   };
 
-  // Generate AI Music
-  const handleGenerateAIMusic = async () => {
+  // Quick Rename Office Name
+  const handleSaveQuickRename = async () => {
+    const am = renameAmharic.trim();
+    const en = renameEnglish.trim();
+    if (!am && !en) {
+      setRenameModalError(isAmharic ? 'እባክዎ የቢሮውን ስም ያስገቡ' : 'Please provide an office name');
+      return;
+    }
+
     try {
-      setIsGeneratingMusic(true);
-      const res = await api.generateAIMusic(musicPrompt);
-      if (res.success) {
-        alert(isAmharic ? 'የቢሮ ሙዚቃ በተሳካ ሁኔታ ተዘጋጅቷል!' : 'AI Music generated successfully!');
+      setIsSavingRenameModal(true);
+      setRenameModalError('');
+      const res = await api.updateOfficeSettings({
+        officeNameAmharic: am || en,
+        officeName: en || am
+      });
+
+      if (res.success && res.setting) {
+        setOfficeForm(res.setting);
+        setIsOfficeFormDirty(false);
+        setIsRenameModalOpen(false);
+        const msg = isAmharic ? 'የቢሮ ስም ተቀይሯል!' : 'Office name updated successfully!';
+        setSaveSuccessMsg(msg);
+        setTimeout(() => setSaveSuccessMsg(''), 3500);
+        await refreshQueue();
         loadAdminData();
       }
     } catch (err: any) {
-      alert(err.message);
+      setRenameModalError(err.message || 'Failed to rename office');
     } finally {
-      setIsGeneratingMusic(false);
+      setIsSavingRenameModal(false);
     }
   };
 
@@ -614,18 +800,36 @@ export const AdminView: React.FC = () => {
           </div>
         </div>
 
-        {/* Daily Reset Queue Button */}
-        <button
-          onClick={() => {
-            if (confirm(isAmharic ? 'የዛሬው የወረፋ ዝርዝር ሙሉ ለሙሉ እንዲጸዳ ይፈልጋሉ?' : 'Reset today queue tickets?')) {
-              resetDailyQueue();
-            }
-          }}
-          className="flex items-center space-x-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition"
-        >
-          <RotateCcw className="w-4 h-4" />
-          <span>{isAmharic ? 'የዛሬውን ወረፋ አድስ (Daily Reset)' : 'Reset Daily Queue'}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Quick Rename Office Button */}
+          <button
+            id="btn-quick-rename-office"
+            onClick={() => {
+              setRenameAmharic(officeSetting?.officeNameAmharic || officeForm.officeNameAmharic || '');
+              setRenameEnglish(officeSetting?.officeName || officeForm.officeName || '');
+              setRenameModalError('');
+              setIsRenameModalOpen(true);
+            }}
+            className="flex items-center space-x-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition shadow-2xs"
+            title="Rename Office Name"
+          >
+            <Building2 className="w-4 h-4" />
+            <span>{isAmharic ? 'የቢሮ ስም ቀይር' : 'Rename Office'}</span>
+          </button>
+
+          {/* Daily Reset Queue Button */}
+          <button
+            onClick={() => {
+              if (confirm(isAmharic ? 'የዛሬው የወረፋ ዝርዝር ሙሉ ለሙሉ እንዲጸዳ ይፈልጋሉ?' : 'Reset today queue tickets?')) {
+                resetDailyQueue();
+              }
+            }}
+            className="flex items-center space-x-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span>{isAmharic ? 'የዛሬውን ወረፋ አድስ' : 'Reset Daily Queue'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Admin Session Notice if not signed in */}
@@ -1273,43 +1477,268 @@ export const AdminView: React.FC = () => {
             </button>
           </div>
 
-          {/* Right 5 Cols: Background Music & Audio Ducking Studio */}
+          {/* Right 5 Cols: Background Music & Local Database Storage Studio */}
           <div className="lg:col-span-5 bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-5">
-            <div className="flex items-center space-x-2 border-b border-slate-100 pb-3">
-              <Music className="w-5 h-5 text-indigo-600" />
-              <h3 className="font-bold text-slate-900 text-base">
-                {isAmharic ? 'የቢሮ ዳራ ሙዚቃ እና ድምፅ ማስታገሻ' : 'Background Music & Ducking'}
-              </h3>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center space-x-2">
+                <Music className="w-5 h-5 text-indigo-600" />
+                <h3 className="font-bold text-slate-900 text-base">
+                  {isAmharic ? 'የቢሮ ዳራ ሙዚቃ እና ዳታቤዝ ማከማቻ' : 'Background Music & DB Storage'}
+                </h3>
+              </div>
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">
+                {audioAssets.filter(a => a.type === 'MUSIC').length} {isAmharic ? 'ሙዚቃዎች' : 'Tracks'}
+              </span>
             </div>
 
             <p className="text-xs text-slate-500 leading-relaxed font-medium">
               {isAmharic
-                ? 'የማስታወቂያ ጥሪ ሲደረግ የቢሮው ዳራ ሙዚቃ በራስ-ሰር ቀስ ብሎ ይቆማል፤ ማስታወቂያው ሲጠናቀቅ ደግሞ ይቀጥላል።'
-                : 'Background music automatically ducks/pauses during queue announcements and smoothly resumes after.'}
+                ? 'የማስታወቂያ ጥሪ ሲደረግ የቢሮው ዳራ ሙዚቃ በራስ-ሰር ቀስ ብሎ ይቆማል፤ ማስታወቂያው ሲጠናቀቅ ደግሞ ይቀጥላል። ሁሉም ሙዚቃዎች በ MongoDB/ዳታቤዝ ውስጥ ይቀመጣሉ።'
+                : 'Background ambient music automatically ducks/pauses during announcements. All tracks are persisted in the database storage.'}
             </p>
 
-            <div className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-100 space-y-3">
-              <div className="flex items-center space-x-2 text-indigo-900 font-bold text-xs">
-                <Sparkles className="w-4 h-4 text-indigo-600" />
-                <span>{isAmharic ? 'የ AI ዳራ ሙዚቃ ማመንጫ' : 'Generate AI Office Music'}</span>
+            {/* Action Feedback Banner */}
+            {musicActionMessage && (
+              <div className="p-3 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-xl text-xs font-bold flex items-center space-x-2 animate-fade-in">
+                <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span>{musicActionMessage}</span>
+              </div>
+            )}
+
+            {/* Master Music Toggle & Volume */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-slate-800">
+                    {isAmharic ? 'የዳራ ሙዚቃ አጫውት' : 'Enable Background Music'}
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    {isAmharic ? 'በስክሪኑ (Display) ላይ ቀጣይነት ያለው ጸጥ ያለ ሙዚቃ' : 'Gentle ambient loops on public displays'}
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={audioForm.backgroundMusicEnabled ?? false}
+                    onChange={(e) => {
+                      setAudioForm({ ...audioForm, backgroundMusicEnabled: e.target.checked });
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
               </div>
 
-              <input
-                type="text"
-                value={musicPrompt}
-                onChange={(e) => setMusicPrompt(e.target.value)}
-                placeholder="Calm relaxing lobby lounge chords..."
-                className="w-full p-2.5 text-xs bg-white border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900 font-medium"
-              />
+              {audioForm.backgroundMusicEnabled && (
+                <div className="space-y-1.5 pt-2 border-t border-slate-200">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-700 flex items-center space-x-1.5">
+                      <Volume2 className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>{isAmharic ? 'የዳራ ሙዚቃ መጠን' : 'Background Volume'}</span>
+                    </span>
+                    <span className="font-mono font-bold text-indigo-600">{audioForm.backgroundMusicVolume || 14}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="2"
+                    max="45"
+                    step="1"
+                    value={audioForm.backgroundMusicVolume || 14}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      setAudioForm({ ...audioForm, backgroundMusicVolume: v });
+                      if (setBackgroundVolume) setBackgroundVolume(v);
+                    }}
+                    className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                    <span>{isAmharic ? 'ቀስ ያለ (2%)' : 'Subtle (2%)'}</span>
+                    <span>{isAmharic ? 'መካከለኛ (20%)' : 'Comfortable (20%)'}</span>
+                    <span>{isAmharic ? 'ከፍተኛ (45%)' : 'Loud (45%)'}</span>
+                  </div>
+                </div>
+              )}
+            </div>
 
-              <button
-                onClick={handleGenerateAIMusic}
-                disabled={isGeneratingMusic}
-                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center justify-center space-x-1.5"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>{isGeneratingMusic ? (isAmharic ? 'በማመንጨት ላይ...' : 'Generating...') : (isAmharic ? 'በ AI ሙዚቃ ፍጠር' : 'Generate with AI')}</span>
-              </button>
+            {/* Local Database Track Library */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+                  <Disc className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{isAmharic ? 'የተቀመጡ የዳራ ሙዚቃዎች' : 'Local Database Tracks'}</span>
+                </span>
+
+                <button
+                  type="button"
+                  onClick={handleRestoreDefaultTracks}
+                  disabled={isRestoringDefaults}
+                  className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center space-x-1 transition cursor-pointer"
+                >
+                  <RotateCcw className={`w-3 h-3 ${isRestoringDefaults ? 'animate-spin' : ''}`} />
+                  <span>{isAmharic ? 'ነባሪዎችን መልስ' : 'Restore Defaults'}</span>
+                </button>
+              </div>
+
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {audioAssets.filter(a => a.type === 'MUSIC').length === 0 ? (
+                  <div className="p-4 text-center rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500">
+                    {isAmharic ? 'ምንም የተቀመጠ ሙዚቃ የለም። እባክዎ ነባሪዎችን ይመልሱ ወይም አዲስ ይፍጠሩ።' : 'No music tracks found in database. Click "Restore Defaults" or generate one.'}
+                  </div>
+                ) : (
+                  audioAssets
+                    .filter(a => a.type === 'MUSIC')
+                    .map((track) => {
+                      const isActive = (audioForm.currentMusicAssetId === track.id) || (!audioForm.currentMusicAssetId && track.id === 'asset-music-1');
+                      const isPreviewing = currentlyPreviewingId === track.id;
+
+                      return (
+                        <div
+                          key={track.id}
+                          className={`p-3 rounded-xl border transition flex items-center justify-between gap-2 ${
+                            isActive
+                              ? 'bg-indigo-50/80 border-indigo-300 ring-1 ring-indigo-200'
+                              : 'bg-white border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2.5 min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => handleTogglePreviewTrack(track)}
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition ${
+                                isPreviewing
+                                  ? 'bg-indigo-600 text-white animate-pulse'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                              }`}
+                              title={isPreviewing ? 'Stop Preview' : 'Preview Track'}
+                            >
+                              {isPreviewing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 ml-0.5" />}
+                            </button>
+
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-900 truncate">
+                                {track.title}
+                              </p>
+                              <div className="flex items-center space-x-1.5 text-[10px] text-slate-500">
+                                <span className="px-1.5 py-0.2 rounded bg-slate-100 border border-slate-200 font-medium">
+                                  {track.source || 'DATABASE'}
+                                </span>
+                                {track.durationSeconds && (
+                                  <span>{Math.round(track.durationSeconds / 60)} min</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-1.5 shrink-0">
+                            {isActive ? (
+                              <span className="px-2 py-0.5 bg-indigo-600 text-white rounded-md text-[10px] font-bold flex items-center space-x-1">
+                                <Check className="w-3 h-3" />
+                                <span>{isAmharic ? 'የተመረጠ' : 'Active'}</span>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleSelectActiveTrack(track.id)}
+                                className="px-2 py-1 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 rounded-md text-[10px] font-bold transition cursor-pointer"
+                              >
+                                {isAmharic ? 'ምረጥ' : 'Select'}
+                              </button>
+                            )}
+
+                            {track.source === 'UPLOAD' && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteTrack(track.id)}
+                                className="p-1 text-slate-400 hover:text-rose-600 rounded transition"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+            </div>
+
+            {/* Upload Local Audio File */}
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold text-slate-800">
+                  {isAmharic ? 'ከኮምፒውተር የሙዚቃ ፋይል ጫን' : 'Upload Local Audio File'}
+                </p>
+                <p className="text-[10px] text-slate-500">
+                  {isAmharic ? 'MP3, WAV ወይም OGG ፋይል ይምረጡ' : 'Upload MP3 / WAV into database'}
+                </p>
+              </div>
+
+              <label className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5 cursor-pointer shrink-0">
+                <Upload className="w-3.5 h-3.5 text-indigo-600" />
+                <span>{isUploadingMusic ? (isAmharic ? 'በመጫን ላይ...' : 'Uploading...') : (isAmharic ? 'ፋይል ምረጥ' : 'Choose File')}</span>
+                <input
+                  type="file"
+                  accept="audio/*"
+                  onChange={handleUploadMusicFile}
+                  disabled={isUploadingMusic}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {/* AI & Procedural Music Generator */}
+            <div className="p-4 bg-indigo-50/70 rounded-2xl border border-indigo-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2 text-indigo-900 font-bold text-xs">
+                  <Sparkles className="w-4 h-4 text-indigo-600" />
+                  <span>{isAmharic ? 'የ AI / የአካባቢ ዳራ ሙዚቃ ማመንጫ' : 'Generate Ambient Music'}</span>
+                </div>
+              </div>
+
+              {/* Quick Preset Buttons */}
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { name: 'Krar Lounge', prompt: 'Addis Krar Pentatonic lounge relaxing gentle acoustic' },
+                  { name: 'Tizita Lo-Fi', prompt: 'Ethiopian Tizita Lo-Fi chill subtle peaceful office' },
+                  { name: 'Bati Horizon', prompt: 'Ethiopian Bati modal serene slow atmospheric' },
+                  { name: 'Masenqo Cafe', prompt: 'Traditional Masenqo coffee cafe gentle acoustic ambient' },
+                  { name: 'Corporate Zen', prompt: 'Gentle corporate office waiting room pentatonic chords' }
+                ].map((item, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setMusicPrompt(item.prompt);
+                      handleGenerateAIMusic(item.prompt);
+                    }}
+                    disabled={isGeneratingMusic}
+                    className="text-[10px] px-2 py-1 bg-white hover:bg-indigo-100 border border-indigo-200 text-indigo-900 rounded-lg font-bold transition truncate cursor-pointer shadow-2xs"
+                  >
+                    + {item.name}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={musicPrompt}
+                  onChange={(e) => setMusicPrompt(e.target.value)}
+                  placeholder="Calm relaxing lobby lounge chords..."
+                  className="flex-1 p-2.5 text-xs bg-white border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900 font-medium"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => handleGenerateAIMusic()}
+                  disabled={isGeneratingMusic}
+                  className="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center justify-center space-x-1.5 shrink-0 cursor-pointer"
+                >
+                  <Sparkles className={`w-3.5 h-3.5 ${isGeneratingMusic ? 'animate-spin' : ''}`} />
+                  <span>{isGeneratingMusic ? (isAmharic ? '...' : '...') : (isAmharic ? 'ፍጠር' : 'Generate')}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1341,7 +1770,7 @@ export const AdminView: React.FC = () => {
                   : 'bg-amber-100 text-amber-800 border border-amber-200'
               }`}>
                 <span className={`w-2 h-2 rounded-full mr-1.5 ${dbStatus?.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-                {dbStatus?.connected ? 'Atlas Connected' : 'Resilient Local Storage'}
+                {dbStatus?.connected ? 'MongoDB Atlas Active' : 'MongoDB Atlas Connecting'}
               </span>
             </div>
           </div>
@@ -1357,7 +1786,7 @@ export const AdminView: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
               <span className="text-[11px] text-slate-500 font-semibold block">Target Database</span>
-              <span className="text-sm font-bold text-slate-900 font-mono mt-0.5 block">{dbStatus?.database || 'ethio_queue_master'}</span>
+              <span className="text-sm font-bold text-slate-900 font-mono mt-0.5 block">{dbStatus?.database || 'office_queue_db'}</span>
             </div>
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
               <span className="text-[11px] text-slate-500 font-semibold block">Cluster Host</span>
@@ -1367,7 +1796,7 @@ export const AdminView: React.FC = () => {
             </div>
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
               <span className="text-[11px] text-slate-500 font-semibold block">Architecture Mode</span>
-              <span className="text-sm font-bold text-emerald-700 font-mono mt-0.5 block">Dual Sync & Fallback</span>
+              <span className="text-sm font-bold text-emerald-700 font-mono mt-0.5 block">Pure MongoDB Atlas</span>
             </div>
           </div>
 
@@ -1422,93 +1851,300 @@ export const AdminView: React.FC = () => {
 
       {/* TAB 6: OFFICE SETTINGS */}
       {activeTab === 'office' && (
-        <div className="max-w-2xl bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
-          <h2 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">
-            {isAmharic ? 'አጠቃላይ የቢሮ እና የስክሪን ቅንብሮች' : 'General Office Settings'}
-          </h2>
-
-          {/* Inline Feedback Alerts */}
+        <div className="space-y-6">
+          {/* Top Feedback Alerts */}
           {officeSaveSuccess && (
-            <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center space-x-2 animate-in fade-in">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-bold flex items-center space-x-2 animate-in fade-in">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
               <span>{officeSaveSuccess}</span>
             </div>
           )}
           {officeSaveError && (
-            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold flex items-center space-x-2 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs font-bold flex items-center space-x-2 animate-in fade-in">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
               <span>{officeSaveError}</span>
             </div>
           )}
 
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                {isAmharic ? 'የቢሮ ስም (አማርኛ)' : 'Office Name (Amharic)'}
-              </label>
-              <input
-                type="text"
-                value={officeForm.officeNameAmharic || ''}
-                onChange={(e) => setOfficeForm({ ...officeForm, officeNameAmharic: e.target.value })}
-                className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium text-slate-900"
-              />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left: Office Identity Form */}
+            <div className="lg:col-span-7 bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                    <Building2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-slate-900">
+                      {isAmharic ? 'የቢሮ እና የተቋም መለያ ስም' : 'Office & Organization Identity'}
+                    </h2>
+                    <p className="text-[11px] text-slate-500">
+                      {isAmharic ? 'በስክሪኖች፣ በቲኬት ማተሚያዎች እና በሰራተኞች ዴስክ ላይ የሚታይ ይፋዊ ስም' : 'Official title displayed across public TV displays, thermal tickets, and navigation'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Office Presets Pills */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  {isAmharic ? 'ፈጣን የአማራጭ ስሞች (One-Click Presets)' : 'Quick Presets (Click to fill)'}
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { am: 'የኢትዮጵያ አገልግሎት መስጫ ማዕከል', en: 'ETHIOPIA SERVICE CENTER' },
+                    { am: 'የኢትዮጵያ ገቢዎች ሚኒስቴር', en: 'MINISTRY OF REVENUES ETHIOPIA' },
+                    { am: 'የኢሚግሬሽን እና ዜግነት አገልግሎት', en: 'IMMIGRATION & CITIZENSHIP SERVICE' },
+                    { am: 'የቂርቆስ ክፍለ ከተማ አገልግሎት ማዕከል', en: 'KIRKOS SUB-CITY SERVICE CENTER' },
+                    { am: 'የቦሌ ክፍለ ከተማ ወሳኝ ኩነት ምዝገባ', en: 'BOLE SUB-CITY VITAL EVENTS' },
+                    { am: 'የኢትዮጵያ ንግድ ባንክ - ዋና ቅርንጫፍ', en: 'COMMERCIAL BANK OF ETHIOPIA' }
+                  ].map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setOfficeForm(prev => ({
+                          ...prev,
+                          officeNameAmharic: preset.am,
+                          officeName: preset.en
+                        }));
+                        setIsOfficeFormDirty(true);
+                      }}
+                      className="px-2.5 py-1 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 border border-slate-200 rounded-lg text-[11px] font-medium text-slate-700 transition cursor-pointer"
+                    >
+                      {isAmharic ? preset.am : preset.en}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Input Fields */}
+              <div className="space-y-4 pt-1">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-slate-700">
+                      {isAmharic ? 'የቢሮ ስም (አማርኛ) *' : 'Office Name (Amharic) *'}
+                    </label>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {(officeForm.officeNameAmharic || '').length} chars
+                    </span>
+                  </div>
+                  <input
+                    id="input-office-name-amharic"
+                    type="text"
+                    placeholder="ለምሳሌ፡ የቂርቆስ ክፍለ ከተማ አገልግሎት ማዕከል"
+                    value={officeForm.officeNameAmharic || ''}
+                    onChange={(e) => {
+                      setOfficeForm({ ...officeForm, officeNameAmharic: e.target.value });
+                      setIsOfficeFormDirty(true);
+                    }}
+                    className="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none font-medium text-slate-900 shadow-2xs"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-slate-700">
+                      {isAmharic ? 'የቢሮ ስም (English) *' : 'Office Name (English) *'}
+                    </label>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {(officeForm.officeName || '').length} chars
+                    </span>
+                  </div>
+                  <input
+                    id="input-office-name-english"
+                    type="text"
+                    placeholder="e.g. KIRKOS SUB-CITY SERVICE CENTER"
+                    value={officeForm.officeName || ''}
+                    onChange={(e) => {
+                      setOfficeForm({ ...officeForm, officeName: e.target.value });
+                      setIsOfficeFormDirty(true);
+                    }}
+                    className="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none font-medium text-slate-900 shadow-2xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {isAmharic ? 'በስክሪኑ ግርጌ የሚታይ ማስታወቂያ (አማርኛ ዜና/ማሳሰቢያ)' : 'Bottom Ticker Notice (Amharic)'}
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={officeForm.displayNoticeAmharic || ''}
+                    onChange={(e) => {
+                      setOfficeForm({ ...officeForm, displayNoticeAmharic: e.target.value });
+                      setIsOfficeFormDirty(true);
+                    }}
+                    className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none font-medium text-slate-900"
+                    placeholder="እንኳን ወደ አገልግሎት መስጫ ማዕከላችን በደህና መጡ..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {isAmharic ? 'በስክሪኑ ግርጌ የሚታይ ማስታወቂያ (English)' : 'Bottom Ticker Notice (English)'}
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={officeForm.displayNoticeEnglish || ''}
+                    onChange={(e) => {
+                      setOfficeForm({ ...officeForm, displayNoticeEnglish: e.target.value });
+                      setIsOfficeFormDirty(true);
+                    }}
+                    className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none font-medium text-slate-900"
+                    placeholder="Welcome to our official service center..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {isAmharic ? 'ለአንድ ሰው የሚገመት የጥበቃ ደቂቃ' : 'Estimated Wait Minutes Per Customer'}
+                  </label>
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="number"
+                      min={1}
+                      max={120}
+                      value={officeForm.estimatedWaitPerPersonMinutes || 4}
+                      onChange={(e) => {
+                        setOfficeForm({ ...officeForm, estimatedWaitPerPersonMinutes: Number(e.target.value) });
+                        setIsOfficeFormDirty(true);
+                      }}
+                      className="w-28 p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-bold text-slate-900"
+                    />
+                    <span className="text-xs text-slate-500">
+                      {isAmharic ? 'ደቂቃዎች በአንድ ደንበኛ' : 'minutes per queue ticket'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center space-x-3 pt-2 border-t border-slate-100">
+                <button
+                  id="btn-save-office-settings"
+                  onClick={handleSaveOfficeSettings}
+                  disabled={isSavingOffice}
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5 cursor-pointer"
+                >
+                  {isSavingOffice ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>{isAmharic ? 'በማስቀመጥ ላይ...' : 'Saving Office Name...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>{isAmharic ? 'የቢሮውን ስም እና ቅንብሮች አስቀምጥ' : 'Save Office Name & Settings'}</span>
+                    </>
+                  )}
+                </button>
+
+                {isOfficeFormDirty && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (officeSetting) {
+                        setOfficeForm(officeSetting);
+                        setIsOfficeFormDirty(false);
+                      }
+                    }}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                  >
+                    {isAmharic ? 'ወደ ነበረበት መልስ' : 'Revert Changes'}
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                {isAmharic ? 'የቢሮ ስም (English)' : 'Office Name (English)'}
-              </label>
-              <input
-                type="text"
-                value={officeForm.officeName || ''}
-                onChange={(e) => setOfficeForm({ ...officeForm, officeName: e.target.value })}
-                className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium text-slate-900"
-              />
-            </div>
+            {/* Right: Live Real-Time Previews */}
+            <div className="lg:col-span-5 space-y-4">
+              <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-sm space-y-3">
+                <div className="flex items-center justify-between text-xs text-indigo-400 font-semibold border-b border-slate-800 pb-2">
+                  <div className="flex items-center space-x-1.5">
+                    <Tv className="w-3.5 h-3.5" />
+                    <span>{isAmharic ? 'የቀጥታ ስክሪን ቅድመ-እይታ (TV Display)' : 'TV Public Display Preview'}</span>
+                  </div>
+                  <span className="text-[10px] uppercase font-mono bg-indigo-950 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-800/60">
+                    Live
+                  </span>
+                </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                {isAmharic ? 'በስክሪኑ ግርጌ የሚታይ ማስታወቂያ (አማርኛ)' : 'Bottom Ticker Notice (Amharic)'}
-              </label>
-              <textarea
-                rows={2}
-                value={officeForm.displayNoticeAmharic || ''}
-                onChange={(e) => setOfficeForm({ ...officeForm, displayNoticeAmharic: e.target.value })}
-                className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium text-slate-900"
-              />
-            </div>
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-lg text-white shrink-0">
+                    Q
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-white uppercase tracking-tight truncate">
+                      {isAmharic 
+                        ? (officeForm.officeNameAmharic || officeForm.officeName || 'የአገልግሎት መስጫ ቢሮ')
+                        : (officeForm.officeName || officeForm.officeNameAmharic || 'ABC SERVICE OFFICE')}
+                    </p>
+                    <p className="text-[10px] text-indigo-400 font-medium truncate mt-0.5">
+                      {isAmharic ? 'የቀጥታ የወረፋ መከታተያ ስክሪን • በአዲስ AI ድምፅ' : 'Live Official Queue Display • Addis AI Voice'}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                {isAmharic ? 'ለአንድ ሰው የሚገመት የጥበቃ ደቂቃ' : 'Estimated Wait Minutes Per Customer'}
-              </label>
-              <input
-                type="number"
-                value={officeForm.estimatedWaitPerPersonMinutes || 4}
-                onChange={(e) => setOfficeForm({ ...officeForm, estimatedWaitPerPersonMinutes: Number(e.target.value) })}
-                className="w-32 p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium text-slate-900"
-              />
+              {/* Sidebar Header Preview */}
+              <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-sm space-y-3">
+                <div className="flex items-center justify-between text-xs text-slate-400 font-semibold border-b border-slate-800 pb-2">
+                  <div className="flex items-center space-x-1.5">
+                    <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>{isAmharic ? 'የሳይድባር ቅድመ-እይታ (Sidebar Header)' : 'Navigation Sidebar Preview'}</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shrink-0">
+                    <Building2 className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-white truncate">
+                      {isAmharic 
+                        ? (officeForm.officeNameAmharic || officeForm.officeName || 'የኢትዮጵያ አገልግሎት መስጫ ማዕከል')
+                        : (officeForm.officeName || officeForm.officeNameAmharic || 'ETHIOPIA SERVICE CENTER')}
+                    </p>
+                    <div className="flex items-center space-x-1 mt-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      <span className="text-[9px] text-slate-400 uppercase font-semibold">
+                        {isAmharic ? 'የወረፋ ስርዓት' : 'Smart Queue'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Printed Thermal Ticket Preview */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                <div className="flex items-center justify-between text-xs text-slate-700 font-bold border-b border-slate-100 pb-2">
+                  <div className="flex items-center space-x-1.5">
+                    <Printer className="w-3.5 h-3.5 text-slate-600" />
+                    <span>{isAmharic ? 'የማተሚያ ቲኬት ቅድመ-እይታ (80mm Thermal Ticket)' : '80mm Thermal Ticket Print Preview'}</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 border border-dashed border-slate-300 p-4 rounded-xl text-center font-mono space-y-2">
+                  <div className="border-b border-dashed border-slate-400 pb-2">
+                    <p className="text-xs font-black uppercase text-slate-900">
+                      {officeForm.officeNameAmharic || officeForm.officeName || 'ETHIOPIA SERVICE CENTER'}
+                    </p>
+                    <p className="text-[10px] text-slate-600 uppercase">
+                      {officeForm.officeName || officeForm.officeNameAmharic || 'ETHIOPIA SERVICE CENTER'}
+                    </p>
+                  </div>
+                  <div className="py-1">
+                    <p className="text-[9px] text-slate-500 uppercase font-bold">QUEUE TICKET / የወረፋ ቲኬት</p>
+                    <p className="text-2xl font-black text-slate-900 tracking-wider">A-001</p>
+                  </div>
+                  <div className="border-t border-dashed border-slate-400 pt-2 text-[9px] text-slate-500">
+                    <p>{isAmharic ? 'እናመሰግናለን! • በሰላም ይቆዩ' : 'Thank you for your patience'}</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-
-          <button
-            id="btn-save-office-settings"
-            onClick={handleSaveOfficeSettings}
-            disabled={isSavingOffice}
-            className="mt-4 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5 cursor-pointer"
-          >
-            {isSavingOffice ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>{isAmharic ? 'በማስቀመጥ ላይ...' : 'Saving Office Settings...'}</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                <span>{isAmharic ? 'ቅንብሮችን አስቀምጥ' : 'Save Office Settings'}</span>
-              </>
-            )}
-          </button>
         </div>
       )}
 
@@ -1864,6 +2500,148 @@ export const AdminView: React.FC = () => {
                   <>
                     <Save className="w-3.5 h-3.5" />
                     <span>{isAmharic ? 'አስቀምጥ' : 'Save Staff'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QUICK RENAME OFFICE MODAL */}
+      {isRenameModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {isAmharic ? 'የቢሮ ስም መቀየሪያ' : 'Rename Office / Organization'}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {isAmharic ? 'በስክሪኑ እና በቲኬቶች ላይ የሚታየውን ስም ይለውጡ' : 'Update the official name shown across screens, kiosks, and tickets.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRenameModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {renameModalError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{renameModalError}</span>
+              </div>
+            )}
+
+            {/* Quick Presets */}
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                {isAmharic ? 'ፈጣን የአማራጭ ስሞች' : 'Quick Presets'}
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { am: 'የኢትዮጵያ አገልግሎት መስጫ ማዕከል', en: 'ETHIOPIA SERVICE CENTER' },
+                  { am: 'የኢትዮጵያ ገቢዎች ሚኒስቴር', en: 'MINISTRY OF REVENUES ETHIOPIA' },
+                  { am: 'የኢሚግሬሽን እና ዜግነት አገልግሎት', en: 'IMMIGRATION & CITIZENSHIP SERVICE' },
+                  { am: 'የቂርቆስ ክፍለ ከተማ አገልግሎት ማዕከል', en: 'KIRKOS SUB-CITY SERVICE CENTER' },
+                  { am: 'የቦሌ ክፍለ ከተማ ወሳኝ ኩነት ምዝገባ', en: 'BOLE SUB-CITY VITAL EVENTS' }
+                ].map((p, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setRenameAmharic(p.am);
+                      setRenameEnglish(p.en);
+                    }}
+                    className="px-2 py-1 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 border border-slate-200 rounded-lg text-[11px] font-medium text-slate-700 transition"
+                  >
+                    {isAmharic ? p.am : p.en}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-1">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  {isAmharic ? 'የቢሮ ስም (አማርኛ) *' : 'Office Name (Amharic) *'}
+                </label>
+                <input
+                  id="modal-input-office-name-amharic"
+                  type="text"
+                  value={renameAmharic}
+                  onChange={(e) => setRenameAmharic(e.target.value)}
+                  placeholder="ለምሳሌ፡ የቂርቆስ ክፍለ ከተማ አገልግሎት ማዕከል"
+                  className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none font-medium text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  {isAmharic ? 'የቢሮ ስም (English) *' : 'Office Name (English) *'}
+                </label>
+                <input
+                  id="modal-input-office-name-english"
+                  type="text"
+                  value={renameEnglish}
+                  onChange={(e) => setRenameEnglish(e.target.value)}
+                  placeholder="e.g. KIRKOS SUB-CITY SERVICE CENTER"
+                  className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none font-medium text-slate-900"
+                />
+              </div>
+            </div>
+
+            {/* Live Preview Inside Modal */}
+            <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 text-white flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shrink-0 text-xs">
+                HQ
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-white truncate">
+                  {isAmharic 
+                    ? (renameAmharic || renameEnglish || 'የቢሮ ስም') 
+                    : (renameEnglish || renameAmharic || 'OFFICE NAME')}
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  {isAmharic ? 'በስክሪን እና በቲኬት ላይ እንዲህ ይታያል' : 'Preview on public displays & tickets'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsRenameModalOpen(false)}
+                disabled={isSavingRenameModal}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 rounded-xl border border-slate-200 hover:bg-slate-50 transition"
+              >
+                {isAmharic ? 'ሰርዝ' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                id="btn-save-rename-modal"
+                onClick={handleSaveQuickRename}
+                disabled={isSavingRenameModal}
+                className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-xl shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
+              >
+                {isSavingRenameModal ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>{isAmharic ? 'በማስቀመጥ ላይ...' : 'Saving...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{isAmharic ? 'ስሙን ቀይር እና አስቀምጥ' : 'Apply & Save Name'}</span>
                   </>
                 )}
               </button>

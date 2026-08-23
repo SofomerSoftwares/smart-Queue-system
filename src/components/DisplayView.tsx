@@ -6,6 +6,7 @@ import {
   Maximize2, 
   Minimize2, 
   Music, 
+  Disc,
   Sparkles, 
   Clock, 
   Users, 
@@ -23,6 +24,10 @@ export const DisplayView: React.FC = () => {
     counters, 
     officeSetting, 
     audioSetting, 
+    audioAssets,
+    currentMusicTrack,
+    changeBackgroundMusicTrack,
+    setBackgroundVolume,
     lastAnnouncement,
     uiLanguage,
     isAudioUnlocked,
@@ -274,19 +279,57 @@ export const DisplayView: React.FC = () => {
             </div>
           </div>
 
-          {/* Background Audio / Music Indicator */}
-          <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-            <div className="flex items-center space-x-2">
-              <Music className={`w-3.5 h-3.5 ${isMusicPlaying ? 'text-purple-400 animate-bounce' : 'text-slate-600'}`} />
-              <span className="text-[11px]">{isMusicPlaying ? (isAmharic ? 'የቢሮ ሙዚቃ በርቷል' : 'Ambient Music Playing') : (isAmharic ? 'ሙዚቃ ዝም ብሏል' : 'Audio Muted')}</span>
+          {/* Background Audio / Music Control Bar */}
+          <div className="mt-4 pt-3 border-t border-slate-800 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center space-x-2 min-w-0">
+                <Music className={`w-3.5 h-3.5 shrink-0 ${isMusicPlaying ? 'text-indigo-400 animate-pulse' : 'text-slate-600'}`} />
+                <div className="truncate">
+                  <span className="text-[11px] font-bold text-slate-300">
+                    {isMusicPlaying 
+                      ? (currentMusicTrack?.title || (isAmharic ? 'የቢሮ ዳራ ሙዚቃ' : 'Office Ambient Music')) 
+                      : (isAmharic ? 'የዳራ ሙዚቃ ቆሟል' : 'Ambient Music Paused')}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 shrink-0">
+                {isMusicPlaying && (
+                  <div className="hidden sm:flex items-center gap-0.5 h-3">
+                    <div className="w-0.5 h-1.5 bg-indigo-400 animate-pulse"></div>
+                    <div className="w-0.5 h-3 bg-indigo-500 animate-pulse"></div>
+                    <div className="w-0.5 h-2 bg-indigo-400 animate-pulse"></div>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => toggleBackgroundMusic()}
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-400 hover:text-indigo-300 rounded-lg font-bold text-xs transition border border-slate-700 cursor-pointer"
+                >
+                  {isMusicPlaying ? (isAmharic ? 'አቁም' : 'Pause') : (isAmharic ? 'አጫውት' : 'Play')}
+                </button>
+              </div>
             </div>
 
-            <button
-              onClick={() => toggleBackgroundMusic()}
-              className="text-indigo-400 hover:text-indigo-300 font-semibold text-xs"
-            >
-              {isMusicPlaying ? (isAmharic ? 'አቁም' : 'Pause') : (isAmharic ? 'አጫውት' : 'Play')}
-            </button>
+            {/* Quick Track Switcher if multiple tracks exist */}
+            {audioAssets && audioAssets.filter(a => a.type === 'MUSIC').length > 1 && (
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <span className="text-[10px] text-slate-500 font-medium">
+                  {isAmharic ? 'ሙዚቃ ቀይር:' : 'Track:'}
+                </span>
+                <select
+                  value={audioSetting?.currentMusicAssetId || ''}
+                  onChange={(e) => changeBackgroundMusicTrack && changeBackgroundMusicTrack(e.target.value)}
+                  className="bg-slate-900 border border-slate-800 rounded-md px-2 py-0.5 text-[11px] text-slate-300 focus:outline-none focus:border-indigo-500 font-medium flex-1 truncate"
+                >
+                  {audioAssets.filter(a => a.type === 'MUSIC').map(track => (
+                    <option key={track.id} value={track.id}>
+                      {track.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
       </div>

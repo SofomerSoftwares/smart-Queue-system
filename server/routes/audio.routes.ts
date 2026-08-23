@@ -7,7 +7,7 @@ import {
   buildAmharicAnnouncementText, 
   buildEnglishAnnouncementText 
 } from '../services/addis-voice.service.js';
-import { geminiMusicProvider } from '../services/music.service.js';
+import { geminiMusicProvider, getLocalPresetTracks } from '../services/music.service.js';
 import { AudioAsset } from '../types.js';
 import { broadcaster } from '../websocket.js';
 
@@ -96,6 +96,33 @@ router.post('/generate', authenticate, authorize('audio.manage'), async (req: Re
 router.get('/assets', (req: Request, res: Response) => {
   const assets = db.getAudioAssets();
   res.json({ success: true, assets });
+});
+
+// POST /api/audio/assets/reset-defaults (Restore default local background music tracks)
+router.post('/assets/reset-defaults', authenticate, authorize('audio.manage'), (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const defaults = getLocalPresetTracks();
+    const existing = db.getAudioAssets();
+    
+    // Add default tracks that don't exist yet
+    for (const d of defaults) {
+      if (!existing.some(a => a.id === d.id)) {
+        db.addAudioAsset(d);
+      }
+    }
+
+    db.addAuditLog({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      action: 'RESTORE_DEFAULT_AUDIO_ASSETS',
+      entity: 'AudioAsset'
+    });
+
+    const updated = db.getAudioAssets();
+    res.json({ success: true, assets: updated, message: 'Default background music tracks restored to database.' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // POST /api/audio/music/generate

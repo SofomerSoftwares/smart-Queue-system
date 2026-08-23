@@ -166,15 +166,20 @@ class AudioManager {
     });
   }
 
+  private previewAudioEl: HTMLAudioElement | null = null;
+  private currentMusicUrl: string | null = null;
+
   // --- Background Music Handling ---
-  public startBackgroundMusic(urlOrPreset?: string, volume: number = 12): void {
+  public startBackgroundMusic(urlOrPreset?: string, volume: number = 14): void {
     this.isMusicPlaying = true;
+    this.currentMusicUrl = urlOrPreset || null;
 
     const isPlayableUrl = typeof urlOrPreset === 'string' && (
       urlOrPreset.startsWith('data:audio/') || 
       urlOrPreset.startsWith('http://') || 
       urlOrPreset.startsWith('https://') || 
-      urlOrPreset.startsWith('/api/')
+      urlOrPreset.startsWith('/api/') ||
+      urlOrPreset.startsWith('blob:')
     );
 
     if (!isPlayableUrl) {
@@ -199,7 +204,10 @@ class AudioManager {
             this.startAmbientSynth(volume);
           };
         }
-        this.backgroundAudioEl.src = urlOrPreset;
+        
+        if (this.backgroundAudioEl.src !== urlOrPreset) {
+          this.backgroundAudioEl.src = urlOrPreset;
+        }
         this.backgroundAudioEl.volume = Math.max(0.02, Math.min(1.0, volume / 100));
         const playPromise = this.backgroundAudioEl.play();
         if (playPromise !== undefined) {
@@ -210,6 +218,33 @@ class AudioManager {
       } catch {
         this.startAmbientSynth(volume);
       }
+    }
+  }
+
+  public previewTrack(url: string, volume: number = 30): void {
+    this.stopPreview();
+    if (!url) return;
+
+    try {
+      this.previewAudioEl = new Audio(url);
+      this.previewAudioEl.volume = Math.max(0.05, Math.min(1.0, volume / 100));
+      this.previewAudioEl.onended = () => {
+        this.previewAudioEl = null;
+      };
+      this.previewAudioEl.play().catch(() => {});
+    } catch (err) {
+      console.warn('Preview audio error:', err);
+    }
+  }
+
+  public stopPreview(): void {
+    if (this.previewAudioEl) {
+      try {
+        this.previewAudioEl.pause();
+        this.previewAudioEl.removeAttribute('src');
+        this.previewAudioEl.load();
+      } catch {}
+      this.previewAudioEl = null;
     }
   }
 

@@ -194,6 +194,11 @@ export const api = {
   getAudioAssets: () =>
     request<{ success: boolean; assets: AudioAsset[] }>('/api/audio/assets'),
 
+  restoreDefaultAudioAssets: () =>
+    request<{ success: boolean; assets: AudioAsset[]; message: string }>('/api/audio/assets/reset-defaults', {
+      method: 'POST'
+    }),
+
   generateAIMusic: (prompt: string, model?: string) =>
     request<{ success: boolean; result: { audioBase64?: string; title: string; source: string } }>('/api/audio/music/generate', {
       method: 'POST',

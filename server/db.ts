@@ -1,5 +1,3 @@
-import fs from 'fs';
-import path from 'path';
 import bcrypt from 'bcryptjs';
 import { 
   User, 
@@ -16,14 +14,7 @@ import {
   RoleName
 } from './types.js';
 import { mongoService } from './mongodb.js';
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const DATA_FILE = path.join(DATA_DIR, 'queue_db.json');
-
-// Ensure data dir exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
+import { getLocalPresetTracks } from './services/music.service.js';
 
 export const PERMISSIONS: Permission[] = [
   { id: 'dashboard.view', name: 'View Dashboard', description: 'Access dashboard screens' },
@@ -309,28 +300,13 @@ function seedDatabase(): DatabaseSchema {
     repeatCount: 1,
     announcementDelaySeconds: 1,
     backgroundMusicEnabled: true,
-    backgroundMusicVolume: 12
+    backgroundMusicVolume: 14,
+    currentMusicAssetId: 'asset-music-1'
   };
 
+  const presetTracks = getLocalPresetTracks();
   const audioAssets: AudioAsset[] = [
-    {
-      id: 'asset-music-1',
-      title: 'Gentle Addis Ambient Lo-Fi (Calm Office)',
-      type: 'MUSIC',
-      url: 'preset:ambient-calm-1',
-      source: 'PRESET',
-      durationSeconds: 180,
-      createdAt: now
-    },
-    {
-      id: 'asset-music-2',
-      title: 'Serene Acoustic Krar Waves (Peaceful Lounge)',
-      type: 'MUSIC',
-      url: 'preset:acoustic-peace-2',
-      source: 'PRESET',
-      durationSeconds: 210,
-      createdAt: now
-    },
+    ...presetTracks,
     {
       id: 'asset-chime-1',
       title: 'Modern Airport Queue Chime',
@@ -458,54 +434,35 @@ class Database {
   }
 
   private async initMongoSync(): Promise<void> {
-    // If a valid MONGODB_URI is provided, attempt connection and sync
-    if (mongoService.getStatus().configured) {
-      try {
-        const connected = await mongoService.connect();
-        if (connected) {
-          const mongoData = await mongoService.loadAll();
-          if (mongoData && mongoData.users && mongoData.users.length > 0) {
-            // MongoDB Atlas has existing data; hydrate our in-memory cache
-            this.data = mongoData;
-            this.saveImmediate(this.data);
-            console.log(`🚀 [MongoDB Atlas] Synchronized and loaded ${mongoData.tickets?.length || 0} tickets, ${mongoData.services?.length || 0} services from Atlas`);
-          } else {
-            // MongoDB Atlas is freshly connected and empty; push initial seed to Atlas
-            await mongoService.saveAll(this.data);
-            console.log(`📦 [MongoDB Atlas] Successfully seeded initial schema and data to Atlas collections`);
-          }
+    try {
+      const connected = await mongoService.connect();
+      if (connected) {
+        const mongoData = await mongoService.loadAll();
+        if (mongoData && mongoData.users && mongoData.users.length > 0) {
+          // MongoDB Atlas has existing data; hydrate our state directly from MongoDB
+          this.data = mongoData;
+          console.log(`🚀 [MongoDB Atlas] Successfully loaded ${mongoData.tickets?.length || 0} tickets, ${mongoData.services?.length || 0} services from Atlas collections`);
+        } else {
+          // MongoDB Atlas is freshly connected and empty; push initial seed to Atlas collections
+          await mongoService.saveAll(this.data);
+          console.log(`📦 [MongoDB Atlas] Successfully seeded initial schema and collections to MongoDB Atlas`);
         }
-      } catch (err: any) {
-        console.log(`ℹ️ [MongoDB Atlas] Startup note: ${err?.message || 'Using resilient local storage'}`);
       }
+    } catch (err: any) {
+      console.log(`ℹ️ [MongoDB Atlas] Startup note: ${err?.message || 'Connecting to MongoDB Atlas...'}`);
     }
   }
 
   private load(): DatabaseSchema {
-    try {
-      if (fs.existsSync(DATA_FILE)) {
-        const raw = fs.readFileSync(DATA_FILE, 'utf-8');
-        return JSON.parse(raw);
-      }
-    } catch (err) {
-      console.warn('Failed to load existing database file, initializing fresh seed:', err);
-    }
-    const fresh = seedDatabase();
-    this.saveImmediate(fresh);
-    return fresh;
+    return seedDatabase();
   }
 
   private saveImmediate(snapshot: DatabaseSchema) {
-    try {
-      fs.writeFileSync(DATA_FILE, JSON.stringify(snapshot, null, 2), 'utf-8');
-      // Asynchronously mirror snapshot to MongoDB Atlas in background
-      if (mongoService.isReady()) {
-        mongoService.saveAll(snapshot).catch(err => {
-          console.warn('MongoDB Atlas async save warning:', err.message);
-        });
-      }
-    } catch (err) {
-      console.error('Failed to write database file:', err);
+    // Mirror and persist snapshot directly to MongoDB Atlas collections
+    if (mongoService.isReady()) {
+      mongoService.saveAll(snapshot).catch(err => {
+        console.warn('MongoDB Atlas persistence warning:', err.message);
+      });
     }
   }
 
@@ -515,7 +472,7 @@ class Database {
     setTimeout(() => {
       this.saveImmediate(this.data);
       this.isWriting = false;
-    }, 100);
+    }, 50);
   }
 
   public getMongoStatus() {
@@ -528,7 +485,6 @@ class Database {
       const mongoData = await mongoService.loadAll();
       if (mongoData && mongoData.users && mongoData.users.length > 0) {
         this.data = mongoData;
-        this.saveImmediate(this.data);
       } else {
         await mongoService.saveAll(this.data);
       }
