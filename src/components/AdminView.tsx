@@ -37,13 +37,18 @@ import {
   Building2,
   X,
   Printer,
-  Smartphone
+  Smartphone,
+  Mic,
+  Headphones,
+  Sliders,
+  Languages,
+  Zap
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { audioManager } from '../lib/audioManager';
-import { Service, Counter, User, AudioSetting, OfficeSetting, AuditLog, AddisVoiceOption, AudioAsset } from '../types';
+import { Service, Counter, User, AudioSetting, OfficeSetting, AuditLog, AudioAsset, AddisVoiceOption } from '../types';
 
 export const AdminView: React.FC = () => {
   const { 
@@ -76,17 +81,6 @@ export const AdminView: React.FC = () => {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [audioAssets, setAudioAssets] = useState<any[]>([]);
 
-  // Addis AI Voice Options & DB Status
-  const [addisVoices, setAddisVoices] = useState<AddisVoiceOption[]>([
-    { id: 'aster', name: 'Aster (Natural Amharic)', nameAmharic: 'አስቴር (የተረጋጋ የሴት ድምፅ)', gender: 'FEMALE', description: 'Crisp, calm female Amharic voice', descriptionAmharic: 'ለአዳራሽ እና ለቆጣሪ ጥሪዎች የተዘጋጀ የሴት ድምፅ' },
-    { id: 'abebe', name: 'Abebe (Clear Amharic)', nameAmharic: 'አበበ (ግልፅ የወንድ ድምፅ)', gender: 'MALE', description: 'Deep and clear male Amharic voice', descriptionAmharic: 'ግልፅ እና ጎላ ያለ ይፋዊ የወንድ ድምፅ' },
-    { id: 'selam', name: 'Selam (Expressive Amharic)', nameAmharic: 'ሰላም (ደማቅ የሴት ድምፅ)', gender: 'FEMALE', description: 'Warm and welcoming female voice', descriptionAmharic: 'ሞቅ ያለ እና እንግዳ ተቀባይ የሴት ድምፅ' },
-    { id: 'dawit', name: 'Dawit (Official Amharic)', nameAmharic: 'ዳዊት (ይፋዊ የወንድ ድምፅ)', gender: 'MALE', description: 'Authoritative and formal male voice', descriptionAmharic: 'ለመንግስት እና ለባንክ ተቋማት የሚመጥን የወንድ ድምፅ' }
-  ]);
-  const [selectedAddisVoice, setSelectedAddisVoice] = useState<string>('aster');
-  const [selectedTtsProvider, setSelectedTtsProvider] = useState<'ADDIS_AI' | 'GEMINI_TTS'>('ADDIS_AI');
-  const [voiceSpeed, setVoiceSpeed] = useState<number>(1.0);
-
   // MongoDB Atlas State
   const [dbStatus, setDbStatus] = useState<any>(null);
   const [mongoUriInput, setMongoUriInput] = useState<string>('');
@@ -111,13 +105,6 @@ export const AdminView: React.FC = () => {
   const [userModalError, setUserModalError] = useState<string>('');
   const [showUserPassword, setShowUserPassword] = useState<boolean>(false);
 
-  // Audio Testing State
-  const [testVoiceText, setTestVoiceText] = useState<string>('ቁጥር ሀ ሃያ አራት ያላችሁ ደንበኛ ወደ ቆጣሪ ሁለት ይሂዱ');
-  const [testLanguage, setTestLanguage] = useState<'AMHARIC' | 'ENGLISH'>('AMHARIC');
-  const [selectedVoice, setSelectedVoice] = useState<string>('Kore');
-  const [isTestingVoice, setIsTestingVoice] = useState<boolean>(false);
-  const [testVoiceStatus, setTestVoiceStatus] = useState<string>('');
-
   // AI & Local Music Library State
   const [musicPrompt, setMusicPrompt] = useState<string>('Gentle calm Addis Krar ambient office lounge background relaxing');
   const [isGeneratingMusic, setIsGeneratingMusic] = useState<boolean>(false);
@@ -126,14 +113,31 @@ export const AdminView: React.FC = () => {
   const [isUploadingMusic, setIsUploadingMusic] = useState<boolean>(false);
   const [musicActionMessage, setMusicActionMessage] = useState<string>('');
 
+  // Addis Voice API State
+  const [addisVoiceStatus, setAddisVoiceStatus] = useState<any>(null);
+  const [addisVoices, setAddisVoices] = useState<AddisVoiceOption[]>([]);
+  const [testVoiceText, setTestVoiceText] = useState<string>('ቁጥር ሀ ሃያ አራት ያላችሁ ደንበኛ ወደ ቆጣሪ ሁለት ይሂዱ።');
+  const [isTestingVoice, setIsTestingVoice] = useState<boolean>(false);
+  const [testVoiceStatusMsg, setTestVoiceStatusMsg] = useState<string>('');
+  const [audioStudioTab, setAudioStudioTab] = useState<'voice' | 'music'>('voice');
+
   // Office & Audio Settings Form
   const [officeForm, setOfficeForm] = useState<Partial<OfficeSetting>>({});
   const [isOfficeFormDirty, setIsOfficeFormDirty] = useState<boolean>(false);
-  const [audioForm, setAudioForm] = useState<Partial<AudioSetting>>({});
+  const [audioForm, setAudioForm] = useState<Partial<AudioSetting>>({
+    voiceEnabled: true,
+    language: 'AMHARIC',
+    volume: 85,
+    repeatCount: 1,
+    announcementDelaySeconds: 1,
+    addisVoiceEnabled: true,
+    addisVoice: 'aster',
+    voiceSpeed: 1.0,
+    backgroundMusicEnabled: true,
+    backgroundMusicVolume: 14
+  });
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>('');
   const [isSavingAudio, setIsSavingAudio] = useState<boolean>(false);
-  const [audioSaveSuccess, setAudioSaveSuccess] = useState<string>('');
-  const [audioSaveError, setAudioSaveError] = useState<string>('');
   const [isSavingOffice, setIsSavingOffice] = useState<boolean>(false);
   const [officeSaveSuccess, setOfficeSaveSuccess] = useState<string>('');
   const [officeSaveError, setOfficeSaveError] = useState<string>('');
@@ -154,29 +158,33 @@ export const AdminView: React.FC = () => {
       setRenameEnglish(officeSetting.officeName || '');
     }
     if (audioSetting) {
-      setAudioForm(audioSetting);
-      setSelectedVoice(audioSetting.ttsVoice || 'Kore');
-      setSelectedAddisVoice(audioSetting.addisVoice || 'aster');
-      setSelectedTtsProvider(audioSetting.ttsProvider || 'ADDIS_AI');
-      setVoiceSpeed(audioSetting.addisAiSpeed || 1.0);
+      setAudioForm(prev => ({
+        ...prev,
+        ...audioSetting,
+        addisVoiceEnabled: audioSetting.addisVoiceEnabled !== undefined ? audioSetting.addisVoiceEnabled : true,
+        addisVoice: audioSetting.addisVoice || 'aster',
+        voiceSpeed: audioSetting.voiceSpeed || 1.0
+      }));
     }
   }, [officeSetting, audioSetting, isOfficeFormDirty]);
 
   const loadAdminData = async () => {
     try {
-      const [uRes, aRes, audRes, vRes, dbRes] = await Promise.all([
+      const [uRes, aRes, audRes, dbRes, vStatusRes, vListRes] = await Promise.all([
         api.getUsers().catch(() => ({ success: false, users: [] })),
         api.getAuditLogs().catch(() => ({ success: false, logs: [] })),
         api.getAudioAssets().catch(() => ({ success: false, assets: [] })),
-        api.getAddisVoices().catch(() => ({ success: false, voices: [] })),
-        api.getDatabaseStatus().catch(() => ({ success: false }))
+        api.getDatabaseStatus().catch(() => ({ success: false })),
+        api.getAddisVoiceStatus().catch(() => ({ success: false, status: { configured: false, apiUrl: '', activeModel: '', availableVoicesCount: 0, provider: '' } })),
+        api.getAddisVoices().catch(() => ({ success: false, voices: [] }))
       ]);
 
       if (uRes.success) setUsersList(uRes.users);
       if (aRes.success) setAuditLogs(aRes.logs);
       if (audRes.success) setAudioAssets(audRes.assets);
-      if (vRes.success && vRes.voices?.length > 0) setAddisVoices(vRes.voices);
       if (dbRes.success) setDbStatus(dbRes);
+      if (vStatusRes.success && vStatusRes.status) setAddisVoiceStatus(vStatusRes.status);
+      if (vListRes.success && vListRes.voices) setAddisVoices(vListRes.voices);
     } catch (err) {
       console.warn('Error loading admin data:', err);
     }
@@ -186,92 +194,95 @@ export const AdminView: React.FC = () => {
     loadAdminData();
   }, [activeTab]);
 
-  // Voice Test Handler
-  const handleTestVoice = async () => {
+  // Test Live Addis Voice Announcement
+  const handleTestAddisVoice = async (customPhrase?: string) => {
+    const textToAnnounce = customPhrase || testVoiceText;
     try {
       setIsTestingVoice(true);
-      audioManager.initContext();
-      setTestVoiceStatus(isAmharic ? 'በአዲስ AI (Addis AI) ድምፅ በማመንጨት ላይ...' : 'Synthesizing with Addis AI Voice...');
-      const res = await api.testVoice({
-        text: testVoiceText,
-        language: testLanguage,
-        provider: 'ADDIS_AI',
-        voice: selectedAddisVoice,
-        speed: voiceSpeed
+      setTestVoiceStatusMsg(isAmharic ? 'በ Addis Voice API ድምፅ በማመንጨት ላይ...' : 'Synthesizing voice via Addis Voice API...');
+      
+      const res = await api.testAddisVoice({
+        text: textToAnnounce,
+        voice: audioForm.addisVoice || 'aster',
+        speed: audioForm.voiceSpeed || 1.0,
+        language: audioForm.language === 'ENGLISH' ? 'en' : 'am'
       });
 
-      if (res.success) {
-        setTestVoiceStatus(isAmharic ? 'ድምፅ እየተጫወተ ነው...' : 'Playing Addis AI voice announcement...');
+      if (res.success && res.audioBase64) {
+        setTestVoiceStatusMsg(isAmharic ? 'የ Addis Voice ጥሪ በመጫወት ላይ...' : 'Playing Addis Voice crystal-clear audio...');
         await audioManager.playAnnouncement(
-          testVoiceText,
-          res.audioResult?.audioBase64,
-          res.audioResult?.mimeType || 'audio/wav',
-          audioForm.volume || 85,
-          res.audioResult?.phoneticText
+          textToAnnounce,
+          res.audioBase64,
+          res.mimeType || 'audio/wav',
+          audioForm.volume || 85
         );
-        setTestVoiceStatus(isAmharic ? 'ድምፅ ተጠናቅቋል' : 'Voice playback finished');
-        setTimeout(() => setTestVoiceStatus(''), 2500);
+        setTestVoiceStatusMsg(isAmharic ? 'የ Addis Voice ጥሪ ተጫውቷል!' : 'Addis Voice audio announcement played successfully!');
       } else {
-        setTestVoiceStatus(isAmharic ? 'ድምፅ ተፈትኗል' : 'Voice synthesis complete');
-        setTimeout(() => setTestVoiceStatus(''), 3000);
+        setTestVoiceStatusMsg(isAmharic ? 'በአሳሽ የድምፅ ሞተር በመጫወት ላይ...' : 'Playing browser speech announcement...');
+        await audioManager.playAnnouncement(
+          textToAnnounce,
+          undefined,
+          'audio/wav',
+          audioForm.volume || 85
+        );
+        setTestVoiceStatusMsg(isAmharic ? 'የድምፅ ጥሪ ተጫውቷል' : 'Announcement played');
       }
+      setTimeout(() => setTestVoiceStatusMsg(''), 5000);
     } catch (err: any) {
-      setTestVoiceStatus('');
-      setAudioSaveError(`Voice test error: ${err.message}`);
+      setTestVoiceStatusMsg(`Error: ${err.message}`);
     } finally {
       setIsTestingVoice(false);
     }
   };
 
-  // Save Audio Settings
+  // Save Complete Audio & Voice Settings
   const handleSaveAudioSettings = async () => {
     try {
       setIsSavingAudio(true);
-      setAudioSaveError('');
-      setAudioSaveSuccess('');
-
-      const payload: Partial<AudioSetting> = {
-        ...audioForm,
-        ttsProvider: 'ADDIS_AI',
-        addisVoice: selectedAddisVoice,
-        addisAiSpeed: Number(voiceSpeed) || 1.0,
-        addisAiEndpoint: (audioForm.addisAiEndpoint || '').trim() || 'https://api.addis.ai/v1/tts',
-        addisAiApiKey: (audioForm.addisAiApiKey || '').trim(),
-        language: audioForm.language || 'AMHARIC',
-        voiceEnabled: audioForm.voiceEnabled ?? true,
-        volume: Number(audioForm.volume) || 85,
-        repeatCount: Number(audioForm.repeatCount) || 1,
-        announcementDelaySeconds: Number(audioForm.announcementDelaySeconds) || 0,
-        backgroundMusicEnabled: audioForm.backgroundMusicEnabled ?? false,
-        backgroundMusicVolume: Number(audioForm.backgroundMusicVolume) || 12,
-        currentMusicAssetId: audioForm.currentMusicAssetId
-      };
-
-      const res = await api.updateAudioSettings(payload);
+      setSaveSuccessMsg('');
+      const res = await api.updateAudioSettings(audioForm);
       if (res.success && res.settings) {
         setAudioForm(res.settings);
-        setSelectedAddisVoice(res.settings.addisVoice || 'aster');
-        setSelectedTtsProvider('ADDIS_AI');
-        setVoiceSpeed(res.settings.addisAiSpeed || 1.0);
+        const msg = isAmharic ? 'የድምፅ ጥሪ እና የሙዚቃ ቅንብሮች በተሳካ ሁኔታ ተቀምጠዋል!' : 'Addis Voice and Audio settings saved successfully!';
+        setSaveSuccessMsg(msg);
+        setTimeout(() => setSaveSuccessMsg(''), 4000);
+        await refreshQueue();
       }
-
-      const msg = isAmharic 
-        ? 'የአዲስ AI ድምፅ ቅንብሮች በተሳካ ሁኔታ ተቀምጠዋል!' 
-        : 'Addis AI Voice settings saved and applied successfully!';
-      setAudioSaveSuccess(msg);
-      setSaveSuccessMsg(msg);
-      setTimeout(() => {
-        setAudioSaveSuccess('');
-        setSaveSuccessMsg('');
-      }, 4000);
-      await refreshQueue();
-      loadAdminData();
     } catch (err: any) {
-      console.error('Error saving audio settings:', err);
-      const errMsg = err.message || (isAmharic ? 'የድምፅ ቅንብሮችን ማስቀመጥ አልተቻለም። እባክዎ እንደ አስተዳዳሪ መግባትዎን ያረጋግጡ።' : 'Failed to save Addis AI voice settings. Please check admin authorization.');
-      setAudioSaveError(errMsg);
+      alert(err.message || 'Failed to save audio settings');
     } finally {
       setIsSavingAudio(false);
+    }
+  };
+
+  // Background Music Toggle
+  const handleToggleBackgroundMusic = async (enabled: boolean) => {
+    setAudioForm(prev => ({ ...prev, backgroundMusicEnabled: enabled }));
+    try {
+      setIsSavingAudio(true);
+      await api.updateAudioSettings({ backgroundMusicEnabled: enabled });
+      setMusicActionMessage(
+        enabled
+          ? (isAmharic ? 'የቢሮ ዳራ ሙዚቃ ነቅቷል' : 'Background music enabled')
+          : (isAmharic ? 'የቢሮ ዳራ ሙዚቃ ቆሟል' : 'Background music disabled')
+      );
+      setTimeout(() => setMusicActionMessage(''), 3000);
+      await refreshQueue();
+    } catch (err: any) {
+      console.warn('Error toggling music:', err);
+    } finally {
+      setIsSavingAudio(false);
+    }
+  };
+
+  // Background Music Volume Update
+  const handleUpdateBackgroundVolume = async (volume: number) => {
+    setAudioForm(prev => ({ ...prev, backgroundMusicVolume: volume }));
+    if (setBackgroundVolume) setBackgroundVolume(volume);
+    try {
+      await api.updateAudioSettings({ backgroundMusicVolume: volume });
+    } catch (err: any) {
+      console.warn('Error updating volume:', err);
     }
   };
 
@@ -620,6 +631,25 @@ export const AdminView: React.FC = () => {
             ? (isAmharic ? 'በተሳካ ሁኔታ ከ MongoDB Atlas ጋር ተገናኝቷል!' : 'Successfully connected to MongoDB Atlas!')
             : (isAmharic ? 'ከዳታቤዙ ጋር መገናኘት አልተቻለም፡ ' + res.error : 'Failed to connect: ' + res.error)
         );
+        setTimeout(() => setDbActionMsg(''), 5000);
+      }
+    } catch (err: any) {
+      setDbActionMsg(`Error: ${err.message}`);
+    } finally {
+      setIsConnectingDb(false);
+    }
+  };
+
+  // Disconnect MongoDB Atlas / Switch to Local Resilient Mode
+  const handleDisconnectDb = async () => {
+    try {
+      setIsConnectingDb(true);
+      setDbActionMsg(isAmharic ? 'ወደ አካባቢ ማከማቻ በመቀየር ላይ...' : 'Switching to Local Resilient Storage...');
+      const res = await api.disconnectDatabase();
+      if (res.success) {
+        setDbStatus(res);
+        setMongoUriInput('');
+        setDbActionMsg(isAmharic ? 'ወደ አካባቢ ማከማቻ (Local Mode) ተቀይሯል!' : 'Switched to Resilient Local Storage mode!');
         setTimeout(() => setDbActionMsg(''), 4000);
       }
     } catch (err: any) {
@@ -683,7 +713,7 @@ export const AdminView: React.FC = () => {
                   <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl leading-relaxed">
                     {isAmharic 
                       ? 'ይህ የስራ ክፍል ለአስተዳዳሪ (Admin) ብቻ የተፈቀደ ነው። አገልግሎቶች፣ ቆጣሪዎች፣ ሰራተኞች፣ የአማርኛ ድምፅ እና የቢሮ ቅንብሮች እዚህ ይዋቀራሉ።'
-                      : 'This portal is strictly restricted to System Administrators. Service catalog, counter routing, staff accounts, Addis AI Voice parameters, MongoDB Atlas sync, and audit logs are managed here.'}
+                      : 'This portal is strictly restricted to System Administrators. Service catalog, counter routing, staff accounts, Voice parameters, MongoDB Atlas sync, and audit logs are managed here.'}
                   </p>
                 </div>
               </div>
@@ -797,7 +827,7 @@ export const AdminView: React.FC = () => {
               {isAmharic ? 'የአስተዳዳሪ መቆጣጠሪያ ማዕከል' : 'Administrator Control Center'}
             </h1>
             <p className="text-xs text-slate-500 font-medium">
-              {isAmharic ? 'አገልግሎቶች፣ ቆጣሪዎች፣ ሰራተኞች፣ የአማርኛ ድምፅ እና የቢሮ ቅንብሮች' : 'Manage services, counters, staff, Amharic voice and office settings'}
+              {isAmharic ? 'አገልግሎቶች፣ ቆጣሪዎች፣ ሰራተኞች፣ የዳራ ሙዚቃ እና የቢሮ ቅንብሮች' : 'Manage services, counters, staff, background music and office settings'}
             </p>
           </div>
         </div>
@@ -874,7 +904,7 @@ export const AdminView: React.FC = () => {
           { id: 'services', label: isAmharic ? 'አገልግሎቶች' : 'Services', icon: Layers },
           { id: 'counters', label: isAmharic ? 'ቆጣሪዎች' : 'Counters', icon: Tv },
           { id: 'staff', label: isAmharic ? 'ሰራተኞች' : 'Staff & Roles', icon: Users },
-          { id: 'audio', label: isAmharic ? 'የድምፅ ስቱዲዮ (Addis AI)' : 'Voice & Audio (Addis AI)', icon: Volume2 },
+          { id: 'audio', label: isAmharic ? 'ድምፅ እና ሙዚቃ (Addis Voice)' : 'Voice & Audio Studio (Addis Voice)', icon: Volume2 },
           { id: 'database', label: isAmharic ? 'ዳታቤዝ (MongoDB)' : 'Database (MongoDB Atlas)', icon: Database },
           { id: 'office', label: isAmharic ? 'የቢሮ ቅንብር' : 'Office Settings', icon: Settings },
           { id: 'audit', label: isAmharic ? 'የእንቅስቃሴ መዝገብ' : 'Audit Trail', icon: FileText }
@@ -1224,525 +1254,695 @@ export const AdminView: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 5: VOICE & AUDIO STUDIO (ADDIS AI VOICE AS PRIMARY) */}
+      {/* TAB 5: VOICE ANNOUNCEMENT & BACKGROUND MUSIC STUDIO (ADDIS VOICE API) */}
       {activeTab === 'audio' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* Left 7 Cols: Addis AI Voice Engine & Configuration */}
-          <div className="lg:col-span-7 bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center space-x-2">
-                <Volume2 className="w-5 h-5 text-indigo-600" />
-                <h3 className="font-bold text-slate-900 text-base">
-                  {isAmharic ? 'የአዲስ AI (Addis AI) ድምፅ ማስታወቂያ ቅንብር' : 'Addis AI Voice Announcement Configuration'}
-                </h3>
+        <div className="space-y-6">
+          {/* Sub-Header Tabs: Addis Voice vs Background Music */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-xs">
+                <Volume2 className="w-5 h-5" />
               </div>
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                Addis AI Active
-              </span>
-            </div>
-
-            {/* Inline Feedback Alerts */}
-            {audioSaveSuccess && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center space-x-2 animate-in fade-in">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>{audioSaveSuccess}</span>
-              </div>
-            )}
-            {audioSaveError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold flex items-center space-x-2 animate-in fade-in">
-                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                <span>{audioSaveError}</span>
-              </div>
-            )}
-
-            {/* Addis AI Voice Persona Selection */}
-            <div className="space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-slate-800">
-                  {isAmharic ? 'የአዲስ AI ድምፅ ምርጫ (Addis Voice Persona)' : 'Select Addis AI Voice Persona'}
-                </label>
-                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
-                  Addis AI Engine
-                </span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {addisVoices.map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => setSelectedAddisVoice(v.id)}
-                    className={`p-3 rounded-xl border text-left transition flex flex-col justify-between ${
-                      selectedAddisVoice === v.id
-                        ? 'border-indigo-600 bg-white shadow-xs ring-1 ring-indigo-500'
-                        : 'border-slate-200 bg-white/70 hover:bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-900">
-                        {isAmharic ? v.nameAmharic : v.name}
-                      </span>
-                      <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
-                        {v.gender}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      {isAmharic ? v.descriptionAmharic : v.description}
-                    </p>
-                  </button>
-                ))}
-              </div>
-
-              {/* Voice Speed Multiplier */}
-              <div className="pt-2">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-xs font-bold text-slate-700">
-                    {isAmharic ? 'የንግግር ፍጥነት (Speed)' : 'Speech Rate Speed'}
-                  </label>
-                  <span className="text-xs font-mono font-bold text-indigo-600">{voiceSpeed}x</span>
-                </div>
-                <input
-                  type="range"
-                  min="0.8"
-                  max="1.3"
-                  step="0.05"
-                  value={voiceSpeed}
-                  onChange={(e) => setVoiceSpeed(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                />
-                <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-1">
-                  <span>0.8x (Slower)</span>
-                  <span>1.0x (Normal)</span>
-                  <span>1.3x (Faster)</span>
-                </div>
-              </div>
-
-              {/* Addis Voice API Endpoint & API Key */}
-              <div className="pt-2 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    {isAmharic ? 'የአዲስ AI ድምፅ API Endpoint' : 'Addis AI Voice API Endpoint'}
-                  </label>
-                  <input
-                    type="text"
-                    value={audioForm.addisAiEndpoint || ''}
-                    onChange={(e) => setAudioForm({ ...audioForm, addisAiEndpoint: e.target.value })}
-                    placeholder="https://api.addis.ai/v1/tts"
-                    className="w-full p-2 text-xs bg-white border border-slate-200 rounded-xl font-mono text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    {isAmharic ? 'ነባሪ አድራሻ፡ https://api.addis.ai/v1/tts' : 'Default endpoint: https://api.addis.ai/v1/tts'}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    {isAmharic ? 'የአዲስ AI API ቁልፍ (API Key)' : 'Addis AI API Key'}
-                  </label>
-                  <input
-                    type="password"
-                    value={audioForm.addisAiApiKey || ''}
-                    onChange={(e) => setAudioForm({ ...audioForm, addisAiApiKey: e.target.value })}
-                    placeholder="sk-addis-ai-..."
-                    className="w-full p-2 text-xs bg-white border border-slate-200 rounded-xl font-mono text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    {isAmharic ? 'ወይም በ .env ውስጥ ADDIS_AI_API_KEY ተጠቀም' : 'Or configure ADDIS_AI_API_KEY in environment'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Volume, Repeat, and Language Controls */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  {isAmharic ? 'የማስታወቂያ ቋንቋ' : 'Announcement Language'}
-                </label>
-                <select
-                  value={audioForm.language || 'AMHARIC'}
-                  onChange={(e) => setAudioForm({ ...audioForm, language: e.target.value as any })}
-                  className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium text-slate-900"
-                >
-                  <option value="AMHARIC">አማርኛ (Amharic Primary)</option>
-                  <option value="ENGLISH">English</option>
-                  <option value="BOTH">አማርኛ & English</option>
-                </select>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    {isAmharic ? 'ዋና የድምፅ መጠን' : 'Announcement Volume'}
-                  </label>
-                  <span className="text-xs font-mono font-bold text-indigo-600">{audioForm.volume || 85}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="20"
-                  max="100"
-                  step="5"
-                  value={audioForm.volume || 85}
-                  onChange={(e) => setAudioForm({ ...audioForm, volume: parseInt(e.target.value) })}
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600 mt-2"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  {isAmharic ? 'ድምፅ አንቃ / አጥፋ' : 'Voice Announcements'}
-                </label>
-                <div className="flex items-center space-x-2 pt-2">
-                  <input
-                    type="checkbox"
-                    id="voiceEnabled"
-                    checked={audioForm.voiceEnabled ?? true}
-                    onChange={(e) => setAudioForm({ ...audioForm, voiceEnabled: e.target.checked })}
-                    className="w-4 h-4 text-indigo-600 rounded"
-                  />
-                  <label htmlFor="voiceEnabled" className="text-xs text-slate-600 font-medium cursor-pointer">
-                    {isAmharic ? 'ጥሪ ሲደረግ በድምፅ ይጥራ' : 'Broadcast on ticket call'}
-                  </label>
-                </div>
+                <h2 className="text-base font-bold text-slate-900">
+                  {isAmharic ? 'የድምፅ ጥሪ እና የሙዚቃ ስቱዲዮ' : 'Voice Announcement & Music Studio'}
+                </h2>
+                <p className="text-xs text-slate-500">
+                  {isAmharic ? 'በ Addis Voice AI የሚሰሩ የአማርኛ እና አፋን ኦሮሞ የድምፅ ጥሪዎች እና የቢሮ ዳራ ሙዚቃዎች' : 'High-fidelity Addis Voice Amharic neural speech & ambient lobby soundtracks'}
+                </p>
               </div>
             </div>
 
-            {/* Live Voice Announcement Tester */}
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800">
-                  {isAmharic ? 'የድምፅ መሞከሪያ (Live Addis AI Voice Preview)' : 'Test Voice Output'}
-                </span>
-                <span className="text-[10px] text-indigo-600 font-mono font-bold">
-                  Addis AI ({selectedAddisVoice})
-                </span>
-              </div>
-
-              {/* Sample Preset Phrases */}
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  'ቁጥር ሀ ሃያ አራት ያላችሁ ደንበኛ ወደ ቆጣሪ ሁለት ይሂዱ',
-                  'ቁጥር ለ አስራ አምስት ወደ ቆጣሪ አንድ ይሂዱ',
-                  'Ticket number A-024, please proceed to counter 2'
-                ].map((phrase, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setTestVoiceText(phrase)}
-                    className="text-[10px] px-2 py-1 bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition truncate max-w-full font-medium"
-                  >
-                    {phrase}
-                  </button>
-                ))}
-              </div>
-
-              <textarea
-                rows={2}
-                value={testVoiceText}
-                onChange={(e) => setTestVoiceText(e.target.value)}
-                className="w-full p-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium text-slate-900"
-                placeholder="Enter phrase to synthesize..."
-              />
-
-              <div className="flex items-center justify-between pt-1">
-                <div className="text-xs font-medium text-slate-500">
-                  {testVoiceStatus}
-                </div>
-                <button
-                  onClick={handleTestVoice}
-                  disabled={isTestingVoice}
-                  className="flex items-center space-x-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-xs"
-                >
-                  <Play className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>{isTestingVoice ? (isAmharic ? 'በማመንጨት ላይ...' : 'Synthesizing...') : (isAmharic ? 'ድምፅ ሞክር (Addis AI)' : 'Test Voice')}</span>
-                </button>
-              </div>
+            {/* Sub-tab Switcher */}
+            <div className="flex items-center space-x-1 p-1 bg-slate-100 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setAudioStudioTab('voice')}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  audioStudioTab === 'voice'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Mic className="w-3.5 h-3.5" />
+                <span>{isAmharic ? 'Addis Voice የድምፅ ጥሪ' : 'Addis Voice Engine'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAudioStudioTab('music')}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  audioStudioTab === 'music'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Music className="w-3.5 h-3.5" />
+                <span>{isAmharic ? 'የቢሮ ዳራ ሙዚቃ' : 'Background Music'}</span>
+              </button>
             </div>
-
-            <button
-              id="btn-save-addis-voice-settings"
-              onClick={handleSaveAudioSettings}
-              disabled={isSavingAudio}
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center justify-center space-x-2 cursor-pointer"
-            >
-              {isSavingAudio ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>{isAmharic ? 'ቅንብሮችን በማስቀመጥ ላይ...' : 'Saving Addis AI Voice Settings...'}</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  <span>{isAmharic ? 'የአዲስ AI ድምፅ ቅንብሮችን አስቀምጥ' : 'Save Addis AI Voice Settings'}</span>
-                </>
-              )}
-            </button>
           </div>
 
-          {/* Right 5 Cols: Background Music & Local Database Storage Studio */}
-          <div className="lg:col-span-5 bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center space-x-2">
-                <Music className="w-5 h-5 text-indigo-600" />
-                <h3 className="font-bold text-slate-900 text-base">
-                  {isAmharic ? 'የቢሮ ዳራ ሙዚቃ እና ዳታቤዝ ማከማቻ' : 'Background Music & DB Storage'}
-                </h3>
-              </div>
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">
-                {audioAssets.filter(a => a.type === 'MUSIC').length} {isAmharic ? 'ሙዚቃዎች' : 'Tracks'}
-              </span>
-            </div>
-
-            <p className="text-xs text-slate-500 leading-relaxed font-medium">
-              {isAmharic
-                ? 'የማስታወቂያ ጥሪ ሲደረግ የቢሮው ዳራ ሙዚቃ በራስ-ሰር ቀስ ብሎ ይቆማል፤ ማስታወቂያው ሲጠናቀቅ ደግሞ ይቀጥላል። ሁሉም ሙዚቃዎች በ MongoDB/ዳታቤዝ ውስጥ ይቀመጣሉ።'
-                : 'Background ambient music automatically ducks/pauses during announcements. All tracks are persisted in the database storage.'}
-            </p>
-
-            {/* Action Feedback Banner */}
-            {musicActionMessage && (
-              <div className="p-3 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-xl text-xs font-bold flex items-center space-x-2 animate-fade-in">
-                <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
-                <span>{musicActionMessage}</span>
-              </div>
-            )}
-
-            {/* Master Music Toggle & Volume */}
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold text-slate-800">
-                    {isAmharic ? 'የዳራ ሙዚቃ አጫውት' : 'Enable Background Music'}
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    {isAmharic ? 'በስክሪኑ (Display) ላይ ቀጣይነት ያለው ጸጥ ያለ ሙዚቃ' : 'Gentle ambient loops on public displays'}
-                  </p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={audioForm.backgroundMusicEnabled ?? false}
-                    onChange={(e) => {
-                      setAudioForm({ ...audioForm, backgroundMusicEnabled: e.target.checked });
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                </label>
-              </div>
-
-              {audioForm.backgroundMusicEnabled && (
-                <div className="space-y-1.5 pt-2 border-t border-slate-200">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-700 flex items-center space-x-1.5">
-                      <Volume2 className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>{isAmharic ? 'የዳራ ሙዚቃ መጠን' : 'Background Volume'}</span>
+          {/* SUB-VIEW 1: ADDIS VOICE ANNOUNCEMENT ENGINE */}
+          {audioStudioTab === 'voice' && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* Left 6 Cols: Addis Voice Persona Selection & Speech Parameters */}
+              <div className="lg:col-span-6 space-y-6">
+                
+                {/* Addis Voice API Status Banner */}
+                <div className="p-5 bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900 text-white rounded-2xl border border-indigo-500/30 shadow-xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-500/30 border border-indigo-400/40 flex items-center justify-center">
+                        <Zap className="w-4 h-4 text-amber-300" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-200">
+                          {isAmharic ? 'Addis Voice AI ሞተር' : 'Addis Voice Neural TTS'}
+                        </h3>
+                        <p className="text-xs text-white font-medium">
+                          {addisVoiceStatus?.activeModel || 'Addis Voices 2 (አሌፍ-Audio-AM)'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/20 border border-emerald-400/40 text-emerald-300">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse" />
+                      {addisVoiceStatus?.configured ? (isAmharic ? 'API ንቁ ነው' : 'API Active') : (isAmharic ? 'Addis Voice ዝግጁ' : 'Engine Ready')}
                     </span>
-                    <span className="font-mono font-bold text-indigo-600">{audioForm.backgroundMusicVolume || 14}%</span>
                   </div>
-                  <input
-                    type="range"
-                    min="2"
-                    max="45"
-                    step="1"
-                    value={audioForm.backgroundMusicVolume || 14}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      setAudioForm({ ...audioForm, backgroundMusicVolume: v });
-                      if (setBackgroundVolume) setBackgroundVolume(v);
-                    }}
-                    className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                  />
-                  <div className="flex justify-between text-[10px] text-slate-400 font-medium">
-                    <span>{isAmharic ? 'ቀስ ያለ (2%)' : 'Subtle (2%)'}</span>
-                    <span>{isAmharic ? 'መካከለኛ (20%)' : 'Comfortable (20%)'}</span>
-                    <span>{isAmharic ? 'ከፍተኛ (45%)' : 'Loud (45%)'}</span>
+
+                  <div className="text-[11px] text-slate-300 grid grid-cols-2 gap-2 pt-1 font-mono">
+                    <div className="p-2 bg-white/5 rounded-xl border border-white/10">
+                      <span className="text-slate-400 block text-[10px]">API Endpoint:</span>
+                      <span className="truncate block font-semibold text-white">
+                        {addisVoiceStatus?.apiUrl ? addisVoiceStatus.apiUrl.replace('https://', '') : 'api.addisassistant.com'}
+                      </span>
+                    </div>
+                    <div className="p-2 bg-white/5 rounded-xl border border-white/10">
+                      <span className="text-slate-400 block text-[10px]">Available Personas:</span>
+                      <span className="block font-semibold text-white">
+                        {addisVoices.length || 8} Amharic/Oromo Voices
+                      </span>
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Local Database Track Library */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
-                  <Disc className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>{isAmharic ? 'የተቀመጡ የዳራ ሙዚቃዎች' : 'Local Database Tracks'}</span>
-                </span>
+                {/* Master Voice Announcement Controls */}
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center space-x-2">
+                      <Mic className="w-5 h-5 text-indigo-600" />
+                      <h3 className="font-bold text-slate-900 text-base">
+                        {isAmharic ? 'የድምፅ ጥሪ ዋና ቅንብሮች' : 'Voice Announcement Parameters'}
+                      </h3>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={audioForm.voiceEnabled ?? true}
+                        onChange={(e) => setAudioForm(prev => ({ ...prev, voiceEnabled: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={handleRestoreDefaultTracks}
-                  disabled={isRestoringDefaults}
-                  className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center space-x-1 transition cursor-pointer"
-                >
-                  <RotateCcw className={`w-3 h-3 ${isRestoringDefaults ? 'animate-spin' : ''}`} />
-                  <span>{isAmharic ? 'ነባሪዎችን መልስ' : 'Restore Defaults'}</span>
-                </button>
+                  {/* Addis Voice API Toggle */}
+                  <div className="p-4 bg-indigo-50/70 rounded-2xl border border-indigo-200 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-indigo-950 flex items-center space-x-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>{isAmharic ? 'Addis Voice AI ጥሪ ተጠቀም' : 'Use Addis Voice AI Synthesis'}</span>
+                      </p>
+                      <p className="text-[11px] text-indigo-700 mt-0.5">
+                        {isAmharic ? 'ተፈጥሯዊ እና ግልጽ የአማርኛ ንባብ በከፍተኛ ጥራት' : 'Crystal-clear native Amharic voice synthesis for queue calling'}
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={audioForm.addisVoiceEnabled ?? true}
+                        onChange={(e) => setAudioForm(prev => ({ ...prev, addisVoiceEnabled: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                  </div>
+
+                  {/* Language Selection */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700">
+                      {isAmharic ? 'የጥሪ ቋንቋ (Announcement Language)' : 'Announcement Language'}
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: 'AMHARIC', label: 'አማርኛ (Amharic)', sub: 'Primary' },
+                        { id: 'ENGLISH', label: 'English', sub: 'Standard' },
+                        { id: 'BOTH', label: 'ሁለቱም (Both)', sub: 'Bilingual' }
+                      ].map((lang) => (
+                        <button
+                          key={lang.id}
+                          type="button"
+                          onClick={() => setAudioForm(prev => ({ ...prev, language: lang.id as any }))}
+                          className={`p-2.5 rounded-xl border text-center transition cursor-pointer ${
+                            audioForm.language === lang.id
+                              ? 'bg-indigo-600 text-white border-indigo-600 font-bold shadow-xs'
+                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-medium'
+                          }`}
+                        >
+                          <span className="block text-xs">{lang.label}</span>
+                          <span className={`block text-[10px] mt-0.5 ${audioForm.language === lang.id ? 'text-indigo-200' : 'text-slate-400'}`}>{lang.sub}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Speech Speed / Rate Slider */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-700 flex items-center space-x-1.5">
+                        <Sliders className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>{isAmharic ? 'የንግግር ፍጥነት (Voice Speed)' : 'Speech Rate / Speed'}</span>
+                      </span>
+                      <span className="font-mono font-bold text-indigo-600">{audioForm.voiceSpeed || 1.0}x</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.8"
+                      max="1.3"
+                      step="0.05"
+                      value={audioForm.voiceSpeed || 1.0}
+                      onChange={(e) => setAudioForm(prev => ({ ...prev, voiceSpeed: parseFloat(e.target.value) }))}
+                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    />
+                    <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                      <span>{isAmharic ? 'ዝግ ያለ (0.8x)' : 'Slow (0.8x)'}</span>
+                      <span>{isAmharic ? 'መደበኛ (1.0x)' : 'Natural (1.0x)'}</span>
+                      <span>{isAmharic ? 'ፈጣን (1.3x)' : 'Fast (1.3x)'}</span>
+                    </div>
+                  </div>
+
+                  {/* Announcement Volume */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-700 flex items-center space-x-1.5">
+                        <Volume2 className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>{isAmharic ? 'የድምፅ መጠን (Announcement Volume)' : 'Announcement Master Volume'}</span>
+                      </span>
+                      <span className="font-mono font-bold text-indigo-600">{audioForm.volume || 85}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="10"
+                      max="100"
+                      step="5"
+                      value={audioForm.volume || 85}
+                      onChange={(e) => setAudioForm(prev => ({ ...prev, volume: parseInt(e.target.value) }))}
+                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    />
+                  </div>
+
+                  {/* Repeats & Delay Grid */}
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-700">
+                        {isAmharic ? 'የጥሪ ድግግሞሽ' : 'Repeat Count'}
+                      </label>
+                      <select
+                        value={audioForm.repeatCount || 1}
+                        onChange={(e) => setAudioForm(prev => ({ ...prev, repeatCount: parseInt(e.target.value) }))}
+                        className="w-full p-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value="1">{isAmharic ? 'አንድ ጊዜ (1x)' : '1 Time (1x)'}</option>
+                        <option value="2">{isAmharic ? 'ሁለት ጊዜ (2x)' : '2 Times (2x)'}</option>
+                      </select>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-700">
+                        {isAmharic ? 'የደወል ቅድመ-ጊዜ' : 'Chime Delay'}
+                      </label>
+                      <select
+                        value={audioForm.announcementDelaySeconds || 1}
+                        onChange={(e) => setAudioForm(prev => ({ ...prev, announcementDelaySeconds: parseInt(e.target.value) }))}
+                        className="w-full p-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value="0">{isAmharic ? 'ወዲያውኑ (0 ሰከንድ)' : 'Instant (0s)'}</option>
+                        <option value="1">{isAmharic ? '1 ሰከንድ በኋላ' : '1 Second'}</option>
+                        <option value="2">{isAmharic ? '2 ሰከንድ በኋላ' : '2 Seconds'}</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Save Settings Button */}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveAudioSettings}
+                      disabled={isSavingAudio}
+                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center justify-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{isSavingAudio ? (isAmharic ? 'በማስቀመጥ ላይ...' : 'Saving...') : (isAmharic ? 'የድምፅ ቅንብሮችን አስቀምጥ' : 'Save Voice Configuration')}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                {audioAssets.filter(a => a.type === 'MUSIC').length === 0 ? (
-                  <div className="p-4 text-center rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500">
-                    {isAmharic ? 'ምንም የተቀመጠ ሙዚቃ የለም። እባክዎ ነባሪዎችን ይመልሱ ወይም አዲስ ይፍጠሩ።' : 'No music tracks found in database. Click "Restore Defaults" or generate one.'}
+              {/* Right 6 Cols: Addis Voice Personas & Live Testing Console */}
+              <div className="lg:col-span-6 space-y-6">
+                
+                {/* Addis Voice Persona Selector Cards */}
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center space-x-2">
+                      <Headphones className="w-5 h-5 text-indigo-600" />
+                      <h3 className="font-bold text-slate-900 text-base">
+                        {isAmharic ? 'የ Addis Voice ድምፅ ምርጫ (Personas)' : 'Select Addis Voice Persona'}
+                      </h3>
+                    </div>
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-200">
+                      {audioForm.addisVoice || 'aster'}
+                    </span>
                   </div>
-                ) : (
-                  audioAssets
-                    .filter(a => a.type === 'MUSIC')
-                    .map((track) => {
-                      const isActive = (audioForm.currentMusicAssetId === track.id) || (!audioForm.currentMusicAssetId && track.id === 'asset-music-1');
-                      const isPreviewing = currentlyPreviewingId === track.id;
 
+                  <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                    {isAmharic
+                      ? 'ለቢሮዎ ተስማሚ የሆነውን የተፈጥሮ ድምፅ ይምረጡ። እያንዳንዱ ድምፅ ለቢሮ ጥሪ እና ለወረፋ አዋጅ የተዘጋጀ ነው።'
+                      : 'Choose an authentic persona calibrated for queue ticket calling and lobby acoustic projection.'}
+                  </p>
+
+                  {/* Personas Grid */}
+                  <div className="grid grid-cols-2 gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+                    {(addisVoices.length > 0 ? addisVoices : [
+                      { id: 'aster', name: 'Aster', amharicName: 'አስቴር', gender: 'FEMALE', language: 'am', description: 'Natural Front Desk (Default)' },
+                      { id: 'abebe', name: 'Abebe', amharicName: 'አበበ', gender: 'MALE', language: 'am', description: 'Clear Professional' },
+                      { id: 'selam', name: 'Selam', amharicName: 'ሰላም', gender: 'FEMALE', language: 'am', description: 'Warm Service' },
+                      { id: 'dawit', name: 'Dawit', amharicName: 'ዳዊት', gender: 'MALE', language: 'am', description: 'Official Teller' },
+                      { id: 'tsehay', name: 'Tsehay', amharicName: 'ፀሐይ', gender: 'FEMALE', language: 'am', description: 'Crisp Announcer' },
+                      { id: 'yared', name: 'Yared', amharicName: 'ያሬድ', gender: 'MALE', language: 'am', description: 'Deep Broadcaster' },
+                      { id: 'chala', name: 'Chala', amharicName: 'ጫላ', gender: 'MALE', language: 'om', description: 'Afaan Oromo Male' },
+                      { id: 'hawi', name: 'Hawi', amharicName: 'ሀዊ', gender: 'FEMALE', language: 'om', description: 'Afaan Oromo Female' }
+                    ]).map((voice) => {
+                      const isSelected = (audioForm.addisVoice || 'aster').toLowerCase() === voice.id.toLowerCase();
                       return (
                         <div
-                          key={track.id}
-                          className={`p-3 rounded-xl border transition flex items-center justify-between gap-2 ${
-                            isActive
-                              ? 'bg-indigo-50/80 border-indigo-300 ring-1 ring-indigo-200'
+                          key={voice.id}
+                          onClick={() => setAudioForm(prev => ({ ...prev, addisVoice: voice.id }))}
+                          className={`p-3 rounded-2xl border transition cursor-pointer flex flex-col justify-between space-y-1.5 ${
+                            isSelected
+                              ? 'bg-indigo-50/90 border-indigo-400 ring-2 ring-indigo-200'
                               : 'bg-white border-slate-200 hover:border-slate-300'
                           }`}
                         >
-                          <div className="flex items-center space-x-2.5 min-w-0">
-                            <button
-                              type="button"
-                              onClick={() => handleTogglePreviewTrack(track)}
-                              className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition ${
-                                isPreviewing
-                                  ? 'bg-indigo-600 text-white animate-pulse'
-                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                              }`}
-                              title={isPreviewing ? 'Stop Preview' : 'Preview Track'}
-                            >
-                              {isPreviewing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 ml-0.5" />}
-                            </button>
-
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold text-slate-900 truncate">
-                                {track.title}
-                              </p>
-                              <div className="flex items-center space-x-1.5 text-[10px] text-slate-500">
-                                <span className="px-1.5 py-0.2 rounded bg-slate-100 border border-slate-200 font-medium">
-                                  {track.source || 'DATABASE'}
-                                </span>
-                                {track.durationSeconds && (
-                                  <span>{Math.round(track.durationSeconds / 60)} min</span>
-                                )}
-                              </div>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-1.5">
+                              <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-indigo-600' : 'bg-slate-300'}`} />
+                              <span className="text-xs font-bold text-slate-900">{voice.amharicName || voice.name}</span>
                             </div>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                              voice.gender === 'FEMALE' ? 'bg-pink-50 text-pink-700 border border-pink-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
+                            }`}>
+                              {voice.gender === 'FEMALE' ? (isAmharic ? 'ሴት' : 'Female') : (isAmharic ? 'ወንድ' : 'Male')}
+                            </span>
                           </div>
-
-                          <div className="flex items-center space-x-1.5 shrink-0">
-                            {isActive ? (
-                              <span className="px-2 py-0.5 bg-indigo-600 text-white rounded-md text-[10px] font-bold flex items-center space-x-1">
-                                <Check className="w-3 h-3" />
-                                <span>{isAmharic ? 'የተመረጠ' : 'Active'}</span>
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleSelectActiveTrack(track.id)}
-                                className="px-2 py-1 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 rounded-md text-[10px] font-bold transition cursor-pointer"
-                              >
-                                {isAmharic ? 'ምረጥ' : 'Select'}
-                              </button>
-                            )}
-
-                            {track.source === 'UPLOAD' && (
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteTrack(track.id)}
-                                className="p-1 text-slate-400 hover:text-rose-600 rounded transition"
-                                title="Delete"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
+                          
+                          <p className="text-[10px] text-slate-500 font-medium truncate">
+                            {voice.description || `${voice.name} - ${voice.language.toUpperCase()}`}
+                          </p>
                         </div>
                       );
-                    })
-                )}
+                    })}
+                  </div>
+                </div>
+
+                {/* Interactive Live Addis Voice Announcement Tester */}
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center space-x-2 text-indigo-900 font-bold text-sm">
+                      <Sparkles className="w-4 h-4 text-indigo-600" />
+                      <span>{isAmharic ? 'የ Addis Voice የቀጥታ ድምፅ መፈተኛ' : 'Live Voice Announcement Tester'}</span>
+                    </div>
+                    {isTestingVoice && (
+                      <div className="flex gap-1 items-end h-3">
+                        <div className="w-1 h-3 bg-indigo-600 rounded-full animate-pulse" />
+                        <div className="w-1 h-2 bg-indigo-500 rounded-full animate-pulse" />
+                        <div className="w-1 h-4 bg-indigo-600 rounded-full animate-pulse" />
+                      </div>
+                    )}
+                  </div>
+
+                  {testVoiceStatusMsg && (
+                    <div className="p-3 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-xl text-xs font-bold flex items-center space-x-2 animate-in fade-in">
+                      <Volume2 className="w-4 h-4 text-indigo-600 shrink-0" />
+                      <span>{testVoiceStatusMsg}</span>
+                    </div>
+                  )}
+
+                  {/* Preset Test Phrases */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-bold text-slate-600">
+                      {isAmharic ? 'የሙከራ ጥሪ ሐረጎች (Quick Presets)' : 'Quick Announcement Presets:'}
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        'ቁጥር ሀ ሃያ አራት ያላችሁ ደንበኛ ወደ ቆጣሪ ሁለት ይሂዱ።',
+                        'ቁጥር ለ አስራ ሁለት ወደ ቆጣሪ አንድ ይሂዱ።',
+                        'ቁጥር ሐ አምስት ያላችሁ ደንበኛ ወደ ቆጣሪ አራት ይሂዱ።',
+                        'ቁጥር መ ዘጠኝ ወደ ቆጣሪ ሶስት ይሂዱ።'
+                      ].map((phrase, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setTestVoiceText(phrase);
+                            handleTestAddisVoice(phrase);
+                          }}
+                          disabled={isTestingVoice}
+                          className="text-[11px] px-2.5 py-1.5 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-900 border border-slate-200 hover:border-indigo-200 text-slate-700 rounded-xl font-medium transition cursor-pointer text-left"
+                        >
+                          ▶ {phrase.length > 25 ? phrase.slice(0, 25) + '...' : phrase}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Custom Test Phrase Input */}
+                  <div className="space-y-2 pt-1">
+                    <textarea
+                      rows={2}
+                      value={testVoiceText}
+                      onChange={(e) => setTestVoiceText(e.target.value)}
+                      placeholder="የሚጠራውን ጽሑፍ እዚህ ያስገቡ..."
+                      className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900 font-medium resize-none"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => handleTestAddisVoice()}
+                      disabled={isTestingVoice || !testVoiceText.trim()}
+                      className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+                    >
+                      <Play className={`w-3.5 h-3.5 fill-current ${isTestingVoice ? 'animate-spin' : ''}`} />
+                      <span>{isTestingVoice ? (isAmharic ? 'ድምፅ በመፍጠር ላይ...' : 'Synthesizing & Playing...') : (isAmharic ? 'የ Addis Voice ጥሪ ሞክር (Test Audio)' : 'Test Addis Voice Announcement')}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
+          )}
 
-            {/* Upload Local Audio File */}
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold text-slate-800">
-                  {isAmharic ? 'ከኮምፒውተር የሙዚቃ ፋይል ጫን' : 'Upload Local Audio File'}
-                </p>
-                <p className="text-[10px] text-slate-500">
-                  {isAmharic ? 'MP3, WAV ወይም OGG ፋይል ይምረጡ' : 'Upload MP3 / WAV into database'}
-                </p>
-              </div>
+          {/* SUB-VIEW 2: BACKGROUND MUSIC STUDIO */}
+          {audioStudioTab === 'music' && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* Left 6 Cols: Background Music Controls & Music Generator */}
+              <div className="lg:col-span-6 space-y-6">
+                {/* Master Music Toggle & Volume */}
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center space-x-2">
+                      <Music className="w-5 h-5 text-indigo-600" />
+                      <h3 className="font-bold text-slate-900 text-base">
+                        {isAmharic ? 'የቢሮ ዳራ ሙዚቃ መቆጣጠሪያ' : 'Background Music Master Controls'}
+                      </h3>
+                    </div>
+                    <span className="text-[11px] px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${audioForm.backgroundMusicEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></span>
+                      {audioForm.backgroundMusicEnabled ? (isAmharic ? 'ሙዚቃ ነቅቷል' : 'Active') : (isAmharic ? 'ሙዚቃ ቆሟል' : 'Disabled')}
+                    </span>
+                  </div>
 
-              <label className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5 cursor-pointer shrink-0">
-                <Upload className="w-3.5 h-3.5 text-indigo-600" />
-                <span>{isUploadingMusic ? (isAmharic ? 'በመጫን ላይ...' : 'Uploading...') : (isAmharic ? 'ፋይል ምረጥ' : 'Choose File')}</span>
-                <input
-                  type="file"
-                  accept="audio/*"
-                  onChange={handleUploadMusicFile}
-                  disabled={isUploadingMusic}
-                  className="hidden"
-                />
-              </label>
-            </div>
+                  <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                    {isAmharic
+                      ? 'በደንበኞች መመልከቻ ስክሪን ላይ የሚጫወት የተረጋጋ የቢሮ ዳራ ሙዚቃ። ሁሉም ሙዚቃዎች በዳታቤዝ ውስጥ ይቀመጣሉ።'
+                      : 'Gentle ambient loops for public lobby display screens and waiting areas. All tracks are stored in the database.'}
+                  </p>
 
-            {/* AI & Procedural Music Generator */}
-            <div className="p-4 bg-indigo-50/70 rounded-2xl border border-indigo-100 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2 text-indigo-900 font-bold text-xs">
-                  <Sparkles className="w-4 h-4 text-indigo-600" />
-                  <span>{isAmharic ? 'የ AI / የአካባቢ ዳራ ሙዚቃ ማመንጫ' : 'Generate Ambient Music'}</span>
+                  {/* Action Feedback Banner */}
+                  {musicActionMessage && (
+                    <div className="p-3 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-xl text-xs font-bold flex items-center space-x-2 animate-in fade-in">
+                      <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+                      <span>{musicActionMessage}</span>
+                    </div>
+                  )}
+
+                  {/* Toggle Switch */}
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">
+                        {isAmharic ? 'የዳራ ሙዚቃ አጫውት' : 'Enable Background Ambient Music'}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {isAmharic ? 'በስክሪኑ (Display) ላይ ቀጣይነት ያለው ጸጥ ያለ ሙዚቃ' : 'Continuous gentle soothing audio loops'}
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={audioForm.backgroundMusicEnabled ?? false}
+                        onChange={(e) => handleToggleBackgroundMusic(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                  </div>
+
+                  {/* Volume Slider */}
+                  {audioForm.backgroundMusicEnabled && (
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-700 flex items-center space-x-1.5">
+                          <Volume2 className="w-4 h-4 text-indigo-600" />
+                          <span>{isAmharic ? 'የዳራ ሙዚቃ መጠን' : 'Background Music Volume'}</span>
+                        </span>
+                        <span className="font-mono font-bold text-indigo-600 text-sm">{audioForm.backgroundMusicVolume || 14}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="2"
+                        max="45"
+                        step="1"
+                        value={audioForm.backgroundMusicVolume || 14}
+                        onChange={(e) => handleUpdateBackgroundVolume(Number(e.target.value))}
+                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                      />
+                      <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                        <span>{isAmharic ? 'ቀስ ያለ (2%)' : 'Subtle (2%)'}</span>
+                        <span>{isAmharic ? 'መካከለኛ (15%)' : 'Comfortable (15%)'}</span>
+                        <span>{isAmharic ? 'ከፍተኛ (45%)' : 'Loud (45%)'}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* AI & Procedural Ambient Music Generator */}
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+                  <div className="flex items-center space-x-2 text-indigo-900 font-bold text-sm">
+                    <Sparkles className="w-4 h-4 text-indigo-600" />
+                    <span>{isAmharic ? 'የ AI / የአካባቢ ዳራ ሙዚቃ ማመንጫ' : 'Generate Ambient Music Track'}</span>
+                  </div>
+
+                  <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                    {isAmharic
+                      ? 'ከስር ያሉትን ባህላዊ እና ዘመናዊ የሙዚቃ ምርጫዎች በመጫን ወይም የራስዎን ገለጻ በመጻፍ አዲስ የቢሮ ዳራ ሙዚቃ ያመንጩ።'
+                      : 'Select an Ethiopian pentatonic or relaxing acoustic preset, or describe your desired office ambience.'}
+                  </p>
+
+                  {/* Quick Preset Buttons */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { name: 'Krar Lounge', prompt: 'Addis Krar Pentatonic lounge relaxing gentle acoustic' },
+                      { name: 'Tizita Lo-Fi', prompt: 'Ethiopian Tizita Lo-Fi chill subtle peaceful office' },
+                      { name: 'Bati Horizon', prompt: 'Ethiopian Bati modal serene slow atmospheric' },
+                      { name: 'Masenqo Cafe', prompt: 'Traditional Masenqo coffee cafe gentle acoustic ambient' },
+                      { name: 'Corporate Zen', prompt: 'Gentle corporate office waiting room pentatonic chords' }
+                    ].map((item, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setMusicPrompt(item.prompt);
+                          handleGenerateAIMusic(item.prompt);
+                        }}
+                        disabled={isGeneratingMusic}
+                        className="text-[11px] px-2.5 py-1.5 bg-indigo-50/70 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 rounded-xl font-bold transition truncate cursor-pointer"
+                      >
+                        + {item.name}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={musicPrompt}
+                      onChange={(e) => setMusicPrompt(e.target.value)}
+                      placeholder="Calm relaxing lobby lounge chords..."
+                      className="flex-1 p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900 font-medium"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateAIMusic()}
+                      disabled={isGeneratingMusic}
+                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center justify-center space-x-1.5 shrink-0 cursor-pointer"
+                    >
+                      <Sparkles className={`w-3.5 h-3.5 ${isGeneratingMusic ? 'animate-spin' : ''}`} />
+                      <span>{isGeneratingMusic ? (isAmharic ? 'በማመንጨት ላይ...' : 'Generating...') : (isAmharic ? 'ሙዚቃ ፍጠር' : 'Generate')}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Upload Local Audio File */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">
+                      {isAmharic ? 'ከኮምፒውተር የሙዚቃ ፋይል ጫን' : 'Upload Audio File to Database'}
+                    </p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      {isAmharic ? 'MP3, WAV ወይም OGG ፋይል ይምረጡ' : 'Supports MP3, WAV, or OGG audio files'}
+                    </p>
+                  </div>
+
+                  <label className="px-3.5 py-2 bg-slate-50 border border-slate-300 hover:bg-slate-100 text-slate-800 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5 cursor-pointer shrink-0">
+                    <Upload className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>{isUploadingMusic ? (isAmharic ? 'በመጫን ላይ...' : 'Uploading...') : (isAmharic ? 'ፋይል ምረጥ' : 'Choose File')}</span>
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      onChange={handleUploadMusicFile}
+                      disabled={isUploadingMusic}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
               </div>
 
-              {/* Quick Preset Buttons */}
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { name: 'Krar Lounge', prompt: 'Addis Krar Pentatonic lounge relaxing gentle acoustic' },
-                  { name: 'Tizita Lo-Fi', prompt: 'Ethiopian Tizita Lo-Fi chill subtle peaceful office' },
-                  { name: 'Bati Horizon', prompt: 'Ethiopian Bati modal serene slow atmospheric' },
-                  { name: 'Masenqo Cafe', prompt: 'Traditional Masenqo coffee cafe gentle acoustic ambient' },
-                  { name: 'Corporate Zen', prompt: 'Gentle corporate office waiting room pentatonic chords' }
-                ].map((item, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      setMusicPrompt(item.prompt);
-                      handleGenerateAIMusic(item.prompt);
-                    }}
-                    disabled={isGeneratingMusic}
-                    className="text-[10px] px-2 py-1 bg-white hover:bg-indigo-100 border border-indigo-200 text-indigo-900 rounded-lg font-bold transition truncate cursor-pointer shadow-2xs"
-                  >
-                    + {item.name}
-                  </button>
-                ))}
-              </div>
+              {/* Right 6 Cols: Local Database Track Library */}
+              <div className="lg:col-span-6 bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-5">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center space-x-2">
+                    <Disc className="w-5 h-5 text-indigo-600" />
+                    <h3 className="font-bold text-slate-900 text-base">
+                      {isAmharic ? 'የተቀመጡ የዳራ ሙዚቃዎች ዝርዝር' : 'Database Music Library'}
+                    </h3>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">
+                      {audioAssets.filter(a => a.type === 'MUSIC').length} {isAmharic ? 'ሙዚቃዎች' : 'Tracks'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleRestoreDefaultTracks}
+                      disabled={isRestoringDefaults}
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center space-x-1 transition cursor-pointer ml-1"
+                    >
+                      <RotateCcw className={`w-3 h-3 ${isRestoringDefaults ? 'animate-spin' : ''}`} />
+                      <span>{isAmharic ? 'ነባሪዎችን መልስ' : 'Restore Defaults'}</span>
+                    </button>
+                  </div>
+                </div>
 
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={musicPrompt}
-                  onChange={(e) => setMusicPrompt(e.target.value)}
-                  placeholder="Calm relaxing lobby lounge chords..."
-                  className="flex-1 p-2.5 text-xs bg-white border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900 font-medium"
-                />
+                <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                  {isAmharic
+                    ? 'በዳታቤዝ ውስጥ የተቀመጡትን ሙዚቃዎች ቅድመ-ዕይታ (Preview) ያዳምጡ፣ ዋናውን የቢሮ ሙዚቃ ይምረጡ ወይም አላስፈላጊ የሆኑትን ያስወግዱ።'
+                    : 'Preview audio tracks, select the active lobby soundtrack, or remove custom uploads.'}
+                </p>
 
-                <button
-                  type="button"
-                  onClick={() => handleGenerateAIMusic()}
-                  disabled={isGeneratingMusic}
-                  className="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center justify-center space-x-1.5 shrink-0 cursor-pointer"
-                >
-                  <Sparkles className={`w-3.5 h-3.5 ${isGeneratingMusic ? 'animate-spin' : ''}`} />
-                  <span>{isGeneratingMusic ? (isAmharic ? '...' : '...') : (isAmharic ? 'ፍጠር' : 'Generate')}</span>
-                </button>
+                <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1">
+                  {audioAssets.filter(a => a.type === 'MUSIC').length === 0 ? (
+                    <div className="p-8 text-center rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-500 space-y-2">
+                      <p>{isAmharic ? 'ምንም የተቀመጠ ሙዚቃ የለም።' : 'No music tracks found in database.'}</p>
+                      <button
+                        type="button"
+                        onClick={handleRestoreDefaultTracks}
+                        className="px-3.5 py-1.5 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-xs cursor-pointer"
+                      >
+                        {isAmharic ? 'ነባሪ ሙዚቃዎችን መልስ' : 'Restore Default Tracks'}
+                      </button>
+                    </div>
+                  ) : (
+                    audioAssets
+                      .filter(a => a.type === 'MUSIC')
+                      .map((track) => {
+                        const isActive = (audioForm.currentMusicAssetId === track.id) || (!audioForm.currentMusicAssetId && track.id === 'asset-music-1');
+                        const isPreviewing = currentlyPreviewingId === track.id;
+
+                        return (
+                          <div
+                            key={track.id}
+                            className={`p-3.5 rounded-2xl border transition flex items-center justify-between gap-3 ${
+                              isActive
+                                ? 'bg-indigo-50/80 border-indigo-300 ring-1 ring-indigo-200'
+                                : 'bg-white border-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-3 min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePreviewTrack(track)}
+                                className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition cursor-pointer ${
+                                  isPreviewing
+                                    ? 'bg-indigo-600 text-white animate-pulse'
+                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                }`}
+                                title={isPreviewing ? 'Stop Preview' : 'Preview Track'}
+                              >
+                                {isPreviewing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                              </button>
+
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-slate-900 truncate">
+                                  {track.title}
+                                </p>
+                                <div className="flex items-center space-x-1.5 text-[10px] text-slate-500 mt-0.5">
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-medium">
+                                    {track.source || 'DATABASE'}
+                                  </span>
+                                  {track.durationSeconds && (
+                                    <span>{Math.round(track.durationSeconds / 60)} min</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-2 shrink-0">
+                              {isActive ? (
+                                <span className="px-2.5 py-1 bg-indigo-600 text-white rounded-xl text-[11px] font-bold flex items-center space-x-1">
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>{isAmharic ? 'የተመረጠ' : 'Active'}</span>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSelectActiveTrack(track.id)}
+                                  className="px-3 py-1 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 rounded-xl text-[11px] font-bold transition cursor-pointer"
+                                >
+                                  {isAmharic ? 'ምረጥ' : 'Select'}
+                                </button>
+                              )}
+
+                              {track.source === 'UPLOAD' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteTrack(track.id)}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition cursor-pointer"
+                                  title="Delete Track"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -1751,28 +1951,32 @@ export const AdminView: React.FC = () => {
         <div className="max-w-4xl bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-xs">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold shadow-xs ${
+                dbStatus?.connected ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white'
+              }`}>
                 <Database className="w-5 h-5" />
               </div>
               <div>
                 <h2 className="text-base font-bold text-slate-900">
-                  {isAmharic ? 'MongoDB Atlas ዳታቤዝ ማዕከል' : 'MongoDB Atlas Cloud Database'}
+                  {isAmharic ? 'የዳታቤዝ እና የክላውድ ማከማቻ ማዕከል' : 'Database & Storage Engine'}
                 </h2>
                 <p className="text-xs text-slate-500">
-                  {isAmharic ? 'የወረፋ፣ የአገልግሎቶች፣ የቆጣሪዎች እና የተጠቃሚዎች መረጃ በክላውድ ዳታቤዝ ማመሳሰል' : 'Cloud persistence, real-time ticket replication, and resilient synchronization'}
+                  {isAmharic ? 'የወረፋ፣ የአገልግሎቶች፣ የቆጣሪዎች እና የተጠቃሚዎች መረጃ በክላውድ እና በአካባቢ ማከማቻ ማስተዳደር' : 'Local resilient persistence with optional MongoDB Atlas cloud synchronization'}
                 </p>
               </div>
             </div>
 
             {/* Status Pill */}
             <div className="flex items-center space-x-2">
-              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
+              <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold ${
                 dbStatus?.connected
                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                  : 'bg-amber-100 text-amber-800 border border-amber-200'
+                  : 'bg-indigo-50 text-indigo-800 border border-indigo-200'
               }`}>
-                <span className={`w-2 h-2 rounded-full mr-1.5 ${dbStatus?.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-                {dbStatus?.connected ? 'MongoDB Atlas Active' : 'MongoDB Atlas Connecting'}
+                <span className={`w-2 h-2 rounded-full mr-1.5 ${dbStatus?.connected ? 'bg-emerald-500 animate-pulse' : 'bg-indigo-500'}`} />
+                {dbStatus?.connected 
+                  ? (isAmharic ? 'MongoDB Atlas የተገናኘ' : 'MongoDB Atlas Active')
+                  : (isAmharic ? 'Local Resilient Storage (ንቁ)' : 'Local Resilient Storage (Active)')}
               </span>
             </div>
           </div>
@@ -1784,57 +1988,112 @@ export const AdminView: React.FC = () => {
             </div>
           )}
 
+          {/* Diagnostic Banner if Atlas Authentication or Connection Error */}
+          {!dbStatus?.connected && dbStatus?.error && (
+            <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl space-y-2">
+              <div className="flex items-start space-x-2.5">
+                <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <h4 className="text-xs font-bold text-amber-900">
+                    {dbStatus?.errorCode === 'AUTH_FAILED'
+                      ? (isAmharic ? 'የ MongoDB Atlas ማረጋገጫ (Authentication) ማስታወሻ' : 'MongoDB Atlas Authentication Notice')
+                      : (isAmharic ? 'የ MongoDB Atlas ግንኙነት ማስታወሻ' : 'MongoDB Atlas Connection Notice')}
+                  </h4>
+                  <p className="text-xs text-amber-800 leading-relaxed font-medium">
+                    {dbStatus.error}
+                  </p>
+                  {dbStatus?.diagnosticTip && (
+                    <p className="text-[11px] text-amber-900 bg-amber-100/70 p-2 rounded-lg font-mono">
+                      💡 {dbStatus.diagnosticTip}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="text-[11px] text-slate-600 bg-white/80 p-2.5 rounded-xl border border-amber-100 space-y-1">
+                <span className="font-bold text-slate-800">
+                  {isAmharic ? 'እንዴት ማስተካከል እንደሚቻል፡' : 'Quick Troubleshooting Steps:'}
+                </span>
+                <ol className="list-decimal list-inside space-y-0.5 text-slate-700">
+                  <li>{isAmharic ? 'ወደ MongoDB Atlas በመግባት Database Access -> Users የሚለውን ይመልከቱ።' : 'Open MongoDB Atlas -> Security -> Database Access to verify or reset your database user password.'}</li>
+                  <li>{isAmharic ? 'ተጠቃሚው Read and Write to any database ፍቃድ እንዳለው ያረጋግጡ።' : 'Ensure the database user has "Read and write to any database" privileges.'}</li>
+                  <li>{isAmharic ? 'በ Network Access ውስጥ 0.0.0.0/0 (Allow access from anywhere) መኖሩን ያረጋግጡ።' : 'In Network Access, make sure IP 0.0.0.0/0 (Allow access from anywhere) is configured.'}</li>
+                  <li>{isAmharic ? 'ትክክለኛውን Connection URI ከታች አስገብተው "ከ Atlas ጋር አገናኝ" የሚለውን ይጫኑ።' : 'Paste the updated connection string below and click "Connect / Re-test Atlas".'}</li>
+                </ol>
+              </div>
+            </div>
+          )}
+
           {/* Database Specs Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
               <span className="text-[11px] text-slate-500 font-semibold block">Target Database</span>
-              <span className="text-sm font-bold text-slate-900 font-mono mt-0.5 block">{dbStatus?.database || 'office_queue_db'}</span>
+              <span className="text-sm font-bold text-slate-900 font-mono mt-0.5 block">{dbStatus?.database || 'SmartQ'}</span>
             </div>
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-              <span className="text-[11px] text-slate-500 font-semibold block">Cluster Host</span>
+              <span className="text-[11px] text-slate-500 font-semibold block">Cluster Host / Target</span>
               <span className="text-sm font-bold text-slate-900 font-mono mt-0.5 block truncate">
-                {dbStatus?.clusterUri ? dbStatus.clusterUri.replace(/mongodb\+srv:\/\/[^@]+@/, 'mongodb+srv://***@') : 'MongoDB Atlas Cluster'}
+                {dbStatus?.clusterUri ? dbStatus.clusterUri.replace(/mongodb\+srv:\/\/[^@]+@/, 'mongodb+srv://***@') : (isAmharic ? 'የአካባቢ ማከማቻ (Local Mode)' : 'Local Resilient Storage')}
               </span>
             </div>
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-              <span className="text-[11px] text-slate-500 font-semibold block">Architecture Mode</span>
-              <span className="text-sm font-bold text-emerald-700 font-mono mt-0.5 block">Pure MongoDB Atlas</span>
+              <span className="text-[11px] text-slate-500 font-semibold block">Active Storage Engine</span>
+              <span className={`text-sm font-bold font-mono mt-0.5 block ${
+                dbStatus?.connected ? 'text-emerald-700' : 'text-indigo-700'
+              }`}>
+                {dbStatus?.connected ? 'MongoDB Atlas (Cloud)' : 'Local Resilient (Active)'}
+              </span>
             </div>
           </div>
 
           {/* MongoDB Connection Form */}
           <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
-            <h3 className="text-xs font-bold text-slate-800">
-              {isAmharic ? 'የ MongoDB Atlas Connection URI ማስተካከያ' : 'MongoDB Atlas Connection String'}
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-slate-800">
+                {isAmharic ? 'የ MongoDB Atlas Connection URI ማስተካከያ' : 'MongoDB Atlas Connection String'}
+              </h3>
+              <span className="text-[11px] text-slate-500 font-mono">mongodb+srv://...</span>
+            </div>
             
             <form onSubmit={handleConnectDb} className="space-y-3">
               <input
                 type="text"
                 value={mongoUriInput}
                 onChange={(e) => setMongoUriInput(e.target.value)}
-                placeholder="mongodb+srv://<username>:<password>@cluster0.mongodb.net/ethio_queue_master?retryWrites=true&w=majority"
+                placeholder="mongodb+srv://<username>:<password>@cluster0.mongodb.net/SmartQ?retryWrites=true&w=majority"
                 className="w-full p-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono text-slate-900"
               />
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="submit"
                   disabled={isConnectingDb}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs"
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs cursor-pointer"
                 >
                   <Server className="w-3.5 h-3.5" />
                   <span>{isConnectingDb ? (isAmharic ? 'በመገናኘት ላይ...' : 'Connecting...') : (isAmharic ? 'ከ Atlas ጋር አገናኝ' : 'Connect / Re-test Atlas')}</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={handleSyncDb}
-                  disabled={isSyncingDb}
-                  className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isSyncingDb ? 'animate-spin' : ''}`} />
-                  <span>{isSyncingDb ? (isAmharic ? 'በማመሳሰል ላይ...' : 'Syncing...') : (isAmharic ? 'ሁሉንም መረጃዎች ወደ Atlas ላክ (Sync Now)' : 'Sync All Collections Now')}</span>
-                </button>
+                {(dbStatus?.connected || dbStatus?.error) && (
+                  <button
+                    type="button"
+                    onClick={handleDisconnectDb}
+                    disabled={isConnectingDb}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border border-slate-300 cursor-pointer"
+                  >
+                    <span>{isAmharic ? 'ወደ አካባቢ ማከማቻ ቀይር (Use Local Storage)' : 'Use Local Storage Mode'}</span>
+                  </button>
+                )}
+
+                {dbStatus?.connected && (
+                  <button
+                    type="button"
+                    onClick={handleSyncDb}
+                    disabled={isSyncingDb}
+                    className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isSyncingDb ? 'animate-spin' : ''}`} />
+                    <span>{isSyncingDb ? (isAmharic ? 'በማመሳሰል ላይ...' : 'Syncing...') : (isAmharic ? 'ሁሉንም መረጃዎች ወደ Atlas ላክ (Sync Now)' : 'Sync All Collections Now')}</span>
+                  </button>
+                )}
               </div>
             </form>
           </div>
@@ -1844,8 +2103,8 @@ export const AdminView: React.FC = () => {
             <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
             <p className="text-xs text-emerald-900 font-medium leading-relaxed">
               {isAmharic
-                ? 'በዚህ ስርዓት ውስጥ የሚከናወኑ ማናቸውም ቲኬቶች፣ የአገልግሎት ለውጦች እና የቆጣሪ ጥሪዎች በቀጥታ ወደ MongoDB Atlas ዳታቤዝ ይገባሉ።'
-                : 'All queue tickets, service definitions, counters, staff accounts, audit logs, and audio settings are automatically synced to MongoDB Atlas.'}
+                ? 'በዚህ ስርዓት ውስጥ የሚከናወኑ ማናቸውም ቲኬቶች፣ የአገልግሎት ለውጦች እና የቆጣሪ ጥሪዎች በአካባቢ ማከማቻ ውስጥ ያለምንም መቆራረጥ የሚቀመጡ ሲሆን MongoDB Atlas ሲገናኝ ደግሞ በራስ-ሰር ወደ ክላውድ ይተላለፋሉ።'
+                : 'All queue tickets, service definitions, counters, staff accounts, audit logs, and audio settings are safely persisted locally with zero downtime and seamlessly replicate to MongoDB Atlas when connected.'}
             </p>
           </div>
         </div>
@@ -2083,7 +2342,7 @@ export const AdminView: React.FC = () => {
                         : (officeForm.officeName || officeForm.officeNameAmharic || 'ABC SERVICE OFFICE')}
                     </p>
                     <p className="text-[10px] text-indigo-400 font-medium truncate mt-0.5">
-                      {isAmharic ? 'የቀጥታ የወረፋ መከታተያ ስክሪን • በአዲስ AI ድምፅ' : 'Live Official Queue Display • Addis AI Voice'}
+                      {isAmharic ? 'የቀጥታ የወረፋ መከታተያ ስክሪን • የድምፅ ጥሪ' : 'Live Official Queue Display • Voice Announcements'}
                     </p>
                   </div>
                 </div>

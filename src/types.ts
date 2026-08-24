@@ -87,32 +87,40 @@ export interface OfficeSetting {
   qrCodeUrlBase?: string;
 }
 
-export type TTSProviderType = 'ADDIS_AI' | 'BROWSER_SYNTHESIS';
+export interface AudioSetting {
+  id: string;
+  voiceEnabled: boolean;
+  language: AnnouncementLanguage;
+  volume: number;
+  repeatCount: number;
+  announcementDelaySeconds: number;
+  addisVoiceEnabled?: boolean;
+  addisVoice?: string; // 'aster' | 'abebe' | 'selam' | 'dawit' | 'tsehay' | 'yared' | 'chala' | 'hawi'
+  voiceSpeed?: number; // 0.8 to 1.3
+  backgroundMusicEnabled: boolean;
+  backgroundMusicVolume: number;
+  currentMusicAssetId?: string;
+}
 
 export interface AddisVoiceOption {
   id: string;
   name: string;
   nameAmharic: string;
   gender: 'FEMALE' | 'MALE';
+  language: 'am' | 'om' | 'en';
   description: string;
   descriptionAmharic: string;
+  samplePhrase: string;
 }
 
-export interface AudioSetting {
-  id: string;
-  voiceEnabled: boolean;
-  language: AnnouncementLanguage;
-  ttsProvider?: TTSProviderType;
-  addisVoice?: string;
-  addisAiSpeed?: number;
-  addisAiEndpoint?: string;
-  addisAiApiKey?: string;
-  volume: number;
-  repeatCount: number;
-  announcementDelaySeconds: number;
-  backgroundMusicEnabled: boolean;
-  backgroundMusicVolume: number;
-  currentMusicAssetId?: string;
+export interface AddisVoiceSynthesizeResponse {
+  success: boolean;
+  audioBase64?: string;
+  mimeType?: string;
+  voice?: string;
+  language?: string;
+  provider: 'ADDIS_VOICE_API' | 'BROWSER_TTS_FALLBACK';
+  message?: string;
 }
 
 export interface AudioAsset {
@@ -137,7 +145,7 @@ export interface AnnouncementPayload {
   phoneticText?: string;
   audioBase64?: string;
   audioMimeType?: string;
-  source?: 'ADDIS_AI' | 'GEMINI_TTS' | 'CACHE' | 'SYNTHESIS_FALLBACK';
+  voiceProvider?: string;
   timestamp: string;
 }
 

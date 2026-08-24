@@ -1,32 +1,66 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db.js';
 import { authenticate, authorize, requireAdmin, AuthenticatedRequest } from '../middleware/auth.js';
-import { 
-  addisVoiceProvider,
-  ADDIS_AI_VOICES, 
-  buildAmharicAnnouncementText, 
-  buildEnglishAnnouncementText,
-  buildPhoneticAnnouncementText
-} from '../services/addis-voice.service.js';
 import { geminiMusicProvider, getLocalPresetTracks } from '../services/music.service.js';
+import { addisVoiceService } from '../services/addisVoice.service.js';
 import { AudioAsset } from '../types.js';
 import { broadcaster } from '../websocket.js';
 
 const router = Router();
 
-// GET /api/audio/voices - List all Addis AI Voices
-router.get('/voices', (req: Request, res: Response) => {
-  res.json({
-    success: true,
-    provider: 'Addis AI Voice',
-    voices: ADDIS_AI_VOICES
-  });
-});
-
 // GET /api/audio/settings
 router.get('/settings', (req: Request, res: Response) => {
   const settings = db.getAudioSetting();
   res.json({ success: true, settings });
+});
+
+// GET /api/audio/addis-voice/status
+router.get('/addis-voice/status', (req: Request, res: Response) => {
+  const status = addisVoiceService.getStatus();
+  res.json({ success: true, status });
+});
+
+// GET /api/audio/addis-voice/voices
+router.get('/addis-voice/voices', (req: Request, res: Response) => {
+  const voices = addisVoiceService.getVoices();
+  res.json({ success: true, voices });
+});
+
+// POST /api/audio/addis-voice/synthesize
+router.post('/addis-voice/synthesize', async (req: Request, res: Response) => {
+  try {
+    const { text, language, voice, speed } = req.body;
+    const result = await addisVoiceService.synthesize({ text, language, voice, speed });
+    res.json({ success: result.success, ...result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/audio/addis-voice/test
+router.post('/addis-voice/test', authenticate, authorize('audio.manage'), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { text, voice, speed, language } = req.body;
+    const sampleText = text || 'ቁጥር ሀ ሃያ አራት ያላችሁ ደንበኛ ወደ ቆጣሪ ሁለት ይሂዱ።';
+    const result = await addisVoiceService.synthesize({
+      text: sampleText,
+      voice: voice || 'aster',
+      speed: speed || 1.0,
+      language: language || 'am'
+    });
+
+    db.addAuditLog({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      action: 'TEST_ADDIS_VOICE',
+      entity: 'AudioSetting',
+      metadata: { text: sampleText, voice, provider: result.provider }
+    });
+
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 // PUT /api/audio/settings (Admin only)
@@ -48,58 +82,13 @@ router.put('/settings', authenticate, requireAdmin, (req: AuthenticatedRequest, 
   }
 });
 
-// POST /api/audio/test-voice - Test announcement using Addis AI Voice (Admin only)
-router.post('/test-voice', authenticate, requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const { 
-      text, 
-      language = 'AMHARIC', 
-      voice = 'aster', 
-      speed = 1.0 
-    } = req.body;
-    
-    let phrase = text;
-    if (!phrase) {
-      phrase = language === 'AMHARIC' 
-        ? buildAmharicAnnouncementText('A-024', 2, 'አዲስ ማመልከቻ')
-        : buildEnglishAnnouncementText('A-024', 2, 'New Application');
-    }
-
-    // Addis AI Voice synthesis
-    const audioResult = await addisVoiceProvider.generateSpeech(phrase, language, voice, speed);
-
-    res.json({
-      success: true,
-      text: phrase,
-      audioResult
-    });
-  } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// POST /api/audio/generate
-router.post('/generate', authenticate, authorize('audio.manage'), async (req: Request, res: Response) => {
-  try {
-    const { text, language = 'AMHARIC', voice = 'aster', speed = 1.0 } = req.body;
-    if (!text) {
-      return res.status(400).json({ success: false, message: 'Text is required.' });
-    }
-
-    const audioResult = await addisVoiceProvider.generateSpeech(text, language, voice, speed);
-    res.json({ success: true, audioResult });
-  } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
 // GET /api/audio/assets
 router.get('/assets', (req: Request, res: Response) => {
   const assets = db.getAudioAssets();
   res.json({ success: true, assets });
 });
 
-// POST /api/audio/assets/reset-defaults (Restore default local background music tracks)
+// POST /api/audio/assets/reset-defaults (Restore default background music tracks)
 router.post('/assets/reset-defaults', authenticate, authorize('audio.manage'), (req: AuthenticatedRequest, res: Response) => {
   try {
     const defaults = getLocalPresetTracks();

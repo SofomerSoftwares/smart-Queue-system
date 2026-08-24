@@ -69,7 +69,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
       case 'admin':
         return {
           title: isAmharic ? 'የስርዓት አስተዳደር ማዕከል' : 'System Administration',
-          subtitle: isAmharic ? 'ቆጣሪዎች፣ ሰራተኞች፣ አገልግሎቶች፣ አዲስ AI ድምፅ እና ዳታቤዝ' : 'Counters, services, Addis AI Voice, Atlas DB and audit logs',
+          subtitle: isAmharic ? 'ቆጣሪዎች፣ ሰራተኞች፣ አገልግሎቶች፣ የዳራ ሙዚቃ እና ዳታቤዝ' : 'Counters, services, background music, Atlas DB and audit logs',
           icon: ShieldCheck
         };
       case 'reports':
@@ -153,10 +153,10 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
           <span>{timeStr || '--:--:--'}</span>
         </div>
 
-        {/* Addis AI Active Badge */}
+        {/* Voice Engine Active Badge */}
         <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 border border-indigo-100/80 text-xs font-semibold text-indigo-700">
           <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-          <span className="text-[11px]">{isAmharic ? 'Addis AI ድምፅ' : 'Addis AI Voice'}</span>
+          <span className="text-[11px]">{isAmharic ? 'የድምፅ ሞተር' : 'Voice Active'}</span>
         </div>
 
       </div>

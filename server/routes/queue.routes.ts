@@ -3,17 +3,17 @@ import { db } from '../db.js';
 import { authenticate, authorize, optionalAuthenticate, AuthenticatedRequest } from '../middleware/auth.js';
 import { broadcaster } from '../websocket.js';
 import { 
-  addisVoiceProvider, 
   buildAmharicAnnouncementText, 
   buildEnglishAnnouncementText, 
-  buildPhoneticAnnouncementText,
+  buildPhoneticAnnouncementText, 
   getAmharicTicketNumber 
-} from '../services/addis-voice.service.js';
+} from '../utils/announcement.js';
 import { AnnouncementPayload } from '../types.js';
+import { addisVoiceService } from '../services/addisVoice.service.js';
 
 const router = Router();
 
-// Helper to trigger asynchronous voice generation & broadcast
+// Helper to trigger announcement broadcast to listening displays and audio managers
 async function triggerVoiceAnnouncement(
   ticketNumber: string, 
   counterNumber: number, 
@@ -31,7 +31,31 @@ async function triggerVoiceAnnouncement(
     const phoneticText = buildPhoneticAnnouncementText(ticketNumber, counterNumber, serviceName);
     const ticketAmharic = getAmharicTicketNumber(ticketNumber);
 
-    // Initial announcement payload
+    // Call Addis Voice API for crystal clear Amharic announcement audio if enabled
+    let audioBase64: string | undefined;
+    let audioMimeType: string | undefined;
+    let voiceProvider: string | undefined = 'BROWSER_TTS_FALLBACK';
+
+    if (audioSettings.addisVoiceEnabled !== false) {
+      try {
+        const synth = await addisVoiceService.synthesize({
+          text: audioSettings.language === 'ENGLISH' ? textEnglish : textAmharic,
+          language: audioSettings.language === 'ENGLISH' ? 'en' : 'am',
+          voice: audioSettings.addisVoice || 'aster',
+          speed: audioSettings.voiceSpeed || 1.0
+        });
+
+        if (synth.success && synth.audioBase64) {
+          audioBase64 = synth.audioBase64;
+          audioMimeType = synth.mimeType || 'audio/wav';
+          voiceProvider = synth.provider;
+        }
+      } catch (synthErr) {
+        console.warn('Addis Voice synthesis failed, falling back to client audio:', synthErr);
+      }
+    }
+
+    // Clean announcement payload for client-side audio player
     const payload: AnnouncementPayload = {
       ticketNumber,
       ticketNumberAmharic: ticketAmharic,
@@ -42,27 +66,13 @@ async function triggerVoiceAnnouncement(
       textAmharic,
       textEnglish,
       phoneticText,
+      audioBase64,
+      audioMimeType,
+      voiceProvider,
       timestamp: new Date().toISOString()
     };
 
-    // Asynchronous Voice generation via Addis AI Voice / Gemini TTS
-    const speechText = audioSettings.language === 'ENGLISH' ? textEnglish : textAmharic;
-    const audioResult = await addisVoiceProvider.generateSpeech(
-      speechText,
-      audioSettings.language,
-      audioSettings.addisVoice || 'aster',
-      audioSettings.addisAiSpeed || 1.0
-    );
-
-    if (audioResult) {
-      if (audioResult.audioBase64) {
-        payload.audioBase64 = audioResult.audioBase64;
-        payload.audioMimeType = audioResult.mimeType;
-      }
-      payload.source = audioResult.source;
-    }
-
-    // Broadcast announcement to all listening displays and staff
+    // Broadcast announcement event to all connected clients
     broadcaster.broadcast('announcement:play', payload);
   } catch (err) {
     console.error('Error during voice announcement trigger:', err);

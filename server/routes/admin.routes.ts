@@ -541,6 +541,23 @@ router.post('/database/connect', authenticate, requireAdmin, async (req: Authent
   }
 });
 
+// POST /api/database/disconnect (Admin only)
+router.post('/database/disconnect', authenticate, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const status = await db.disconnectMongo();
+    db.addAuditLog({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      action: 'DISCONNECT_MONGODB_ATLAS',
+      entity: 'Database',
+      metadata: { connected: false, mode: 'LOCAL_RESILIENT' }
+    });
+    res.json({ success: true, ...status });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // POST /api/database/sync (Admin only)
 router.post('/database/sync', authenticate, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {

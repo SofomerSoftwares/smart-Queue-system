@@ -861,7 +861,7 @@ export const OfficerStationView: React.FC = () => {
               </div>
             </div>
 
-            {/* Audio Waveform / Addis Voice Synthesis Indicator */}
+            {/* Audio Waveform / Voice Synthesis Indicator */}
             <div className="mt-auto pt-4 border-t border-slate-800 flex items-center justify-between text-xs">
               <div className="flex items-center gap-3">
                 <div className="flex gap-1 items-end h-5">
@@ -871,7 +871,7 @@ export const OfficerStationView: React.FC = () => {
                   <div className="w-1 h-4 bg-indigo-400 rounded-full animate-pulse"></div>
                 </div>
                 <p className="text-[10px] text-slate-400 font-medium">
-                  {isAmharic ? 'Addis AI የአማርኛ ድምፅ ማስታወቂያ ዝግጁ' : 'Addis AI Voice Engine Active...'}
+                  {isAmharic ? 'የአማርኛ ድምፅ ማስታወቂያ ዝግጁ' : 'Voice Engine Active...'}
                 </p>
               </div>
             </div>

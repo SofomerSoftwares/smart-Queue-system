@@ -256,7 +256,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="flex items-center justify-between text-[11px]">
                 <div className="flex items-center gap-1.5 text-indigo-400 font-semibold">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Addis AI Voice</span>
+                  <span>{isAmharic ? 'የድምፅ ሞተር' : 'Voice Engine'}</span>
                 </div>
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60">
                   Amharic
