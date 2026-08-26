@@ -166,19 +166,6 @@ export interface AudioSetting {
   volume: number; // 0 to 100
   repeatCount: number; // 1 or 2
   announcementDelaySeconds: number;
-  backgroundMusicEnabled: boolean;
-  backgroundMusicVolume: number; // 0 to 100
-  currentMusicAssetId?: string;
-}
-
-export interface AudioAsset {
-  id: string;
-  title: string;
-  type: 'MUSIC' | 'VOICE_PRESET' | 'CHIME';
-  url: string;
-  source: 'UPLOAD' | 'AI_GENERATED' | 'PRESET';
-  durationSeconds?: number;
-  createdAt: string;
 }
 
 export interface AuditLog {
@@ -201,7 +188,6 @@ export interface DatabaseSchema {
   events: QueueEvent[];
   officeSetting: OfficeSetting;
   audioSetting: AudioSetting;
-  audioAssets: AudioAsset[];
   auditLogs: AuditLog[];
   customerReviews: CustomerReview[];
 }

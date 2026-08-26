@@ -137,19 +137,6 @@ export interface AudioSetting {
   volume: number;
   repeatCount: number;
   announcementDelaySeconds: number;
-  backgroundMusicEnabled: boolean;
-  backgroundMusicVolume: number;
-  currentMusicAssetId?: string;
-}
-
-export interface AudioAsset {
-  id: string;
-  title: string;
-  type: 'MUSIC' | 'VOICE_PRESET' | 'CHIME';
-  url: string;
-  source: 'UPLOAD' | 'AI_GENERATED' | 'PRESET';
-  durationSeconds?: number;
-  createdAt: string;
 }
 
 export interface AnnouncementPayload {

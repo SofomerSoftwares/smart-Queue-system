@@ -5,8 +5,6 @@ import {
   VolumeX, 
   Maximize2, 
   Minimize2, 
-  Music, 
-  Disc,
   Sparkles, 
   Users, 
   CheckCircle2, 
@@ -30,16 +28,10 @@ export const DisplayView: React.FC = () => {
     counters, 
     officeSetting, 
     audioSetting, 
-    audioAssets,
-    currentMusicTrack,
-    changeBackgroundMusicTrack,
-    setBackgroundVolume,
     lastAnnouncement,
     uiLanguage,
     isAudioUnlocked,
     unlockAudio,
-    isMusicPlaying,
-    toggleBackgroundMusic,
     updateOfficeSettingAction
   } = useQueue();
 

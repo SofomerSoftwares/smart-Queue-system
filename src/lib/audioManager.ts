@@ -1,18 +1,11 @@
-// Audio Manager coordinating Background Music and Addis AI Voice Announcements
+// Audio Manager coordinating Addis AI Voice Announcements and Chimes
 import { transliterateToPhonetic } from './amharic';
 
 export { transliterateToPhonetic as transliterateAmharicToPhonetic };
 
 class AudioManager {
   private audioCtx: AudioContext | null = null;
-  private backgroundAudioEl: HTMLAudioElement | null = null;
   private currentVoiceAudioEl: HTMLAudioElement | null = null;
-  private isMusicPlaying = false;
-  private ambientOscillatorNodes: OscillatorNode[] = [];
-  private ambientGainNode: GainNode | null = null;
-  private isAmbientSynthRunning = false;
-  private previewAudioEl: HTMLAudioElement | null = null;
-  private currentMusicUrl: string | null = null;
 
   public initContext(): AudioContext {
     if (!this.audioCtx) {
@@ -58,7 +51,7 @@ class AudioManager {
     }
   }
 
-  // Play announcement with music ducking (pause music -> play chime -> play voice -> resume music)
+  // Play announcement (chime -> voice audio)
   public async playAnnouncement(
     text: string, 
     audioBase64?: string, 
@@ -66,17 +59,11 @@ class AudioManager {
     volume: number = 85,
     phoneticText?: string
   ): Promise<void> {
-    // 1. Pause background music if active
-    const wasMusicPlaying = this.isMusicPlaying;
-    if (wasMusicPlaying) {
-      this.pauseBackgroundMusic();
-    }
-
     try {
-      // 2. Play lobby chime
+      // 1. Play lobby chime
       await this.playChime();
 
-      // 3. Play voice
+      // 2. Play voice audio
       let playedSuccessfully = false;
       if (audioBase64 && audioBase64.trim().length > 0) {
         playedSuccessfully = await this.playBase64Audio(audioBase64, mimeType, volume);
@@ -88,13 +75,6 @@ class AudioManager {
       }
     } catch (err) {
       console.warn('Announcement playback notice:', err);
-    } finally {
-      // 4. Smoothly resume background music after short pause
-      if (wasMusicPlaying) {
-        setTimeout(() => {
-          this.resumeBackgroundMusic();
-        }, 1200);
-      }
     }
   }
 
@@ -184,7 +164,7 @@ class AudioManager {
           let voiceToUse = amVoice;
 
           if (!amVoice) {
-            // If no Amharic voice is installed on OS, use phonetic transliterated text with natural English voice
+            // If no Amharic voice is installed on OS, use phonetic transliterated text with natural voice
             textToSpeak = phoneticText || transliterateToPhonetic(text);
             
             // Prefer high-quality English voice
@@ -238,175 +218,6 @@ class AudioManager {
         resolve();
       }
     });
-  }
-
-  // --- Background Music Handling ---
-  public startBackgroundMusic(urlOrPreset?: string, volume: number = 14): void {
-    this.isMusicPlaying = true;
-    this.currentMusicUrl = urlOrPreset || null;
-
-    const isPlayableUrl = typeof urlOrPreset === 'string' && (
-      urlOrPreset.startsWith('data:audio/') || 
-      urlOrPreset.startsWith('http://') || 
-      urlOrPreset.startsWith('https://') || 
-      urlOrPreset.startsWith('/api/') ||
-      urlOrPreset.startsWith('blob:')
-    );
-
-    if (!isPlayableUrl) {
-      if (this.backgroundAudioEl) {
-        try {
-          this.backgroundAudioEl.pause();
-          this.backgroundAudioEl.removeAttribute('src');
-          this.backgroundAudioEl.load();
-        } catch {}
-        this.backgroundAudioEl = null;
-      }
-      // Start relaxing ambient synth
-      this.startAmbientSynth(volume);
-    } else {
-      this.stopAmbientSynth();
-      try {
-        if (!this.backgroundAudioEl) {
-          this.backgroundAudioEl = new Audio();
-          this.backgroundAudioEl.loop = true;
-          this.backgroundAudioEl.onerror = () => {
-            this.backgroundAudioEl = null;
-            this.startAmbientSynth(volume);
-          };
-        }
-        
-        if (this.backgroundAudioEl.src !== urlOrPreset) {
-          this.backgroundAudioEl.src = urlOrPreset;
-        }
-        this.backgroundAudioEl.volume = Math.max(0.02, Math.min(1.0, volume / 100));
-        const playPromise = this.backgroundAudioEl.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(() => {
-            this.startAmbientSynth(volume);
-          });
-        }
-      } catch {
-        this.startAmbientSynth(volume);
-      }
-    }
-  }
-
-  public previewTrack(url: string, volume: number = 30): void {
-    this.stopPreview();
-    if (!url) return;
-
-    try {
-      this.previewAudioEl = new Audio(url);
-      this.previewAudioEl.volume = Math.max(0.05, Math.min(1.0, volume / 100));
-      this.previewAudioEl.onended = () => {
-        this.previewAudioEl = null;
-      };
-      this.previewAudioEl.play().catch(() => {});
-    } catch (err) {
-      console.warn('Preview audio error:', err);
-    }
-  }
-
-  public stopPreview(): void {
-    if (this.previewAudioEl) {
-      try {
-        this.previewAudioEl.pause();
-        this.previewAudioEl.removeAttribute('src');
-        this.previewAudioEl.load();
-      } catch {}
-      this.previewAudioEl = null;
-    }
-  }
-
-  public setBackgroundMusicVolume(volume: number): void {
-    if (this.backgroundAudioEl) {
-      this.backgroundAudioEl.volume = Math.max(0.02, Math.min(1.0, volume / 100));
-    }
-    if (this.ambientGainNode && this.audioCtx) {
-      this.ambientGainNode.gain.setValueAtTime(
-        Math.max(0.005, (volume / 100) * 0.08), 
-        this.audioCtx.currentTime
-      );
-    }
-  }
-
-  public pauseBackgroundMusic(): void {
-    if (this.backgroundAudioEl) {
-      this.backgroundAudioEl.pause();
-    }
-    if (this.isAmbientSynthRunning) {
-      this.stopAmbientSynth();
-    }
-  }
-
-  public resumeBackgroundMusic(): void {
-    if (!this.isMusicPlaying) return;
-
-    if (this.backgroundAudioEl && this.backgroundAudioEl.src && this.backgroundAudioEl.src.startsWith('data:')) {
-      this.backgroundAudioEl.play().catch(() => {
-        this.startAmbientSynth();
-      });
-    } else {
-      this.startAmbientSynth();
-    }
-  }
-
-  public stopBackgroundMusic(): void {
-    this.isMusicPlaying = false;
-    if (this.backgroundAudioEl) {
-      try {
-        this.backgroundAudioEl.pause();
-        this.backgroundAudioEl.removeAttribute('src');
-        this.backgroundAudioEl.load();
-      } catch {}
-      this.backgroundAudioEl = null;
-    }
-    this.stopAmbientSynth();
-  }
-
-  // Gentle synthesized calming office ambient drone (Pentatonic chords)
-  private startAmbientSynth(volume: number = 12): void {
-    if (this.isAmbientSynthRunning) return;
-    try {
-      const ctx = this.initContext();
-      this.ambientGainNode = ctx.createGain();
-      const targetGain = Math.max(0.005, (volume / 100) * 0.06);
-      this.ambientGainNode.gain.setValueAtTime(targetGain, ctx.currentTime);
-      this.ambientGainNode.connect(ctx.destination);
-
-      // Warm relaxing frequencies (D3, A3, D4, F#4)
-      const chord = [146.83, 220.00, 293.66, 369.99];
-      this.ambientOscillatorNodes = chord.map(freq => {
-        const osc = ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, ctx.currentTime);
-        osc.connect(this.ambientGainNode!);
-        osc.start();
-        return osc;
-      });
-
-      this.isAmbientSynthRunning = true;
-    } catch (err) {
-      console.warn('Ambient synth initialization:', err);
-    }
-  }
-
-  private stopAmbientSynth(): void {
-    if (!this.isAmbientSynthRunning) return;
-    try {
-      this.ambientOscillatorNodes.forEach(osc => {
-        try { osc.stop(); osc.disconnect(); } catch (e) {}
-      });
-      this.ambientOscillatorNodes = [];
-      if (this.ambientGainNode) {
-        this.ambientGainNode.disconnect();
-        this.ambientGainNode = null;
-      }
-      this.isAmbientSynthRunning = false;
-    } catch (err) {
-      console.warn('Error stopping ambient synth:', err);
-    }
   }
 }
 

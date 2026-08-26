@@ -5,7 +5,6 @@ import {
   QueueTicket, 
   OfficeSetting, 
   AudioSetting, 
-  AudioAsset, 
   AuditLog, 
   QueueStats,
   PrintTicketData,
@@ -225,31 +224,6 @@ export const api = {
     }>('/api/audio/test-voice', {
       method: 'POST',
       body: JSON.stringify(data)
-    }),
-
-  getAudioAssets: () =>
-    request<{ success: boolean; assets: AudioAsset[] }>('/api/audio/assets'),
-
-  restoreDefaultAudioAssets: () =>
-    request<{ success: boolean; assets: AudioAsset[]; message: string }>('/api/audio/assets/reset-defaults', {
-      method: 'POST'
-    }),
-
-  generateAIMusic: (prompt: string, model?: string) =>
-    request<{ success: boolean; result: { audioBase64?: string; title: string; source: string } }>('/api/audio/music/generate', {
-      method: 'POST',
-      body: JSON.stringify({ prompt, model })
-    }),
-
-  uploadMusic: (data: { title: string; base64Data: string; mimeType?: string; durationSeconds?: number }) =>
-    request<{ success: boolean; asset: AudioAsset }>('/api/audio/music/upload', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    }),
-
-  deleteAudioAsset: (id: string) =>
-    request<{ success: boolean; message: string }>(`/api/audio/assets/${id}`, {
-      method: 'DELETE'
     }),
 
   // --- ADMIN & MANAGEMENT ---

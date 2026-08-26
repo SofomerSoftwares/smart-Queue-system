@@ -9,14 +9,12 @@ import {
   QueueEvent, 
   OfficeSetting, 
   AudioSetting, 
-  AudioAsset, 
   AuditLog,
   CustomerReview,
   RoleName,
   DatabaseSchema
 } from './types.js';
 import { mongoService } from './mongodb.js';
-import { getLocalPresetTracks } from './services/music.service.js';
 
 export const PERMISSIONS: Permission[] = [
   { id: 'dashboard.view', name: 'View Dashboard', description: 'Access dashboard screens' },
@@ -45,7 +43,7 @@ export const PERMISSIONS: Permission[] = [
   { id: 'reports.view', name: 'View Reports', description: 'Access daily and analytical reports' },
   { id: 'settings.view', name: 'View Settings', description: 'View system configuration' },
   { id: 'settings.update', name: 'Update Settings', description: 'Change system configuration' },
-  { id: 'audio.manage', name: 'Manage Audio', description: 'Configure Gemini voice and background music' }
+  { id: 'audio.manage', name: 'Manage Audio', description: 'Configure Addis AI voice announcement settings' }
 ];
 
 export const ROLES: Record<RoleName, Role> = {
@@ -298,25 +296,8 @@ function seedDatabase(): DatabaseSchema {
     addisAiEndpoint: process.env.ADDIS_AI_ENDPOINT || 'https://api.addis.ai/v1/tts',
     volume: 85,
     repeatCount: 1,
-    announcementDelaySeconds: 1,
-    backgroundMusicEnabled: true,
-    backgroundMusicVolume: 14,
-    currentMusicAssetId: 'asset-music-1'
+    announcementDelaySeconds: 1
   };
-
-  const presetTracks = getLocalPresetTracks();
-  const audioAssets: AudioAsset[] = [
-    ...presetTracks,
-    {
-      id: 'asset-chime-1',
-      title: 'Modern Airport Queue Chime',
-      type: 'CHIME',
-      url: 'preset:chime-airport',
-      source: 'PRESET',
-      durationSeconds: 2,
-      createdAt: now
-    }
-  ];
 
   // Seed sample initial tickets for today
   const todayKey = getTodayKey();
@@ -424,7 +405,6 @@ function seedDatabase(): DatabaseSchema {
     events: [],
     officeSetting,
     audioSetting,
-    audioAssets,
     auditLogs: [],
     customerReviews: []
   };
@@ -995,26 +975,6 @@ class Database {
     this.data.audioSetting = { ...this.data.audioSetting, ...update };
     this.save();
     return this.data.audioSetting;
-  }
-
-  public getAudioAssets(): AudioAsset[] {
-    return this.data.audioAssets;
-  }
-
-  public addAudioAsset(asset: AudioAsset): AudioAsset {
-    this.data.audioAssets.push(asset);
-    this.save();
-    return asset;
-  }
-
-  public deleteAudioAsset(id: string): boolean {
-    const len = this.data.audioAssets.length;
-    this.data.audioAssets = this.data.audioAssets.filter(a => a.id !== id);
-    if (this.data.audioAssets.length !== len) {
-      this.save();
-      return true;
-    }
-    return false;
   }
 
   // --- CUSTOMER REVIEWS & SATISFACTION ---

@@ -5,9 +5,8 @@ import {
   Service, 
   OfficeSetting, 
   AudioSetting, 
-  AudioAsset,
   QueueStats, 
-  AnnouncementPayload,
+  AnnouncementPayload, 
   PrintTicketData
 } from '../types';
 import { api } from '../lib/api';
@@ -21,8 +20,6 @@ interface QueueContextType {
   services: Service[];
   officeSetting: OfficeSetting | null;
   audioSetting: AudioSetting | null;
-  audioAssets: AudioAsset[];
-  currentMusicTrack: AudioAsset | null;
   stats: QueueStats | null;
   isLoading: boolean;
   lastAnnouncement: AnnouncementPayload | null;
@@ -30,10 +27,6 @@ interface QueueContextType {
   setUiLanguage: (lang: 'AMHARIC' | 'ENGLISH') => void;
   isAudioUnlocked: boolean;
   unlockAudio: () => void;
-  isMusicPlaying: boolean;
-  toggleBackgroundMusic: (enable?: boolean) => void;
-  changeBackgroundMusicTrack: (assetId: string) => Promise<void>;
-  setBackgroundVolume: (volume: number) => Promise<void>;
   callNextTicket: (counterId: string, specificTicketId?: string) => Promise<{ success: boolean; ticket?: QueueTicket | null; message?: string }>;
   recallTicket: (ticketId: string) => Promise<void>;
   startService: (ticketId: string) => Promise<void>;
@@ -58,29 +51,19 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [services, setServices] = useState<Service[]>([]);
   const [officeSetting, setOfficeSetting] = useState<OfficeSetting | null>(null);
   const [audioSetting, setAudioSetting] = useState<AudioSetting | null>(null);
-  const [audioAssets, setAudioAssets] = useState<AudioAsset[]>([]);
   const [stats, setStats] = useState<QueueStats | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [lastAnnouncement, setLastAnnouncement] = useState<AnnouncementPayload | null>(null);
   const [uiLanguage, setUiLanguage] = useState<'AMHARIC' | 'ENGLISH'>('AMHARIC');
   const [isAudioUnlocked, setIsAudioUnlocked] = useState<boolean>(false);
-  const [isMusicPlaying, setIsMusicPlaying] = useState<boolean>(false);
 
   const audioUnlockedRef = useRef<boolean>(false);
   const audioSettingRef = useRef<AudioSetting | null>(null);
-  const audioAssetsRef = useRef<AudioAsset[]>([]);
   audioSettingRef.current = audioSetting;
-  audioAssetsRef.current = audioAssets;
-
-  const currentMusicTrack = audioAssets.find(a => a.id === audioSetting?.currentMusicAssetId) || 
-    audioAssets.find(a => a.type === 'MUSIC') || null;
 
   const refreshQueue = useCallback(async () => {
     try {
-      const [res, assetsRes] = await Promise.all([
-        api.getQueueStatus(),
-        api.getAudioAssets().catch(() => ({ success: false, assets: [] }))
-      ]);
+      const res = await api.getQueueStatus();
 
       if (res.success) {
         setWaitingTickets(res.waitingTickets || []);
@@ -92,10 +75,6 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setAudioSetting(res.audioSetting);
         setStats(res.stats);
       }
-
-      if (assetsRes.success && assetsRes.assets) {
-        setAudioAssets(assetsRes.assets);
-      }
     } catch (err) {
       console.warn('Error fetching queue status:', err);
     } finally {
@@ -103,73 +82,11 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
-  const getActiveTrackUrl = useCallback((): string | undefined => {
-    const currentAssetId = audioSettingRef.current?.currentMusicAssetId;
-    const matched = audioAssetsRef.current.find(a => a.id === currentAssetId) || 
-                    audioAssetsRef.current.find(a => a.type === 'MUSIC');
-    return matched?.url;
-  }, []);
-
   const unlockAudio = useCallback(() => {
     setIsAudioUnlocked(true);
     audioUnlockedRef.current = true;
     audioManager.playChime();
-    if (audioSettingRef.current?.backgroundMusicEnabled) {
-      const trackUrl = getActiveTrackUrl();
-      audioManager.startBackgroundMusic(
-        trackUrl,
-        audioSettingRef.current.backgroundMusicVolume || 14
-      );
-      setIsMusicPlaying(true);
-    }
-  }, [getActiveTrackUrl]);
-
-  const toggleBackgroundMusic = useCallback((enable?: boolean) => {
-    const newState = enable !== undefined ? enable : !isMusicPlaying;
-    setIsMusicPlaying(newState);
-    if (newState) {
-      const trackUrl = getActiveTrackUrl();
-      audioManager.startBackgroundMusic(
-        trackUrl,
-        audioSettingRef.current?.backgroundMusicVolume || 14
-      );
-    } else {
-      audioManager.stopBackgroundMusic();
-    }
-  }, [isMusicPlaying, getActiveTrackUrl]);
-
-  const changeBackgroundMusicTrack = useCallback(async (assetId: string) => {
-    const matched = audioAssets.find(a => a.id === assetId);
-    if (matched) {
-      const newAudioSetting = { ...audioSetting, currentMusicAssetId: assetId };
-      setAudioSetting(newAudioSetting as AudioSetting);
-      audioSettingRef.current = newAudioSetting as AudioSetting;
-
-      try {
-        await api.updateAudioSettings({ currentMusicAssetId: assetId });
-      } catch (err) {
-        console.warn('Failed to persist active music track:', err);
-      }
-
-      if (isMusicPlaying || audioUnlockedRef.current) {
-        audioManager.startBackgroundMusic(
-          matched.url,
-          newAudioSetting.backgroundMusicVolume || 14
-        );
-        setIsMusicPlaying(true);
-      }
-    }
-  }, [audioAssets, audioSetting, isMusicPlaying]);
-
-  const setBackgroundVolume = useCallback(async (volume: number) => {
-    audioManager.setBackgroundMusicVolume(volume);
-    const newAudioSetting = { ...audioSetting, backgroundMusicVolume: volume };
-    setAudioSetting(newAudioSetting as AudioSetting);
-    audioSettingRef.current = newAudioSetting as AudioSetting;
-    try {
-      await api.updateAudioSettings({ backgroundMusicVolume: volume });
-    } catch {}
-  }, [audioSetting]);
+  }, []);
 
   // Initial load and periodic safety sync
   useEffect(() => {
@@ -308,8 +225,6 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         services,
         officeSetting,
         audioSetting,
-        audioAssets,
-        currentMusicTrack,
         stats,
         isLoading,
         lastAnnouncement,
@@ -317,10 +232,6 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setUiLanguage,
         isAudioUnlocked,
         unlockAudio,
-        isMusicPlaying,
-        toggleBackgroundMusic,
-        changeBackgroundMusicTrack,
-        setBackgroundVolume,
         callNextTicket,
         recallTicket,
         startService,
