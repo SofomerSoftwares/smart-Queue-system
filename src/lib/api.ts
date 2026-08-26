@@ -9,7 +9,8 @@ import {
   AuditLog, 
   QueueStats,
   PrintTicketData,
-  AddisVoiceOption
+  AddisVoiceOption,
+  CustomerReview
 } from '../types';
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -119,6 +120,32 @@ export const api = {
     }>(`/api/queue/ticket/${ticketNumber}/checkin`, {
       method: 'POST'
     }),
+
+  submitCustomerReview: (ticketNumber: string, data: { rating: number; tags?: string[]; comment?: string }) =>
+    request<{
+      success: boolean;
+      message: string;
+      review: CustomerReview;
+      ticket: QueueTicket & { ticketNumberAmharic?: string };
+    }>(`/api/queue/ticket/${ticketNumber}/review`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+
+  getCustomerReviews: (limitOrDate?: number | string) => {
+    let queryParam = 'limit=100';
+    if (typeof limitOrDate === 'number') {
+      queryParam = `limit=${limitOrDate}`;
+    } else if (typeof limitOrDate === 'string') {
+      queryParam = `date=${encodeURIComponent(limitOrDate)}`;
+    }
+    return request<{
+      success: boolean;
+      total: number;
+      averageRating: number;
+      reviews: CustomerReview[];
+    }>(`/api/queue/reviews?${queryParam}`);
+  },
 
   createTicket: (data: { serviceId: string; priority?: 'NORMAL' | 'PRIORITY' }) =>
     request<{

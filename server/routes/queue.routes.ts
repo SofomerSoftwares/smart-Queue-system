@@ -165,6 +165,7 @@ router.get('/ticket/:ticketNumber', (req: Request, res: Response) => {
         counterId: ticket.counterId,
         isCheckedIn: ticket.isCheckedIn ?? false,
         checkedInAt: ticket.checkedInAt,
+        customerReview: ticket.customerReview,
         peopleAhead,
         estimatedWaitMinutes,
         currentlyServingTicketNumber: currentlyServing?.ticketNumber || 'None'
@@ -221,6 +222,70 @@ router.post('/ticket/:ticketNumber/checkin', (req: Request, res: Response) => {
         ...ticket,
         ticketNumberAmharic: getAmharicTicketNumber(ticket.ticketNumber)
       }
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 2c. POST /api/queue/ticket/:ticketNumber/review - Customer satisfaction rating & review submission
+router.post('/ticket/:ticketNumber/review', (req: Request, res: Response) => {
+  try {
+    const { ticketNumber } = req.params;
+    const { rating, tags, comment } = req.body;
+
+    if (!rating || typeof rating !== 'number' || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'A rating between 1 and 5 is required.'
+      });
+    }
+
+    const { review, ticket } = db.addCustomerReview(ticketNumber, {
+      rating,
+      tags: Array.isArray(tags) ? tags : [],
+      comment
+    });
+
+    // Broadcast realtime update
+    broadcaster.broadcast('queue:updated', {
+      action: 'CUSTOMER_REVIEW_SUBMITTED',
+      ticketNumber: ticket.ticketNumber,
+      rating: review.rating
+    });
+
+    return res.json({
+      success: true,
+      message: 'Customer review submitted successfully. Thank you for your feedback!',
+      review,
+      ticket: {
+        ...ticket,
+        ticketNumberAmharic: getAmharicTicketNumber(ticket.ticketNumber)
+      }
+    });
+  } catch (err: any) {
+    return res.status(err.message === 'Ticket not found' ? 404 : 500).json({
+      success: false,
+      message: err.message || 'Failed to submit review'
+    });
+  }
+});
+
+// 2d. GET /api/queue/reviews - List all customer reviews (Recent feedback)
+router.get('/reviews', optionalAuthenticate, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 100;
+    const reviews = db.getCustomerReviews(limit);
+    
+    // Compute simple summary
+    const total = reviews.length;
+    const avgRating = total > 0 ? (reviews.reduce((acc, r) => acc + r.rating, 0) / total).toFixed(1) : '5.0';
+
+    return res.json({
+      success: true,
+      total,
+      averageRating: parseFloat(avgRating),
+      reviews
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: err.message });

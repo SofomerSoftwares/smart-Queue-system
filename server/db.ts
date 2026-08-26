@@ -11,7 +11,9 @@ import {
   AudioSetting, 
   AudioAsset, 
   AuditLog,
-  RoleName
+  CustomerReview,
+  RoleName,
+  DatabaseSchema
 } from './types.js';
 import { mongoService } from './mongodb.js';
 import { getLocalPresetTracks } from './services/music.service.js';
@@ -82,18 +84,6 @@ export const ROLES: Record<RoleName, Role> = {
     ]
   }
 };
-
-export interface DatabaseSchema {
-  users: User[];
-  services: Service[];
-  counters: Counter[];
-  tickets: QueueTicket[];
-  events: QueueEvent[];
-  officeSetting: OfficeSetting;
-  audioSetting: AudioSetting;
-  audioAssets: AudioAsset[];
-  auditLogs: AuditLog[];
-}
 
 function getTodayKey(): string {
   const d = new Date();
@@ -435,7 +425,8 @@ function seedDatabase(): DatabaseSchema {
     officeSetting,
     audioSetting,
     audioAssets,
-    auditLogs: []
+    auditLogs: [],
+    customerReviews: []
   };
 }
 
@@ -1024,6 +1015,77 @@ class Database {
       return true;
     }
     return false;
+  }
+
+  // --- CUSTOMER REVIEWS & SATISFACTION ---
+  public addCustomerReview(
+    ticketIdOrNumber: string,
+    reviewInput: { rating: number; tags?: string[]; comment?: string }
+  ): { review: CustomerReview; ticket: QueueTicket } {
+    let ticket = this.getTicketById(ticketIdOrNumber);
+    if (!ticket) {
+      ticket = this.getTicketByNumber(ticketIdOrNumber);
+    }
+    if (!ticket) throw new Error('Ticket not found');
+
+    const cleanRating = Math.max(1, Math.min(5, Number(reviewInput.rating) || 5));
+    const now = new Date().toISOString();
+
+    const review: CustomerReview = {
+      id: `rev-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      ticketId: ticket.id,
+      ticketNumber: ticket.ticketNumber,
+      serviceId: ticket.serviceId,
+      serviceName: ticket.serviceName,
+      counterNumber: ticket.counterNumber,
+      officerName: ticket.officerName,
+      rating: cleanRating,
+      tags: Array.isArray(reviewInput.tags) ? reviewInput.tags : [],
+      comment: reviewInput.comment ? reviewInput.comment.trim() : undefined,
+      createdAt: now
+    };
+
+    // Attach to ticket
+    ticket.customerReview = review;
+
+    // Add or update in reviews list
+    if (!this.data.customerReviews) {
+      this.data.customerReviews = [];
+    }
+
+    const existingIdx = this.data.customerReviews.findIndex(r => r.ticketId === ticket.id || r.ticketNumber === ticket.ticketNumber);
+    if (existingIdx >= 0) {
+      this.data.customerReviews[existingIdx] = review;
+    } else {
+      this.data.customerReviews.unshift(review);
+    }
+
+    this.addAuditLog({
+      action: 'SUBMIT_CUSTOMER_REVIEW',
+      entity: 'CustomerReview',
+      entityId: review.id,
+      metadata: {
+        ticketNumber: ticket.ticketNumber,
+        rating: review.rating,
+        tags: review.tags,
+        serviceName: ticket.serviceName
+      }
+    });
+
+    this.save();
+    return { review, ticket };
+  }
+
+  public getCustomerReviews(limit = 100): CustomerReview[] {
+    if (!this.data.customerReviews) return [];
+    return this.data.customerReviews.slice(0, limit);
+  }
+
+  public getTicketReview(ticketIdOrNumber: string): CustomerReview | undefined {
+    const ticket = this.getTicketById(ticketIdOrNumber) || this.getTicketByNumber(ticketIdOrNumber);
+    if (ticket && ticket.customerReview) return ticket.customerReview;
+    if (!this.data.customerReviews) return undefined;
+    return this.data.customerReviews.find(r => r.ticketId === ticketIdOrNumber || r.ticketNumber === ticketIdOrNumber);
   }
 
   // --- STATS & REPORTS ---

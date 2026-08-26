@@ -90,6 +90,21 @@ export interface QueueTicket {
   dateKey: string; // "YYYY-MM-DD" for daily sequence reset
   isCheckedIn?: boolean;
   checkedInAt?: string;
+  customerReview?: CustomerReview;
+}
+
+export interface CustomerReview {
+  id: string;
+  ticketId: string;
+  ticketNumber: string;
+  serviceId: string;
+  serviceName: string;
+  counterNumber?: number;
+  officerName?: string;
+  rating: number; // 1 to 5
+  tags?: string[];
+  comment?: string;
+  createdAt: string;
 }
 
 export interface QueueEvent {
@@ -188,6 +203,7 @@ export interface DatabaseSchema {
   audioSetting: AudioSetting;
   audioAssets: AudioAsset[];
   auditLogs: AuditLog[];
+  customerReviews: CustomerReview[];
 }
 
 export interface AnnouncementPayload {

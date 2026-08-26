@@ -1,5 +1,5 @@
 import { MongoClient, Db } from 'mongodb';
-import { DatabaseSchema, User, Service, Counter, QueueTicket, QueueEvent, AuditLog, AudioAsset } from './types.js';
+import { DatabaseSchema, User, Service, Counter, QueueTicket, QueueEvent, AuditLog, AudioAsset, CustomerReview } from './types.js';
 
 export function sanitizeMongoUri(rawUri?: string | null): string {
   if (!rawUri || typeof rawUri !== 'string') return '';
@@ -182,6 +182,7 @@ class MongoDBService {
       const events = await this.db.collection<QueueEvent>('events').find({}).sort({ timestamp: -1 }).limit(500).toArray();
       const audioAssets = await this.db.collection<AudioAsset>('audio_assets').find({}).toArray();
       const auditLogs = await this.db.collection<AuditLog>('audit_logs').find({}).sort({ timestamp: -1 }).limit(1000).toArray();
+      const customerReviews = await this.db.collection<CustomerReview>('customer_reviews').find({}).sort({ createdAt: -1 }).toArray();
 
       const officeSettingDoc = await this.db.collection('settings').findOne({ _id: 'officeSetting' as any });
       const audioSettingDoc = await this.db.collection('settings').findOne({ _id: 'audioSetting' as any });
@@ -207,6 +208,7 @@ class MongoDBService {
         events: cleanDocs<QueueEvent>(events),
         audioAssets: cleanDocs<AudioAsset>(audioAssets),
         auditLogs: cleanDocs<AuditLog>(auditLogs),
+        customerReviews: cleanDocs<CustomerReview>(customerReviews),
         officeSetting: (officeSettingDoc?.data as any) || undefined,
         audioSetting: (audioSettingDoc?.data as any) || undefined
       } as DatabaseSchema;
@@ -248,6 +250,7 @@ class MongoDBService {
         syncCollection('events', data.events),
         syncCollection('audio_assets', data.audioAssets),
         syncCollection('audit_logs', data.auditLogs),
+        syncCollection('customer_reviews', data.customerReviews || []),
         this.db.collection('settings').updateOne(
           { _id: 'officeSetting' as any },
           { $set: { data: data.officeSetting, updatedAt: new Date().toISOString() } },

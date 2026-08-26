@@ -18,13 +18,46 @@ import {
   Sparkles,
   RefreshCw,
   Zap,
-  CheckCircle
+  CheckCircle,
+  Star,
+  MessageSquare,
+  Send,
+  ThumbsUp,
+  Smile,
+  Edit3,
+  MessageCircleHeart
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../lib/api';
 import { useQueue } from '../context/QueueContext';
-import { QueueTicket } from '../types';
+import { QueueTicket, CustomerReview } from '../types';
 import { AmharicLib } from '../lib/amharic';
+
+interface FeedbackTagOption {
+  id: string;
+  en: string;
+  am: string;
+  isPositive: boolean;
+}
+
+const FEEDBACK_TAGS: FeedbackTagOption[] = [
+  { id: 'fast_service', en: '⚡ Fast Service', am: '⚡ ፈጣን አገልግሎት', isPositive: true },
+  { id: 'polite_officer', en: '🌟 Polite & Friendly Staff', am: '🌟 ተስማሚ እና አክባሪ ሰራተኛ', isPositive: true },
+  { id: 'clear_audio', en: '📢 Clear Audio Announcement', am: '📢 ግልጽ የድምፅ ጥሪ', isPositive: true },
+  { id: 'clear_guidance', en: '💡 Clear Guidance', am: '💡 ግልጽ መመሪያ', isPositive: true },
+  { id: 'clean_lobby', en: '🏢 Clean & Comfortable Lobby', am: '🏢 ንጹህ እና ምቹ አዳራሽ', isPositive: true },
+  { id: 'long_wait', en: '⏳ Long Waiting Time', am: '⏳ ረጅም የጥበቃ ጊዜ', isPositive: false },
+  { id: 'screen_visibility', en: '🖥️ Screen Visibility Issue', am: '🖥️ የስክሪን እይታ ችግር', isPositive: false },
+  { id: 'audio_low', en: '🔉 Low Voice Call Volume', am: '🔉 የድምፅ ጥሪ ማነስ', isPositive: false }
+];
+
+const RATING_DESCRIPTIONS: Record<number, { en: string; am: string; badgeColor: string }> = {
+  1: { en: 'Poor Experience', am: 'ደካማ አገልግሎት', badgeColor: 'bg-rose-100 text-rose-800 border-rose-200' },
+  2: { en: 'Fair Experience', am: 'መጠነኛ አገልግሎት', badgeColor: 'bg-amber-100 text-amber-800 border-amber-200' },
+  3: { en: 'Good Experience', am: 'ጥሩ አገልግሎት', badgeColor: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+  4: { en: 'Very Good Service', am: 'በጣም ጥሩ አገልግሎት', badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+  5: { en: 'Excellent & Outstanding', am: 'ምርጥ / ከፍተኛ እርካታ', badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200' }
+};
 
 export const CustomerTicketView: React.FC = () => {
   const { uiLanguage, officeSetting, waitingTickets, checkInTicket } = useQueue();
@@ -56,6 +89,16 @@ export const CustomerTicketView: React.FC = () => {
   const [isScanSimulating, setIsScanSimulating] = useState<boolean>(false);
   const [scanStep, setScanStep] = useState<'IDLE' | 'SCANNING' | 'SUCCESS'>('IDLE');
 
+  // Customer Review & Satisfaction State
+  const [reviewRating, setReviewRating] = useState<number>(5);
+  const [hoverRating, setHoverRating] = useState<number>(0);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [reviewComment, setReviewComment] = useState<string>('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState<boolean>(false);
+  const [reviewSuccessMsg, setReviewSuccessMsg] = useState<string>('');
+  const [reviewErrorMsg, setReviewErrorMsg] = useState<string>('');
+  const [isEditingReview, setIsEditingReview] = useState<boolean>(false);
+
   const hasAutoCheckedInRef = useRef<boolean>(false);
   const isAmharic = uiLanguage === 'AMHARIC';
 
@@ -66,6 +109,15 @@ export const CustomerTicketView: React.FC = () => {
     const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
     return `${origin}${pathname}?view=customer&ticket=${encodeURIComponent(num)}&checkin=true`;
   };
+
+  // Populate review state from ticketData if already submitted
+  useEffect(() => {
+    if (ticketData?.customerReview && !isEditingReview) {
+      setReviewRating(ticketData.customerReview.rating || 5);
+      setSelectedTags(ticketData.customerReview.tags || []);
+      setReviewComment(ticketData.customerReview.comment || '');
+    }
+  }, [ticketData?.customerReview, isEditingReview]);
 
   // Fetch ticket details
   const fetchTicket = async (num: string, autoCheckInParam = false) => {
@@ -145,6 +197,49 @@ export const CustomerTicketView: React.FC = () => {
     }
   };
 
+  // Toggle Feedback Tag
+  const toggleFeedbackTag = (tagText: string) => {
+    setSelectedTags(prev => 
+      prev.includes(tagText) 
+        ? prev.filter(t => t !== tagText)
+        : [...prev, tagText]
+    );
+  };
+
+  // Submit Customer Review
+  const handleSubmitReview = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!ticketData) return;
+
+    try {
+      setIsSubmittingReview(true);
+      setReviewErrorMsg('');
+      setReviewSuccessMsg('');
+
+      const res = await api.submitCustomerReview(ticketData.ticketNumber, {
+        rating: reviewRating,
+        tags: selectedTags,
+        comment: reviewComment
+      });
+
+      if (res.success) {
+        setReviewSuccessMsg(
+          isAmharic 
+            ? 'አስተያየትዎ እና ደረጃ አሰጣጥዎ በተሳካ ሁኔታ ተመዝግቧል! እናመሰግናለን።' 
+            : 'Thank you! Your feedback and rating have been recorded successfully.'
+        );
+        setIsEditingReview(false);
+        // Update local ticketData with submitted review
+        setTicketData(prev => prev ? { ...prev, customerReview: res.review } : null);
+        setTimeout(() => setReviewSuccessMsg(''), 7000);
+      }
+    } catch (err: any) {
+      setReviewErrorMsg(err.message || (isAmharic ? 'አስተያየት ማስገባት አልተሳካም' : 'Failed to submit review. Please try again.'));
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
   // Copy check-in link to clipboard
   const handleCopyLink = () => {
     const url = getCheckInUrl();
@@ -188,10 +283,15 @@ export const CustomerTicketView: React.FC = () => {
   };
 
   const isCalled = ticketData?.status === 'CALLED' || ticketData?.status === 'SERVING';
+  const isCompleted = ticketData?.status === 'COMPLETED';
   const isCheckedIn = Boolean(ticketData?.isCheckedIn);
   const formattedCheckedInTime = ticketData?.checkedInAt 
     ? new Date(ticketData.checkedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : '';
+
+  const activeDisplayRating = hoverRating || reviewRating;
+  const currentRatingDesc = RATING_DESCRIPTIONS[activeDisplayRating] || RATING_DESCRIPTIONS[5];
+  const hasExistingReview = Boolean(ticketData?.customerReview);
 
   // Quick tickets for convenient testing
   const samplePills = ['A-001', 'A-002', 'P-001', 'D-001'];
@@ -209,7 +309,7 @@ export const CustomerTicketView: React.FC = () => {
           {isAmharic ? (officeSetting?.officeNameAmharic || 'የቀጥታ የወረፋ እና የQR መገኘት ማረጋገጫ') : (officeSetting?.officeName || 'Live Ticket & QR Check-In')}
         </h1>
         <p className="text-xs text-slate-500 font-medium mt-1">
-          {isAmharic ? 'የቲኬት ቁጥርዎን ይከታተሉ ወይም QR ኮድ በመቃኘት መገኘትዎን ያረጋግጡ' : 'Track your queue position and scan QR code to check-in your arrival'}
+          {isAmharic ? 'የቲኬት ቁጥርዎን ይከታተሉ፣ መገኘትዎን ያረጋግጡ እና የአገልግሎት አስተያየትዎን ይስጡ' : 'Track your queue position, check-in with QR, and rate your customer experience'}
         </p>
 
         {/* Ticket Search Bar */}
@@ -316,7 +416,13 @@ export const CustomerTicketView: React.FC = () => {
             </div>
 
             <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-slate-100 text-slate-800 border border-slate-200">
-              <span className={`w-2 h-2 rounded-full ${isCalled ? 'bg-indigo-600 animate-ping' : 'bg-amber-500'}`} />
+              <span className={`w-2 h-2 rounded-full ${
+                isCompleted 
+                  ? 'bg-emerald-500' 
+                  : isCalled 
+                  ? 'bg-indigo-600 animate-ping' 
+                  : 'bg-amber-500'
+              }`} />
               <span>{ticketData.status}</span>
             </div>
           </div>
@@ -493,6 +599,267 @@ export const CustomerTicketView: React.FC = () => {
             <ShieldCheck className="w-4 h-4 text-slate-400" />
             <span>{isAmharic ? 'ምንም አይነት የግል መረጃ አይጠየቅም • 100% ደህንነቱ የተጠበቀ' : '100% Anonymous • Zero PII stored'}</span>
           </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* CUSTOMER REVIEW & SATISFACTION RATING CARD */}
+      {/* ========================================================= */}
+      {ticketData && (
+        <div className="bg-white rounded-3xl p-6 sm:p-7 shadow-xs border border-slate-200 space-y-5 animate-in fade-in slide-in-from-bottom-2">
+          
+          {/* Header */}
+          <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+                <MessageCircleHeart className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  {isAmharic ? 'የደንበኛ እርካታ እና አስተያየት' : 'Rate Your Service Experience'}
+                </h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  {isAmharic ? 'አገልግሎታችንን ለማሻሻል ደረጃ እና አስተያየትዎን ያጋሩን' : 'Help us improve by sharing your quick feedback and star rating'}
+                </p>
+              </div>
+            </div>
+
+            {hasExistingReview && !isEditingReview && (
+              <button
+                type="button"
+                onClick={() => setIsEditingReview(true)}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>{isAmharic ? 'አስተካክል' : 'Edit'}</span>
+              </button>
+            )}
+          </div>
+
+          {/* Review Success Alert */}
+          {reviewSuccessMsg && (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-xs flex items-start space-x-2.5 animate-in fade-in">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="font-bold">{isAmharic ? 'እናመሰግናለን!' : 'Thank You!'}</p>
+                <p className="text-emerald-700">{reviewSuccessMsg}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Review Error Alert */}
+          {reviewErrorMsg && (
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-700 flex items-center space-x-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+              <span className="font-medium">{reviewErrorMsg}</span>
+            </div>
+          )}
+
+          {/* If already submitted and not editing: show existing summary */}
+          {hasExistingReview && !isEditingReview ? (
+            <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200/80 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                
+                {/* Rating stars display */}
+                <div className="flex items-center space-x-1.5">
+                  {[1, 2, 3, 4, 5].map((starVal) => {
+                    const isFilled = starVal <= (ticketData.customerReview?.rating || 5);
+                    return (
+                      <Star
+                        key={starVal}
+                        className={`w-6 h-6 ${
+                          isFilled 
+                            ? 'text-amber-400 fill-amber-400' 
+                            : 'text-slate-300'
+                        }`}
+                      />
+                    );
+                  })}
+                  <span className="font-bold text-slate-800 text-sm ml-2 font-mono">
+                    {ticketData.customerReview?.rating}/5
+                  </span>
+                </div>
+
+                {/* Rating category badge */}
+                <span className={`inline-block px-3 py-1 text-xs font-bold rounded-full border self-start sm:self-auto ${
+                  currentRatingDesc.badgeColor
+                }`}>
+                  {isAmharic ? currentRatingDesc.am : currentRatingDesc.en}
+                </span>
+              </div>
+
+              {/* Selected Tags */}
+              {ticketData.customerReview?.tags && ticketData.customerReview.tags.length > 0 && (
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    {isAmharic ? 'የተመረጡ ማጠቃለያዎች:' : 'Selected Feedback Tags:'}
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ticketData.customerReview.tags.map((tag, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2.5 py-1 bg-white border border-slate-200 text-slate-700 text-xs font-medium rounded-xl shadow-2xs"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Written comment */}
+              {ticketData.customerReview?.comment && (
+                <div className="space-y-1 bg-white p-3.5 rounded-xl border border-slate-200 text-xs text-slate-700">
+                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1">
+                    <MessageSquare className="w-3 h-3" />
+                    <span>{isAmharic ? 'የእርስዎ አስተያየት:' : 'Your Written Comment:'}</span>
+                  </div>
+                  <p className="italic text-slate-800 leading-relaxed font-sans">
+                    "{ticketData.customerReview.comment}"
+                  </p>
+                </div>
+              )}
+
+              <div className="text-[10px] text-slate-400 flex items-center justify-between pt-1">
+                <span>
+                  {isAmharic ? 'የተመዘገበበት ቀን:' : 'Submitted on:'}{' '}
+                  {ticketData.customerReview?.createdAt 
+                    ? new Date(ticketData.customerReview.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    : 'Recently'}
+                </span>
+                <span className="text-emerald-600 font-bold flex items-center space-x-1">
+                  <Check className="w-3 h-3" />
+                  <span>{isAmharic ? 'የጸደቀ አስተያየት' : 'Verified Review'}</span>
+                </span>
+              </div>
+            </div>
+          ) : (
+            /* Interactive Review Form */
+            <form onSubmit={handleSubmitReview} className="space-y-5">
+              
+              {/* Star Rating Selector */}
+              <div className="text-center space-y-2.5 p-4 bg-slate-50 rounded-2xl border border-slate-200/80">
+                <label className="text-xs font-bold text-slate-700 block">
+                  {isAmharic ? 'አገልግሎታችንን እንዴት ይገመግሙታል? (ኮከብ ይምረጡ)' : 'How would you rate our office service today?'}
+                </label>
+
+                {/* Stars Grid */}
+                <div className="flex items-center justify-center space-x-2 py-1">
+                  {[1, 2, 3, 4, 5].map((starVal) => {
+                    const isFilled = starVal <= activeDisplayRating;
+                    return (
+                      <button
+                        key={starVal}
+                        type="button"
+                        onClick={() => setReviewRating(starVal)}
+                        onMouseEnter={() => setHoverRating(starVal)}
+                        onMouseLeave={() => setHoverRating(0)}
+                        className="p-2 transition-transform hover:scale-125 active:scale-95 focus:outline-none cursor-pointer rounded-xl"
+                        aria-label={`Rate ${starVal} stars`}
+                      >
+                        <Star
+                          className={`w-8 h-8 transition-colors ${
+                            isFilled 
+                              ? 'text-amber-400 fill-amber-400 drop-shadow-xs' 
+                              : 'text-slate-300 hover:text-amber-200'
+                          }`}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Score Description Pill */}
+                <div className="inline-block">
+                  <span className={`px-3 py-1 text-xs font-bold rounded-full border transition-all ${
+                    currentRatingDesc.badgeColor
+                  }`}>
+                    {activeDisplayRating} / 5 — {isAmharic ? currentRatingDesc.am : currentRatingDesc.en}
+                  </span>
+                </div>
+              </div>
+
+              {/* Quick Feedback Tags */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 block">
+                  {isAmharic ? 'ፈጣን ማጠቃለያ ምረጡ (አንድ ወይም ከዚያ በላይ)' : 'What went well / needs improvement? (Select tags)'}
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {FEEDBACK_TAGS.map((tag) => {
+                    const tagLabel = isAmharic ? tag.am : tag.en;
+                    const isSelected = selectedTags.includes(tagLabel);
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => toggleFeedbackTag(tagLabel)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center space-x-1.5 ${
+                          isSelected
+                            ? tag.isPositive
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs scale-102'
+                              : 'bg-indigo-600 text-white border-indigo-600 shadow-xs scale-102'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                        }`}
+                      >
+                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                        <span>{tagLabel}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Written Comments */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 block flex items-center space-x-1.5">
+                  <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
+                  <span>{isAmharic ? 'ተጨማሪ አስተያየት ወይም ሀሳብ (አማራጭ)' : 'Additional Comments or Suggestions (Optional)'}</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder={
+                    isAmharic
+                      ? 'የተሰማዎትን ተጨማሪ አስተያየት እዚህ ይጻፉ...'
+                      : 'Share any additional thoughts to help us serve you better...'
+                  }
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition resize-none font-sans"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center space-x-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={isSubmittingReview}
+                  className="flex-1 py-3 px-5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-2xl text-xs font-bold transition shadow-md shadow-indigo-100 flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmittingReview ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>{isAmharic ? 'በመመዝገብ ላይ...' : 'Submitting Feedback...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>{isAmharic ? 'አስተያየቴን አስገባ' : 'Submit My Review'}</span>
+                    </>
+                  )}
+                </button>
+
+                {hasExistingReview && isEditingReview && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingReview(false)}
+                    className="py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition cursor-pointer"
+                  >
+                    {isAmharic ? 'ተመለስ' : 'Cancel'}
+                  </button>
+                )}
+              </div>
+            </form>
+          )}
         </div>
       )}
 

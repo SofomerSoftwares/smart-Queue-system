@@ -13,18 +13,24 @@ import {
   Lock,
   UserCheck,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  Star,
+  MessageSquare,
+  MessageCircleHeart,
+  ThumbsUp,
+  Smile
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
-import { QueueStats } from '../types';
+import { QueueStats, CustomerReview } from '../types';
 
 export const ReportsView: React.FC = () => {
   const { uiLanguage } = useQueue();
   const { user, login, demoLogin } = useAuth();
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [statsData, setStatsData] = useState<QueueStats | null>(null);
+  const [reviewsList, setReviewsList] = useState<CustomerReview[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Admin Gate Form State
@@ -39,9 +45,15 @@ export const ReportsView: React.FC = () => {
     if (!user || user.role !== 'ADMIN') return;
     try {
       setIsLoading(true);
-      const res = await api.getReportsSummary(date);
+      const [res, revRes] = await Promise.all([
+        api.getReportsSummary(date),
+        api.getCustomerReviews(date)
+      ]);
       if (res.success) {
         setStatsData(res.stats);
+      }
+      if (revRes.success) {
+        setReviewsList(revRes.reviews || []);
       }
     } catch (err) {
       console.warn('Error loading report:', err);
@@ -361,6 +373,99 @@ export const ReportsView: React.FC = () => {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Customer Reviews & Feedback Dashboard */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+                  <MessageCircleHeart className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                    {isAmharic ? 'የደንበኞች እርካታ እና አስተያየቶች' : 'CUSTOMER SATISFACTION & REVIEWS'}
+                  </h2>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {isAmharic ? 'በሞባይል መከታተያ በኩል የተሰበሰቡ የቀጥታ አስተያየቶች' : 'Real-time feedback submitted from mobile ticket tracker'}
+                  </p>
+                </div>
+              </div>
+
+              {reviewsList.length > 0 && (
+                <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1 px-3 py-1 bg-amber-50 text-amber-800 rounded-xl border border-amber-200 text-xs font-bold">
+                    <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                    <span>
+                      {(reviewsList.reduce((acc, r) => acc + r.rating, 0) / reviewsList.length).toFixed(1)} / 5.0
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-500 font-medium">
+                    ({reviewsList.length} {isAmharic ? 'አስተያየቶች' : 'reviews'})
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {reviewsList.length === 0 ? (
+              <div className="p-8 bg-slate-50 rounded-2xl text-center space-y-2 border border-dashed border-slate-200">
+                <Smile className="w-8 h-8 text-slate-400 mx-auto" />
+                <p className="text-xs font-bold text-slate-600">
+                  {isAmharic ? 'ለዚህ ቀን እስካሁን ምንም አስተያየት አልተሰጠም' : 'No customer reviews recorded for this date yet'}
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  {isAmharic ? 'ደንበኞች በሞባይል ትራከር በኩል ደረጃ ሲሰጡ እዚህ ይታያሉ።' : 'Customer reviews will automatically appear here when submitted on mobile tracker.'}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {reviewsList.slice(0, 8).map((rev) => (
+                    <div key={rev.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-mono font-bold text-xs text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-200">
+                            {rev.ticketNumber}
+                          </span>
+                          <div className="flex items-center space-x-0.5">
+                            {[1, 2, 3, 4, 5].map((st) => (
+                              <Star
+                                key={st}
+                                className={`w-3.5 h-3.5 ${
+                                  st <= rev.rating 
+                                    ? 'text-amber-400 fill-amber-400' 
+                                    : 'text-slate-300'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          {new Date(rev.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+
+                      {rev.tags && rev.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {rev.tags.map((tg, i) => (
+                            <span key={i} className="text-[10px] px-2 py-0.5 bg-white border border-slate-200 text-slate-700 rounded-md font-medium">
+                              {tg}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {rev.comment && (
+                        <p className="text-xs text-slate-700 italic bg-white p-2.5 rounded-xl border border-slate-100 font-sans">
+                          "{rev.comment}"
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}
