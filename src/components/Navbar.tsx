@@ -160,14 +160,14 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenC
             })}
           </nav>
 
-          {/* Right Action Utilities (Voice Engine Pill, Audio/Music, Language, User/Login) */}
+          {/* Right Action Utilities (Gemini AI Pill, Audio/Music, Language, User/Login) */}
           <div className="flex items-center space-x-2 sm:space-x-2.5">
             
-            {/* Voice Status Badge */}
+            {/* Gemini AI Status Badge */}
             <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-lg text-xs font-medium text-slate-700 transition">
               <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-              <span className="text-[11px] font-semibold text-slate-800">{isAmharic ? 'የድምፅ ሞተር' : 'Voice Active'}</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="text-[11px] font-semibold text-slate-800">Gemini Voice</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
             </div>
 
             {/* Audio Unlock / Live Voice Toggle */}

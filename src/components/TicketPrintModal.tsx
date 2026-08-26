@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Printer, X, CheckCircle2, Clock, Users, Download, Copy, Check, Sparkles } from 'lucide-react';
+import { Printer, X, CheckCircle2, Clock, Users, Download, Copy, Check, Sparkles, Calendar } from 'lucide-react';
 import { PrintTicketData } from '../types';
+import { AmharicLib } from '../lib/amharic';
 
 interface TicketPrintModalProps {
   printData: PrintTicketData | null;
@@ -22,14 +23,18 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
   if (!isOpen || !printData) return null;
 
   const isAmharic = uiLanguage === 'AMHARIC';
+  const issuedDate = new Date(printData.issuedAt);
 
-  const formattedDate = new Date(printData.issuedAt).toLocaleString(
+  const formattedDate = issuedDate.toLocaleString(
     isAmharic ? 'am-ET' : 'en-US',
     {
       dateStyle: 'medium',
       timeStyle: 'short'
     }
   );
+
+  const ethiopianDateStr = AmharicLib.calendar.formatDateString(issuedDate, { useGeez: true });
+  const geezAhead = AmharicLib.numbers.toGeez(printData.peopleAhead);
 
   const generateTicketHtml = () => {
     return `<!DOCTYPE html>
@@ -131,15 +136,19 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
 
   <div class="details">
     <div class="detail-row">
-      <span>People Ahead:</span>
-      <strong>${printData.peopleAhead}</strong>
+      <span>People Ahead / ከፊትዎ:</span>
+      <strong>${printData.peopleAhead} (${geezAhead})</strong>
     </div>
     <div class="detail-row">
-      <span>Est. Wait Time:</span>
+      <span>Est. Wait / ግምታዊ ጊዜ:</span>
       <strong>~${printData.estimatedWaitMinutes} mins</strong>
     </div>
     <div class="detail-row">
-      <span>Issued:</span>
+      <span>Date (ኢትዮጵያ):</span>
+      <span>${ethiopianDateStr}</span>
+    </div>
+    <div class="detail-row">
+      <span>Issued (Gregorian):</span>
       <span>${formattedDate}</span>
     </div>
   </div>

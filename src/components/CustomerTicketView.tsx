@@ -15,6 +15,7 @@ import {
 import { api } from '../lib/api';
 import { useQueue } from '../context/QueueContext';
 import { QueueTicket } from '../types';
+import { AmharicLib } from '../lib/amharic';
 
 export const CustomerTicketView: React.FC = () => {
   const { uiLanguage, officeSetting } = useQueue();
@@ -149,7 +150,7 @@ export const CustomerTicketView: React.FC = () => {
                 {ticketData.peopleAhead}
               </div>
               <div className="text-[10px] text-slate-500 font-medium">
-                {isAmharic ? 'ደንበኞች' : 'Customers'}
+                {isAmharic ? `${AmharicLib.numbers.toGeez(ticketData.peopleAhead)} ደንበኞች` : 'Customers'}
               </div>
             </div>
 
@@ -162,7 +163,7 @@ export const CustomerTicketView: React.FC = () => {
                 ~{ticketData.estimatedWaitMinutes}
               </div>
               <div className="text-[10px] text-indigo-600 font-medium">
-                {isAmharic ? 'ደቂቃ' : 'Minutes'}
+                {isAmharic ? `~${AmharicLib.numbers.toGeez(ticketData.estimatedWaitMinutes)} ደቂቃ` : 'Minutes'}
               </div>
             </div>
           </div>

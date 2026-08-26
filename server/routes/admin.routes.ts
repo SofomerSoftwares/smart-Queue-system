@@ -459,10 +459,29 @@ router.put('/settings', authenticate, requireAdmin, (req: AuthenticatedRequest, 
       displayNoticeEnglish, 
       estimatedWaitPerPersonMinutes,
       ticketNumberResetDaily,
-      themeColor
+      themeColor,
+      displayVideoEnabled,
+      displayVideoUrl,
+      displayVideoTitle,
+      displayVideoTitleAmharic,
+      displayVideoLayout,
+      displayVideoAutoplay,
+      displayVideoLoop,
+      displayVideoMuted,
+      displayVideoVolume
     } = req.body;
 
     const updates: Partial<OfficeSetting> = {};
+
+    if (displayVideoEnabled !== undefined) updates.displayVideoEnabled = Boolean(displayVideoEnabled);
+    if (displayVideoUrl !== undefined) updates.displayVideoUrl = String(displayVideoUrl).trim();
+    if (displayVideoTitle !== undefined) updates.displayVideoTitle = String(displayVideoTitle).trim();
+    if (displayVideoTitleAmharic !== undefined) updates.displayVideoTitleAmharic = String(displayVideoTitleAmharic).trim();
+    if (displayVideoLayout !== undefined) updates.displayVideoLayout = displayVideoLayout;
+    if (displayVideoAutoplay !== undefined) updates.displayVideoAutoplay = Boolean(displayVideoAutoplay);
+    if (displayVideoLoop !== undefined) updates.displayVideoLoop = Boolean(displayVideoLoop);
+    if (displayVideoMuted !== undefined) updates.displayVideoMuted = Boolean(displayVideoMuted);
+    if (displayVideoVolume !== undefined) updates.displayVideoVolume = Number(displayVideoVolume);
 
     if (officeName !== undefined) {
       const trimmed = String(officeName).trim();
@@ -534,23 +553,6 @@ router.post('/database/connect', authenticate, requireAdmin, async (req: Authent
       action: 'CONNECT_MONGODB_ATLAS',
       entity: 'Database',
       metadata: { connected: status.connected, database: status.database }
-    });
-    res.json({ success: true, ...status });
-  } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// POST /api/database/disconnect (Admin only)
-router.post('/database/disconnect', authenticate, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const status = await db.disconnectMongo();
-    db.addAuditLog({
-      userId: req.user?.id,
-      userName: req.user?.name,
-      action: 'DISCONNECT_MONGODB_ATLAS',
-      entity: 'Database',
-      metadata: { connected: false, mode: 'LOCAL_RESILIENT' }
     });
     res.json({ success: true, ...status });
   } catch (err: any) {

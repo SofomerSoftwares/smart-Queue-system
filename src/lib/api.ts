@@ -7,8 +7,9 @@ import {
   AudioSetting, 
   AudioAsset, 
   AuditLog, 
-  QueueStats, 
-  PrintTicketData 
+  QueueStats,
+  PrintTicketData,
+  AddisVoiceOption
 } from '../types';
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -167,9 +168,12 @@ export const api = {
       method: 'POST'
     }),
 
-  // --- AUDIO & ADDIS VOICE API ---
+  // --- AUDIO ---
   getAudioSettings: () =>
     request<{ success: boolean; settings: AudioSetting }>('/api/audio/settings'),
+
+  getAddisVoices: () =>
+    request<{ success: boolean; provider: string; voices: AddisVoiceOption[] }>('/api/audio/voices'),
 
   updateAudioSettings: (settings: Partial<AudioSetting>) =>
     request<{ success: boolean; settings: AudioSetting }>('/api/audio/settings', {
@@ -177,45 +181,12 @@ export const api = {
       body: JSON.stringify(settings)
     }),
 
-  getAddisVoiceStatus: () =>
+  testVoice: (data: { text?: string; language?: string; voice?: string; provider?: string; speed?: number; model?: string }) =>
     request<{
       success: boolean;
-      status: {
-        configured: boolean;
-        apiUrl: string;
-        activeModel: string;
-        availableVoicesCount: number;
-        provider: string;
-      };
-    }>('/api/audio/addis-voice/status'),
-
-  getAddisVoices: () =>
-    request<{ success: boolean; voices: any[] }>('/api/audio/addis-voice/voices'),
-
-  synthesizeAddisVoice: (data: { text: string; language?: string; voice?: string; speed?: number }) =>
-    request<{
-      success: boolean;
-      audioBase64?: string;
-      mimeType?: string;
-      voice?: string;
-      language?: string;
-      provider: string;
-      message?: string;
-    }>('/api/audio/addis-voice/synthesize', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    }),
-
-  testAddisVoice: (data: { text?: string; voice?: string; speed?: number; language?: string }) =>
-    request<{
-      success: boolean;
-      audioBase64?: string;
-      mimeType?: string;
-      voice?: string;
-      language?: string;
-      provider: string;
-      message?: string;
-    }>('/api/audio/addis-voice/test', {
+      text: string;
+      audioResult: { audioBase64?: string; mimeType: string; source: string; voice?: string; provider?: string; phoneticText?: string };
+    }>('/api/audio/test-voice', {
       method: 'POST',
       body: JSON.stringify(data)
     }),
@@ -336,10 +307,7 @@ export const api = {
       database: string;
       clusterUri: string | null;
       error: string | null;
-      errorCode?: string;
       provider: string;
-      mode?: 'MONGODB_ATLAS' | 'LOCAL_RESILIENT';
-      diagnosticTip?: string | null;
     }>('/api/database/status'),
 
   connectDatabase: (uri?: string) =>
@@ -350,29 +318,9 @@ export const api = {
       database: string;
       clusterUri: string | null;
       error: string | null;
-      errorCode?: string;
-      provider: string;
-      mode?: 'MONGODB_ATLAS' | 'LOCAL_RESILIENT';
-      diagnosticTip?: string | null;
     }>('/api/database/connect', {
       method: 'POST',
       body: JSON.stringify({ uri })
-    }),
-
-  disconnectDatabase: () =>
-    request<{
-      success: boolean;
-      connected: boolean;
-      configured: boolean;
-      database: string;
-      clusterUri: string | null;
-      error: string | null;
-      errorCode?: string;
-      provider: string;
-      mode?: 'MONGODB_ATLAS' | 'LOCAL_RESILIENT';
-      diagnosticTip?: string | null;
-    }>('/api/database/disconnect', {
-      method: 'POST'
     }),
 
   syncDatabase: () =>

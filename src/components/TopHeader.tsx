@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
 import { useAuth } from '../context/AuthContext';
+import { AmharicLib } from '../lib/amharic';
 
 interface TopHeaderProps {
   currentView: string;
@@ -29,6 +30,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
   const [timeStr, setTimeStr] = useState<string>('');
 
   const isAmharic = uiLanguage === 'AMHARIC';
+  const t = (key: string, defaultText?: string) => AmharicLib.i18n.t(key, uiLanguage, defaultText);
 
   useEffect(() => {
     const updateTime = () => {
@@ -44,37 +46,37 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
     switch (currentView) {
       case 'display':
         return {
-          title: isAmharic ? 'የስክሪን እይታ' : 'Public Display Screen',
+          title: t('display_screen', 'Public Display Screen'),
           subtitle: isAmharic ? 'የቀጥታ ወረፋ እና ጥሪ ስክሪን' : 'Live queue status & audio broadcasting',
           icon: Tv
         };
       case 'reception':
         return {
-          title: isAmharic ? 'መስተንግዶ ዴስክ' : 'Reception & Ticket Kiosk',
+          title: t('reception_desk', 'Reception & Ticket Kiosk'),
           subtitle: isAmharic ? 'አዲስ የወረፋ ቲኬት መስጫ' : 'Issue visitor tickets & service routing',
           icon: Ticket
         };
       case 'officer':
         return {
-          title: isAmharic ? 'የቆጣሪ ጣቢያ' : 'Officer Counter Station',
+          title: t('officer_station', 'Officer Counter Station'),
           subtitle: isAmharic ? 'ደንበኞችን ይጥሩ እና ያስተናግዱ' : 'Call next ticket, recall, and complete service',
           icon: UserCheck
         };
       case 'customer':
         return {
-          title: isAmharic ? 'የሞባይል ቲኬት መከታተያ' : 'Customer Mobile Tracker',
+          title: t('customer_tracker', 'Customer Mobile Tracker'),
           subtitle: isAmharic ? 'የወረፋ ሂደት በቀጥታ ይከታተሉ' : 'Live position tracking and wait estimations',
           icon: Smartphone
         };
       case 'admin':
         return {
-          title: isAmharic ? 'የስርዓት አስተዳደር ማዕከል' : 'System Administration',
-          subtitle: isAmharic ? 'ቆጣሪዎች፣ ሰራተኞች፣ አገልግሎቶች፣ የዳራ ሙዚቃ እና ዳታቤዝ' : 'Counters, services, background music, Atlas DB and audit logs',
+          title: t('system_admin', 'System Administration'),
+          subtitle: isAmharic ? 'ቆጣሪዎች፣ ሰራተኞች፣ አገልግሎቶች፣ አዲስ AI ድምፅ እና ዳታቤዝ' : 'Counters, services, Addis AI Voice, Atlas DB and audit logs',
           icon: ShieldCheck
         };
       case 'reports':
         return {
-          title: isAmharic ? 'ትንታኔ እና ሪፖርቶች' : 'Analytics & Performance',
+          title: t('analytics_reports', 'Analytics & Performance'),
           subtitle: isAmharic ? 'የመስተንግዶ ጊዜ፣ የተጠቃሚ ብዛት እና የስራ አፈፃፀም' : 'Wait times, counter efficiency and peak hours',
           icon: BarChart3
         };
@@ -153,10 +155,10 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
           <span>{timeStr || '--:--:--'}</span>
         </div>
 
-        {/* Voice Engine Active Badge */}
+        {/* Addis AI Active Badge */}
         <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 border border-indigo-100/80 text-xs font-semibold text-indigo-700">
           <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-          <span className="text-[11px]">{isAmharic ? 'የድምፅ ሞተር' : 'Voice Active'}</span>
+          <span className="text-[11px]">{isAmharic ? 'Addis AI ድምፅ' : 'Addis AI Voice'}</span>
         </div>
 
       </div>

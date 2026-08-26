@@ -1,88 +1,7 @@
-// Audio Manager coordinating Background Music and Smart Queue Voice Announcements
+// Audio Manager coordinating Background Music and Addis AI Voice Announcements
+import { transliterateToPhonetic } from './amharic';
 
-// Amharic to phonetic pronunciation dictionary for browsers without native Amharic TTS
-const AMHARIC_PHONETIC_MAP: Record<string, string> = {
-  'ቁጥር': 'Kutir',
-  'ያላችሁ': 'yalachu',
-  'ደንበኛ': 'denbenya',
-  'እባክዎ': 'ibakiwo',
-  'እባካችሁ': 'ibakachu',
-  'ወደ': 'wode',
-  'ቆጣሪ': 'kotari',
-  'ይሂዱ': 'yihidu',
-  'ይቅረቡ': 'yikrebu',
-  'አዲስ': 'Addis',
-  'ማመልከቻ': 'mamelkecha',
-  'ክፍያ': 'kifiya',
-  'ምዝገባ': 'mizgeba',
-  'ማረጋገጫ': 'maregagecha',
-  'ፈጣን': 'fetan',
-  'አገልግሎት': 'ageliglot',
-  'መደበኛ': 'medebenya',
-  'ፕሪሚየም': 'premium',
-  'ተጠርተዋል': 'tetertewal',
-  'አንድ': 'and',
-  'ሁለት': 'hulet',
-  'ሶስት': 'sost',
-  'አራት': 'arat',
-  'አምስት': 'amist',
-  'ስድስት': 'sidist',
-  'ሰባት': 'sebat',
-  'ስምንት': 'simint',
-  'ዘጠኝ': 'zetegn',
-  'አስር': 'asir',
-  'ሃያ': 'haya',
-  'ሰላሳ': 'selasa',
-  'አርባ': 'arba',
-  'ሃምሳ': 'hamsa',
-  'ስልሳ': 'silsa',
-  'ሰባ': 'seba',
-  'ሰማንያ': 'semanya',
-  'ዘጠና': 'zetena',
-  'መቶ': 'meto',
-  'ሀ': 'Ha',
-  'ለ': 'Le',
-  'ሐ': 'Hha',
-  'መ': 'Me',
-  'ረ': 'Re',
-  'ሰ': 'Se',
-  'ሸ': 'She',
-  'ቀ': 'Ke',
-  'በ': 'Be',
-  'ተ': 'Te',
-  'ቸ': 'Che',
-  'ኀ': 'Ha',
-  'ነ': 'Ne',
-  'ኘ': 'Nye',
-  'አ': 'Ah',
-  'ከ': 'Ke',
-  'ኸ': 'Hhe',
-  'ወ': 'We',
-  'ዐ': 'Ah',
-  'ዘ': 'Ze',
-  'ዠ': 'Zhe',
-  'የ': 'Ye',
-  'ደ': 'De',
-  'ጀ': 'Je',
-  'ገ': 'Ge',
-  'ጠ': 'Te',
-  'ጨ': 'Che',
-  'ጰ': 'Pe',
-  'ጸ': 'Tse',
-  'ፀ': 'Tse',
-  'ፈ': 'Fe',
-  'ፓ': 'Pa'
-};
-
-export function transliterateAmharicToPhonetic(text: string): string {
-  let result = text;
-  // Replace full keywords first
-  Object.keys(AMHARIC_PHONETIC_MAP).forEach((key) => {
-    result = result.split(key).join(AMHARIC_PHONETIC_MAP[key]);
-  });
-  result = result.replace(/፣/g, ',').replace(/።/g, '.').replace(/\s+/g, ' ').trim();
-  return result;
-}
+export { transliterateToPhonetic as transliterateAmharicToPhonetic };
 
 class AudioManager {
   private audioCtx: AudioContext | null = null;
@@ -266,7 +185,7 @@ class AudioManager {
 
           if (!amVoice) {
             // If no Amharic voice is installed on OS, use phonetic transliterated text with natural English voice
-            textToSpeak = phoneticText || transliterateAmharicToPhonetic(text);
+            textToSpeak = phoneticText || transliterateToPhonetic(text);
             
             // Prefer high-quality English voice
             voiceToUse = voices.find(v => 

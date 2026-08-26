@@ -43,7 +43,7 @@ export const PERMISSIONS: Permission[] = [
   { id: 'reports.view', name: 'View Reports', description: 'Access daily and analytical reports' },
   { id: 'settings.view', name: 'View Settings', description: 'View system configuration' },
   { id: 'settings.update', name: 'Update Settings', description: 'Change system configuration' },
-  { id: 'audio.manage', name: 'Manage Audio', description: 'Configure queue voice announcements and background music' }
+  { id: 'audio.manage', name: 'Manage Audio', description: 'Configure Gemini voice and background music' }
 ];
 
 export const ROLES: Record<RoleName, Role> = {
@@ -285,13 +285,27 @@ function seedDatabase(): DatabaseSchema {
     displayNoticeAmharic: 'እንኳን ወደ ቢሮአችን በደህና መጡ። ቁጥርዎ በድምፅ እና በስክሪን እስኪጠራ ድረስ በትዕግስት ይጠብቁ።',
     dailyResetTime: '00:00',
     estimatedWaitPerPersonMinutes: 4,
-    qrCodeUrlBase: ''
+    qrCodeUrlBase: '',
+    displayVideoEnabled: true,
+    displayVideoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    displayVideoTitle: 'Office Information & Welcome Video',
+    displayVideoTitleAmharic: 'የቢሮ መረጃ እና የእንኳን ደህና መጡ ቪዲዮ',
+    displayVideoLayout: 'SPLIT',
+    displayVideoAutoplay: true,
+    displayVideoLoop: true,
+    displayVideoMuted: true,
+    displayVideoVolume: 25,
+    displayFontSize: 'NORMAL'
   };
 
   const audioSetting: AudioSetting = {
     id: 'audio-setting-1',
     voiceEnabled: true,
     language: 'AMHARIC',
+    ttsProvider: 'ADDIS_AI',
+    addisVoice: process.env.ADDIS_AI_DEFAULT_VOICE || 'aster',
+    addisAiSpeed: 1.0,
+    addisAiEndpoint: process.env.ADDIS_AI_ENDPOINT || 'https://api.addis.ai/v1/tts',
     volume: 85,
     repeatCount: 1,
     announcementDelaySeconds: 1,
@@ -485,11 +499,6 @@ class Database {
         await mongoService.saveAll(this.data);
       }
     }
-    return mongoService.getStatus();
-  }
-
-  public async disconnectMongo() {
-    await mongoService.disconnect();
     return mongoService.getStatus();
   }
 

@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: ethiopian-smart-queue
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB_NAME
+        value: office_queue_db
+      - key: GEMINI_TTS_MODEL
+        value: gemini-3.1-flash-tts-preview
+      - key: GEMINI_TTS_VOICE
+        value: Kore
+      - key: GEMINI_MUSIC_MODEL
+        value: lyria-3-clip-preview

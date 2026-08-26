@@ -20,29 +20,13 @@ export function isValidMongoUri(uri?: string | null): boolean {
   return trimmed.startsWith('mongodb://') || trimmed.startsWith('mongodb+srv://');
 }
 
-export type MongoErrorCode = 'AUTH_FAILED' | 'TIMEOUT' | 'INVALID_URI' | 'SSL_ERROR' | 'UNKNOWN' | 'NONE';
-
-export interface MongoStatusResponse {
-  connected: boolean;
-  configured: boolean;
-  database: string;
-  clusterUri: string | null;
-  error: string | null;
-  errorCode: MongoErrorCode;
-  provider: string;
-  mode: 'MONGODB_ATLAS' | 'LOCAL_RESILIENT';
-  diagnosticTip: string | null;
-}
-
 class MongoDBService {
   private client: MongoClient | null = null;
   private db: Db | null = null;
   private isConnected = false;
   private isConnecting = false;
   private lastError: string | null = null;
-  private lastErrorCode: MongoErrorCode = 'NONE';
-  private diagnosticTip: string | null = null;
-  private dbName = process.env.MONGODB_DB_NAME || 'SmartQ';
+  private dbName = process.env.MONGODB_DB_NAME || 'office_queue_db';
   private activeUri: string | null = null;
 
   constructor() {
@@ -57,19 +41,15 @@ class MongoDBService {
     
     if (!isValidMongoUri(connectionUri)) {
       this.isConnected = false;
-      this.lastErrorCode = 'INVALID_URI';
       this.lastError = connectionUri && connectionUri.trim()
         ? 'Provided MongoDB connection URI is incomplete or contains placeholder values (<username>, <password>).'
         : 'No MongoDB URI configured. Operating in local resilient storage mode.';
-      this.diagnosticTip = 'Enter your standard MongoDB Atlas connection string from Atlas > Database > Connect > Drivers.';
       return false;
     }
 
     if (this.isConnecting) return false;
     this.isConnecting = true;
     this.lastError = null;
-    this.lastErrorCode = 'NONE';
-    this.diagnosticTip = null;
 
     try {
       if (this.client) {
@@ -81,8 +61,8 @@ class MongoDBService {
       }
 
       this.client = new MongoClient(connectionUri!, {
-        serverSelectionTimeoutMS: 4000,
-        connectTimeoutMS: 4000,
+        serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 5000,
         retryWrites: true
       });
 
@@ -94,8 +74,6 @@ class MongoDBService {
       this.isConnected = true;
       this.activeUri = connectionUri!;
       this.lastError = null;
-      this.lastErrorCode = 'NONE';
-      this.diagnosticTip = null;
 
       // Ensure MongoDB collection indexes
       try {
@@ -115,50 +93,23 @@ class MongoDBService {
       const rawMsg = err?.message || 'Failed to connect to MongoDB Atlas cluster';
       
       if (rawMsg.includes('SSL') || rawMsg.includes('tlsv1 alert') || rawMsg.includes('alert number 80')) {
-        this.lastErrorCode = 'SSL_ERROR';
         this.lastError = 'Atlas SSL handshake notice: Invalid cluster credentials or hostname in URI.';
-        this.diagnosticTip = 'Verify that your cluster host address is correct and active in MongoDB Atlas.';
       } else if (rawMsg.includes('bad auth') || rawMsg.includes('Authentication failed')) {
-        this.lastErrorCode = 'AUTH_FAILED';
         this.lastError = 'Authentication failed: Incorrect MongoDB username or password.';
-        this.diagnosticTip = 'In MongoDB Atlas > Security > Database Access, verify the database username and reset the password. Ensure user has Read/Write permissions.';
       } else if (rawMsg.includes('ETIMEDOUT') || rawMsg.includes('Server selection timed out')) {
-        this.lastErrorCode = 'TIMEOUT';
-        this.lastError = 'Connection timed out: Check MongoDB Atlas IP whitelist.';
-        this.diagnosticTip = 'In MongoDB Atlas > Security > Network Access, add IP address 0.0.0.0/0 (Allow access from anywhere).';
+        this.lastError = 'Connection timed out: Check MongoDB Atlas IP whitelist (allow 0.0.0.0/0).';
       } else {
-        this.lastErrorCode = 'UNKNOWN';
         this.lastError = rawMsg;
-        this.diagnosticTip = 'Check the connection string format and cluster status.';
       }
 
-      console.log(`ℹ️ [Storage Engine] Operating in Resilient Local Storage Mode. (MongoDB Atlas: ${this.lastError})`);
+      console.log(`ℹ️ [MongoDB Atlas] Connection status: ${this.lastError}`);
       return false;
     } finally {
       this.isConnecting = false;
     }
   }
 
-  public async disconnect(): Promise<void> {
-    try {
-      if (this.client) {
-        await this.client.close();
-      }
-    } catch {
-      // ignore close errors
-    } finally {
-      this.client = null;
-      this.db = null;
-      this.isConnected = false;
-      this.activeUri = '';
-      this.lastError = null;
-      this.lastErrorCode = 'NONE';
-      this.diagnosticTip = null;
-      console.log('🔄 [Storage Engine] Disconnected from MongoDB Atlas. Resilient Local Storage is actively serving all operations.');
-    }
-  }
-
-  public getStatus(): MongoStatusResponse {
+  public getStatus() {
     const currentUri = this.activeUri || process.env.MONGODB_URI;
     const isValid = isValidMongoUri(currentUri);
     const maskedUri = isValid && currentUri 
@@ -171,10 +122,7 @@ class MongoDBService {
       database: this.dbName,
       clusterUri: maskedUri,
       error: this.lastError,
-      errorCode: this.lastErrorCode,
-      provider: 'MongoDB Atlas',
-      mode: this.isConnected ? 'MONGODB_ATLAS' : 'LOCAL_RESILIENT',
-      diagnosticTip: this.diagnosticTip
+      provider: 'MongoDB Atlas'
     };
   }
 
@@ -229,7 +177,7 @@ class MongoDBService {
         audioSetting: (audioSettingDoc?.data as any) || undefined
       } as DatabaseSchema;
     } catch (err: any) {
-      console.warn('Notice loading data from MongoDB Atlas:', err.message);
+      console.error('Error loading data from MongoDB Atlas:', err);
       return null;
     }
   }
