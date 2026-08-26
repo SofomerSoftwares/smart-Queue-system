@@ -14,7 +14,17 @@ import { ChangePasswordModal } from './components/ChangePasswordModal';
 
 const AppContent: React.FC = () => {
   const { user } = useAuth();
-  const [currentView, setCurrentView] = useState<string>('display');
+  const getInitialView = (): string => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const viewParam = params.get('view');
+      if (viewParam) return viewParam;
+      if (params.get('ticket') || params.get('t') || params.get('checkin')) return 'customer';
+    } catch {}
+    return 'display';
+  };
+
+  const [currentView, setCurrentView] = useState<string>(getInitialView);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);

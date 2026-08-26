@@ -1,6 +1,38 @@
 import { MongoClient, Db } from 'mongodb';
 import { DatabaseSchema, User, Service, Counter, QueueTicket, QueueEvent, AuditLog, AudioAsset } from './types.js';
 
+export function sanitizeMongoUri(rawUri?: string | null): string {
+  if (!rawUri || typeof rawUri !== 'string') return '';
+  let uri = rawUri.trim();
+  
+  // Strip outer quotes if pasted with quotes
+  if ((uri.startsWith('"') && uri.endsWith('"')) || (uri.startsWith("'") && uri.endsWith("'"))) {
+    uri = uri.slice(1, -1).trim();
+  }
+
+  // Handle mongodb+srv:// or mongodb:// credentials encoding
+  const match = uri.match(/^(mongodb(?:\+srv)?:\/\/)([^:]+):([^@]+)@(.+)$/);
+  if (match) {
+    const protocol = match[1];
+    const user = match[2];
+    const pass = match[3];
+    const rest = match[4];
+
+    try {
+      // Decode first in case parts are partially encoded, then safely encode
+      const decodedUser = decodeURIComponent(user);
+      const decodedPass = decodeURIComponent(pass);
+      const safeUser = encodeURIComponent(decodedUser);
+      const safePass = encodeURIComponent(decodedPass);
+      return `${protocol}${safeUser}:${safePass}@${rest}`;
+    } catch {
+      return uri;
+    }
+  }
+
+  return uri;
+}
+
 export function isValidMongoUri(uri?: string | null): boolean {
   if (!uri || typeof uri !== 'string') return false;
   const trimmed = uri.trim();
@@ -32,20 +64,22 @@ class MongoDBService {
   constructor() {
     const defaultUri = process.env.MONGODB_URI;
     if (isValidMongoUri(defaultUri)) {
-      this.activeUri = defaultUri!;
+      this.activeUri = sanitizeMongoUri(defaultUri);
     }
   }
 
   public async connect(uri?: string): Promise<boolean> {
-    const connectionUri = uri || this.activeUri || process.env.MONGODB_URI;
+    const rawUri = uri || this.activeUri || process.env.MONGODB_URI;
     
-    if (!isValidMongoUri(connectionUri)) {
+    if (!isValidMongoUri(rawUri)) {
       this.isConnected = false;
-      this.lastError = connectionUri && connectionUri.trim()
+      this.lastError = rawUri && rawUri.trim()
         ? 'Provided MongoDB connection URI is incomplete or contains placeholder values (<username>, <password>).'
         : 'No MongoDB URI configured. Operating in local resilient storage mode.';
       return false;
     }
+
+    const connectionUri = sanitizeMongoUri(rawUri);
 
     if (this.isConnecting) return false;
     this.isConnecting = true;
@@ -60,9 +94,9 @@ class MongoDBService {
         }
       }
 
-      this.client = new MongoClient(connectionUri!, {
-        serverSelectionTimeoutMS: 5000,
-        connectTimeoutMS: 5000,
+      this.client = new MongoClient(connectionUri, {
+        serverSelectionTimeoutMS: 6000,
+        connectTimeoutMS: 6000,
         retryWrites: true
       });
 
@@ -72,7 +106,7 @@ class MongoDBService {
       // Ping database
       await this.db.command({ ping: 1 });
       this.isConnected = true;
-      this.activeUri = connectionUri!;
+      this.activeUri = connectionUri;
       this.lastError = null;
 
       // Ensure MongoDB collection indexes
@@ -82,7 +116,7 @@ class MongoDBService {
         await this.db.collection('tickets').createIndex({ status: 1 });
         await this.db.collection('services').createIndex({ id: 1 }, { unique: true });
         await this.db.collection('counters').createIndex({ id: 1 }, { unique: true });
-      } catch (indexErr) {
+      } catch {
         // Indexes might already exist
       }
 
@@ -95,9 +129,9 @@ class MongoDBService {
       if (rawMsg.includes('SSL') || rawMsg.includes('tlsv1 alert') || rawMsg.includes('alert number 80')) {
         this.lastError = 'Atlas SSL handshake notice: Invalid cluster credentials or hostname in URI.';
       } else if (rawMsg.includes('bad auth') || rawMsg.includes('Authentication failed')) {
-        this.lastError = 'Authentication failed: Incorrect MongoDB username or password.';
+        this.lastError = 'Authentication failed: Incorrect MongoDB Database username or password. Please verify the credentials created in Atlas under Security > Database Access.';
       } else if (rawMsg.includes('ETIMEDOUT') || rawMsg.includes('Server selection timed out')) {
-        this.lastError = 'Connection timed out: Check MongoDB Atlas IP whitelist (allow 0.0.0.0/0).';
+        this.lastError = 'Connection timed out: Check MongoDB Atlas Network Access whitelist (allow 0.0.0.0/0).';
       } else {
         this.lastError = rawMsg;
       }

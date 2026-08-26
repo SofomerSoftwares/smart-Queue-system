@@ -163,6 +163,8 @@ router.get('/ticket/:ticketNumber', (req: Request, res: Response) => {
         calledAt: ticket.calledAt,
         counterNumber: ticket.counterNumber,
         counterId: ticket.counterId,
+        isCheckedIn: ticket.isCheckedIn ?? false,
+        checkedInAt: ticket.checkedInAt,
         peopleAhead,
         estimatedWaitMinutes,
         currentlyServingTicketNumber: currentlyServing?.ticketNumber || 'None'
@@ -172,6 +174,52 @@ router.get('/ticket/:ticketNumber', (req: Request, res: Response) => {
         nameAmharic: officeSetting.officeNameAmharic,
         displayNotice: officeSetting.displayNotice,
         displayNoticeAmharic: officeSetting.displayNoticeAmharic
+      }
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 2b. POST /api/queue/ticket/:ticketNumber/checkin - Customer QR check-in / arrival confirmation
+router.post('/ticket/:ticketNumber/checkin', (req: Request, res: Response) => {
+  try {
+    const { ticketNumber } = req.params;
+    const ticket = db.checkInTicket(ticketNumber);
+
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: `Ticket ${ticketNumber} not found.`,
+        code: 'TICKET_NOT_FOUND'
+      });
+    }
+
+    // Audit log
+    db.addAuditLog({
+      action: 'CHECK_IN_TICKET',
+      entity: 'QueueTicket',
+      entityId: ticket.id,
+      metadata: { ticketNumber: ticket.ticketNumber, checkedInAt: ticket.checkedInAt }
+    });
+
+    // Realtime broadcast to TV displays and Officer stations
+    broadcaster.broadcast('ticket:checkedin', {
+      ticketId: ticket.id,
+      ticketNumber: ticket.ticketNumber,
+      checkedInAt: ticket.checkedInAt
+    });
+    broadcaster.broadcast('queue:updated', {
+      action: 'TICKET_CHECKED_IN',
+      ticketNumber: ticket.ticketNumber
+    });
+
+    return res.json({
+      success: true,
+      message: 'Arrival check-in confirmed successfully.',
+      ticket: {
+        ...ticket,
+        ticketNumberAmharic: getAmharicTicketNumber(ticket.ticketNumber)
       }
     });
   } catch (err: any) {
@@ -262,7 +310,7 @@ router.post('/ticket/call-next', authenticate, authorize('ticket.call'), async (
         const assignedCounter = db.getCounterById(currentUser.assignedCounterId);
         return res.status(403).json({
           success: false,
-          message: `Access denied: You are assigned and limited to Counter ${assignedCounter ? assignedCounter.number : currentUser.assignedCounterId}. (ለእርስዎ የተመደበው ቆጣሪ ብቻ ነው የሚፈቀደው)`
+          message: `Access denied: You are assigned and limited to Counter ${assignedCounter ? assignedCounter.number : currentUser.assignedCounterId}. (ለእርስዎ የተመደበው መስኮት ብቻ ነው የሚፈቀደው)`
         });
       }
 

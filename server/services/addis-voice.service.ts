@@ -37,7 +37,7 @@ export const ADDIS_AI_VOICES: AddisVoiceOption[] = [
     gender: 'FEMALE',
     geminiVoice: 'Kore',
     description: 'Crisp, calm female Amharic voice optimized for public halls and counters',
-    descriptionAmharic: 'ለአዳራሽ እና ለቆጣሪ ጥሪዎች የተዘጋጀ የሴት ድምፅ'
+    descriptionAmharic: 'ለአዳራሽ እና ለመስኮት ጥሪዎች የተዘጋጀ የሴት ድምፅ'
   },
   {
     id: 'abebe',

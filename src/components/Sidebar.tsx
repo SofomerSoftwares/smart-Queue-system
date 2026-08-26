@@ -88,7 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     { 
       id: 'officer', 
-      label: isAmharic ? 'የቆጣሪ ጣቢያ' : 'Counter Station', 
+      label: isAmharic ? 'መስኮት' : 'Counter Station', 
       icon: UserCheck 
     },
     { 

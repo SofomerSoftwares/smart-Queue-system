@@ -42,6 +42,7 @@ interface QueueContextType {
   transferTicket: (ticketId: string, targetServiceId: string) => Promise<void>;
   cancelTicket: (ticketId: string) => Promise<void>;
   createTicket: (serviceId: string, priority?: 'NORMAL' | 'PRIORITY') => Promise<{ ticket: QueueTicket; printData: PrintTicketData }>;
+  checkInTicket: (ticketNumber: string) => Promise<{ success: boolean; message: string; ticket: QueueTicket }>;
   updateOfficeSettingAction: (updates: Partial<OfficeSetting>) => Promise<OfficeSetting>;
   resetDailyQueue: () => Promise<void>;
   refreshQueue: () => Promise<void>;
@@ -277,6 +278,12 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return { ticket: res.ticket, printData: res.printData };
   };
 
+  const checkInTicket = async (ticketNumber: string) => {
+    const res = await api.checkInTicket(ticketNumber);
+    await refreshQueue();
+    return res;
+  };
+
   const updateOfficeSettingAction = async (updates: Partial<OfficeSetting>): Promise<OfficeSetting> => {
     const res = await api.updateOfficeSettings(updates);
     if (res && res.success && res.setting) {
@@ -322,6 +329,7 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         transferTicket,
         cancelTicket,
         createTicket,
+        checkInTicket,
         updateOfficeSettingAction,
         resetDailyQueue,
         refreshQueue

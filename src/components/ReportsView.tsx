@@ -239,7 +239,7 @@ export const ReportsView: React.FC = () => {
               {isAmharic ? 'የወረፋ እና የአገልግሎት ሪፖርቶች' : 'Queue Analytics & Reports'}
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 font-medium">
-              {isAmharic ? 'የደንበኞች ቁጥር፣ የቆይታ ጊዜ እና የቆጣሪዎች አፈፃፀም' : 'Daily throughput, wait times and counter efficiency breakdown'}
+              {isAmharic ? 'የደንበኞች ቁጥር፣ የቆይታ ጊዜ እና የመስኮቶች አፈፃፀም' : 'Daily throughput, wait times and counter efficiency breakdown'}
             </p>
           </div>
         </div>
@@ -343,14 +343,14 @@ export const ReportsView: React.FC = () => {
           {/* Counter Performance */}
           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs">
             <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">
-              {isAmharic ? 'የቆጣሪዎች አፈፃፀም' : 'COUNTER PRODUCTIVITY'}
+              {isAmharic ? 'የመስኮቶች አፈፃፀም' : 'COUNTER PRODUCTIVITY'}
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {statsData.counterBreakdown.map((cnt) => (
                 <div key={cnt.counterId} className="p-5 bg-slate-50 rounded-2xl border border-slate-200">
                   <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                    {isAmharic ? `ቆጣሪ 0${cnt.counterNumber}` : `Counter 0${cnt.counterNumber}`}
+                    {isAmharic ? `መስኮት 0${cnt.counterNumber}` : `Counter 0${cnt.counterNumber}`}
                   </div>
                   <div className="text-2xl font-black text-slate-900 font-mono mt-1">
                     {cnt.totalServed} {isAmharic ? 'ደንበኞች' : 'served'}

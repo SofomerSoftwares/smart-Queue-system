@@ -4,6 +4,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 export interface RealtimeEvent<T = any> {
   type: 
     | 'queue:updated'
+    | 'ticket:checkedin'
     | 'ticket:called'
     | 'ticket:started'
     | 'ticket:completed'

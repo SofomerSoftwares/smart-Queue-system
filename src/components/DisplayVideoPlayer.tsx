@@ -147,24 +147,24 @@ export const DisplayVideoPlayer: React.FC<DisplayVideoPlayerProps> = ({
 
   // Safe playback execution helper with autoplay policy fallback
   const attemptPlay = async () => {
-    if (!videoRef.current) return;
+    const el = videoRef.current;
+    if (!el) return;
     try {
-      await videoRef.current.play();
+      await el.play();
       setIsPlaying(true);
       setIsAutoplayBlocked(false);
       setVideoError('');
     } catch (err: any) {
       // Browser autoplay policy might block unmuted audio
-      if (err?.name === 'NotAllowedError' || !videoRef.current.muted) {
+      const currentEl = videoRef.current;
+      if (currentEl && (err?.name === 'NotAllowedError' || !currentEl.muted)) {
         try {
-          if (videoRef.current) {
-            videoRef.current.muted = true;
-            setIsMuted(true);
-            await videoRef.current.play();
-            setIsPlaying(true);
-            setIsAutoplayBlocked(true);
-            setVideoError('');
-          }
+          currentEl.muted = true;
+          setIsMuted(true);
+          await currentEl.play();
+          setIsPlaying(true);
+          setIsAutoplayBlocked(true);
+          setVideoError('');
         } catch {
           setIsPlaying(false);
         }

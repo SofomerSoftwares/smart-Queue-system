@@ -585,12 +585,12 @@ export const OfficerStationView: React.FC = () => {
             <div>
               <div className="flex items-center space-x-1.5">
                 <span className="text-[10px] uppercase tracking-wider font-extrabold text-indigo-600">
-                  {isAmharic ? 'የተመደበ ቆጣሪ (የተገደበ)' : 'Assigned Station (Limited Access)'}
+                  {isAmharic ? 'የተመደበ መስኮት (የተገደበ)' : 'Assigned Station (Limited Access)'}
                 </span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
               </div>
               <p className="text-sm font-black text-slate-900 font-mono">
-                {isAmharic ? `ቆጣሪ 0${activeCounter?.number || 1}` : `COUNTER 0${activeCounter?.number || 1}`}
+                {isAmharic ? `መስኮት 0${activeCounter?.number || 1}` : `COUNTER 0${activeCounter?.number || 1}`}
                 <span className="font-sans font-medium text-slate-500 text-xs ml-1.5">
                   ({activeCounter?.name || `Counter ${activeCounter?.number}`})
                 </span>
@@ -601,7 +601,7 @@ export const OfficerStationView: React.FC = () => {
           // SUPERVISOR / UNRESTRICTED COUNTER SELECTOR
           <div className="flex items-center space-x-2">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              {isAmharic ? 'ቆጣሪ ምረጥ:' : 'Select Station:'}
+              {isAmharic ? 'መስኮት ምረጥ:' : 'Select Station:'}
             </span>
             <div className="flex items-center space-x-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200 flex-wrap">
               {counters.map((c) => {
@@ -617,7 +617,7 @@ export const OfficerStationView: React.FC = () => {
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                     }`}
                   >
-                    {isAmharic ? `ቆጣሪ 0${c.number}` : `COUNTER 0${c.number}`}
+                    {isAmharic ? `መስኮት 0${c.number}` : `COUNTER 0${c.number}`}
                   </button>
                 );
               })}
@@ -649,7 +649,7 @@ export const OfficerStationView: React.FC = () => {
                 {isOfficer && <Lock className="w-3.5 h-3.5 text-indigo-500" />}
                 <span>
                   {isAmharic 
-                    ? `ቆጣሪ 0${activeCounter?.number || 1}` 
+                    ? `መስኮት 0${activeCounter?.number || 1}` 
                     : `COUNTER 0${activeCounter?.number || 1}`}
                 </span>
               </span>
@@ -697,7 +697,7 @@ export const OfficerStationView: React.FC = () => {
                     --
                   </div>
                   <p className="text-base text-slate-500 font-medium">
-                    {isAmharic ? 'በአሁኑ ሰዓት በቆጣሪዎ ላይ የተጠራ ደንበኛ የለም።' : 'No customer currently at this counter.'}
+                    {isAmharic ? 'በአሁኑ ሰዓት በመስኮትዎ ላይ የተጠራ ደንበኛ የለም።' : 'No customer currently at this counter.'}
                   </p>
                 </div>
               )}
@@ -837,7 +837,7 @@ export const OfficerStationView: React.FC = () => {
               </div>
               <div className="text-lg text-slate-400 mb-6 font-medium">
                 {isAmharic 
-                  ? `ወደ ቆጣሪ 0${activeCounter?.number || 1} ይሂዱ` 
+                  ? `ወደ መስኮት 0${activeCounter?.number || 1} ይሂዱ` 
                   : `Proceed to Counter 0${activeCounter?.number || 1}`}
               </div>
               
@@ -895,7 +895,7 @@ export const OfficerStationView: React.FC = () => {
                     key={ticket.id}
                     className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-100 transition"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5">
                       <span className="font-bold text-slate-800 font-mono text-sm">
                         {ticket.ticketNumber}
                       </span>
@@ -905,6 +905,16 @@ export const OfficerStationView: React.FC = () => {
                       {ticket.priority === 'PRIORITY' && (
                         <span className="text-[10px] px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded font-bold">
                           VIP
+                        </span>
+                      )}
+                      {ticket.isCheckedIn ? (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold flex items-center space-x-1" title="Customer checked-in with QR code">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          <span>{isAmharic ? 'ተገኝተዋል' : 'Checked-In'}</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-full font-medium" title="Awaiting QR check-in">
+                          {isAmharic ? 'አልተረጋገጠም' : 'Pending QR'}
                         </span>
                       )}
                     </div>

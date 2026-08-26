@@ -111,6 +111,15 @@ export const api = {
       };
     }>(`/api/queue/ticket/${ticketNumber}`),
 
+  checkInTicket: (ticketNumber: string) =>
+    request<{
+      success: boolean;
+      message: string;
+      ticket: QueueTicket & { ticketNumberAmharic?: string };
+    }>(`/api/queue/ticket/${ticketNumber}/checkin`, {
+      method: 'POST'
+    }),
+
   createTicket: (data: { serviceId: string; priority?: 'NORMAL' | 'PRIORITY' }) =>
     request<{
       success: boolean;

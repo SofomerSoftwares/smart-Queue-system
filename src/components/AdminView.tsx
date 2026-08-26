@@ -88,7 +88,7 @@ export const AdminView: React.FC = () => {
 
   // Addis AI Voice Options & DB Status
   const [addisVoices, setAddisVoices] = useState<AddisVoiceOption[]>([
-    { id: 'aster', name: 'Aster (Natural Amharic)', nameAmharic: 'አስቴር (የተረጋጋ የሴት ድምፅ)', gender: 'FEMALE', description: 'Crisp, calm female Amharic voice', descriptionAmharic: 'ለአዳራሽ እና ለቆጣሪ ጥሪዎች የተዘጋጀ የሴት ድምፅ' },
+    { id: 'aster', name: 'Aster (Natural Amharic)', nameAmharic: 'አስቴር (የተረጋጋ የሴት ድምፅ)', gender: 'FEMALE', description: 'Crisp, calm female Amharic voice', descriptionAmharic: 'ለአዳራሽ እና ለመስኮት ጥሪዎች የተዘጋጀ የሴት ድምፅ' },
     { id: 'abebe', name: 'Abebe (Clear Amharic)', nameAmharic: 'አበበ (ግልፅ የወንድ ድምፅ)', gender: 'MALE', description: 'Deep and clear male Amharic voice', descriptionAmharic: 'ግልፅ እና ጎላ ያለ ይፋዊ የወንድ ድምፅ' },
     { id: 'selam', name: 'Selam (Expressive Amharic)', nameAmharic: 'ሰላም (ደማቅ የሴት ድምፅ)', gender: 'FEMALE', description: 'Warm and welcoming female voice', descriptionAmharic: 'ሞቅ ያለ እና እንግዳ ተቀባይ የሴት ድምፅ' },
     { id: 'dawit', name: 'Dawit (Official Amharic)', nameAmharic: 'ዳዊት (ይፋዊ የወንድ ድምፅ)', gender: 'MALE', description: 'Authoritative and formal male voice', descriptionAmharic: 'ለመንግስት እና ለባንክ ተቋማት የሚመጥን የወንድ ድምፅ' }
@@ -551,7 +551,7 @@ export const AdminView: React.FC = () => {
 
     const num = Number(editingCounter.number);
     if (!num || num < 1) {
-      setCounterModalError(isAmharic ? 'እባክዎ ትክክለኛ የቆጣሪ ቁጥር ያስገቡ' : 'Please enter a valid counter number');
+      setCounterModalError(isAmharic ? 'እባክዎ ትክክለኛ የመስኮት ቁጥር ያስገቡ' : 'Please enter a valid counter number');
       return;
     }
 
@@ -561,15 +561,15 @@ export const AdminView: React.FC = () => {
         ...editingCounter,
         number: num,
         name: editingCounter.name?.trim() || `Counter ${num}`,
-        nameAmharic: editingCounter.nameAmharic?.trim() || `ቆጣሪ ${num}`
+        nameAmharic: editingCounter.nameAmharic?.trim() || `መስኮት ${num}`
       };
 
       if (editingCounter.id) {
         await api.updateCounter(editingCounter.id, payload);
-        setSaveSuccessMsg(isAmharic ? 'ቆጣሪው በተሳካ ሁኔታ ተሻሽሏል!' : 'Counter updated successfully!');
+        setSaveSuccessMsg(isAmharic ? 'መስኮቱ በተሳካ ሁኔታ ተሻሽሏል!' : 'Counter updated successfully!');
       } else {
         await api.createCounter(payload);
-        setSaveSuccessMsg(isAmharic ? 'አዲስ ቆጣሪ በተሳካ ሁኔታ ተፈጥሯል!' : 'New counter created successfully!');
+        setSaveSuccessMsg(isAmharic ? 'አዲስ መስኮት በተሳካ ሁኔታ ተፈጥሯል!' : 'New counter created successfully!');
       }
 
       setIsCounterModalOpen(false);
@@ -780,7 +780,7 @@ export const AdminView: React.FC = () => {
                   </h1>
                   <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl leading-relaxed">
                     {isAmharic 
-                      ? 'ይህ የስራ ክፍል ለአስተዳዳሪ (Admin) ብቻ የተፈቀደ ነው። አገልግሎቶች፣ ቆጣሪዎች፣ ሰራተኞች፣ የአማርኛ ድምፅ እና የቢሮ ቅንብሮች እዚህ ይዋቀራሉ።'
+                      ? 'ይህ የስራ ክፍል ለአስተዳዳሪ (Admin) ብቻ የተፈቀደ ነው። አገልግሎቶች፣ መስኮት ላያ ያሉ፣ ሰራተኞች፣ የአማርኛ ድምፅ እና የቢሮ ቅንብሮች እዚህ ይዋቀራሉ።'
                       : 'This portal is strictly restricted to System Administrators. Service catalog, counter routing, staff accounts, Addis AI Voice parameters, MongoDB Atlas sync, and audit logs are managed here.'}
                   </p>
                 </div>
@@ -895,7 +895,7 @@ export const AdminView: React.FC = () => {
               {isAmharic ? 'የአስተዳዳሪ መቆጣጠሪያ ማዕከል' : 'Administrator Control Center'}
             </h1>
             <p className="text-xs text-slate-500 font-medium">
-              {isAmharic ? 'አገልግሎቶች፣ ቆጣሪዎች፣ ሰራተኞች፣ የአማርኛ ድምፅ እና የቢሮ ቅንብሮች' : 'Manage services, counters, staff, Amharic voice and office settings'}
+              {isAmharic ? 'አገልግሎቶች፣ መስኮት፣ ሰራተኞች፣ የአማርኛ ድምፅ እና የቢሮ ቅንብሮች' : 'Manage services, counters, staff, Amharic voice and office settings'}
             </p>
           </div>
         </div>
@@ -944,7 +944,7 @@ export const AdminView: React.FC = () => {
                 {isAmharic ? 'የአስተዳዳሪ ፈቃድ ያስፈልጋል' : 'Admin Authorization Required'}
               </p>
               <p className="text-[11px] text-indigo-700">
-                {isAmharic ? 'አገልግሎቶችን፣ ቆጣሪዎችን እና ሰራተኞችን ለማስተካከል በአስተዳዳሪ መለያ ይግቡ' : 'To save services, counters, and office configurations, sign in as Administrator.'}
+                {isAmharic ? 'አገልግሎቶችን፣  ሰራተኞችን ለማስተካከል በአስተዳዳሪ መለያ ይግቡ' : 'To save services, counters, and office configurations, sign in as Administrator.'}
               </p>
             </div>
           </div>
@@ -970,7 +970,7 @@ export const AdminView: React.FC = () => {
         {[
           { id: 'overview', label: isAmharic ? 'አጠቃላይ እይታ' : 'Overview', icon: Activity },
           { id: 'services', label: isAmharic ? 'አገልግሎቶች' : 'Services', icon: Layers },
-          { id: 'counters', label: isAmharic ? 'ቆጣሪዎች' : 'Counters', icon: Tv },
+          { id: 'counters', label: isAmharic ? 'መስኮቶች' : 'Counters', icon: Tv },
           { id: 'staff', label: isAmharic ? 'ሰራተኞች' : 'Staff & Roles', icon: Users },
           { id: 'audio', label: isAmharic ? 'የድምፅ ስቱዲዮ (Addis AI)' : 'Voice & Audio (Addis AI)', icon: Volume2 },
           { id: 'database', label: isAmharic ? 'ዳታቤዝ (MongoDB)' : 'Database (MongoDB Atlas)', icon: Database },
@@ -1130,18 +1130,18 @@ export const AdminView: React.FC = () => {
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-base font-bold text-slate-900">
-              {isAmharic ? 'የቆጣሪዎች አስተዳደር' : 'Counters Management'}
+              {isAmharic ? 'የመስኮቶች አስተዳደር' : 'Counters Management'}
             </h2>
             <button
               onClick={() => {
                 const nextNum = counters.length + 1;
-                setEditingCounter({ number: nextNum, name: `Counter ${nextNum}`, nameAmharic: `ቆጣሪ ${nextNum}` });
+                setEditingCounter({ number: nextNum, name: `Counter ${nextNum}`, nameAmharic: `መስኮት ${nextNum}` });
                 setIsCounterModalOpen(true);
               }}
               className="flex items-center space-x-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs"
             >
               <Plus className="w-4 h-4" />
-              <span>{isAmharic ? 'አዲስ ቆጣሪ ጨምር' : 'Add New Counter'}</span>
+              <span>{isAmharic ? 'አዲስ መስኮት ጨምር' : 'Add New Counter'}</span>
             </button>
           </div>
 
@@ -1153,7 +1153,7 @@ export const AdminView: React.FC = () => {
                   <div>
                     <div className="flex items-center justify-between">
                       <span className="text-2xl font-bold font-mono text-slate-900 tracking-tight">
-                        {isAmharic ? `ቆጣሪ ${c.number}` : `Counter ${c.number}`}
+                        {isAmharic ? `መስኮት ${c.number}` : `Counter ${c.number}`}
                       </span>
                       <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700">
                         {c.status}
@@ -1181,10 +1181,10 @@ export const AdminView: React.FC = () => {
                     </button>
                     <button
                       onClick={async () => {
-                        if (confirm(isAmharic ? 'ይህ ቆጣሪ ይሰረዝ?' : 'Delete this counter?')) {
+                        if (confirm(isAmharic ? 'ይህ መስኮት ይሰረዝ?' : 'Delete this counter?')) {
                           try {
                             await api.deleteCounter(c.id);
-                            setSaveSuccessMsg(isAmharic ? 'ቆጣሪው ተሰርዟል' : 'Counter deleted successfully');
+                            setSaveSuccessMsg(isAmharic ? 'መስኮቱ ተሰርዟል' : 'Counter deleted successfully');
                             setTimeout(() => setSaveSuccessMsg(''), 3000);
                             refreshQueue();
                           } catch (err: any) {
@@ -1230,7 +1230,7 @@ export const AdminView: React.FC = () => {
                   <th className="py-3 px-4">Name</th>
                   <th className="py-3 px-4">Username</th>
                   <th className="py-3 px-4">Role</th>
-                  <th className="py-3 px-4">{isAmharic ? 'የተመደበ ቆጣሪ' : 'Assigned Station'}</th>
+                  <th className="py-3 px-4">{isAmharic ? 'የተመደበ መስኮት' : 'Assigned Station'}</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -1251,7 +1251,7 @@ export const AdminView: React.FC = () => {
                         {assignedCnt ? (
                           <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                             <Lock className="w-3 h-3 text-indigo-500" />
-                            <span>{isAmharic ? `ቆጣሪ 0${assignedCnt.number}` : `Counter 0${assignedCnt.number}`}</span>
+                            <span>{isAmharic ? `መስኮት 0${assignedCnt.number}` : `Counter 0${assignedCnt.number}`}</span>
                           </span>
                         ) : (
                           <span className="text-slate-400 text-xs italic">{isAmharic ? 'አልተመደበም' : 'Unassigned'}</span>
@@ -1519,8 +1519,8 @@ export const AdminView: React.FC = () => {
               {/* Sample Preset Phrases */}
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  'ቁጥር ሀ ሃያ አራት ያላችሁ ደንበኛ ወደ ቆጣሪ ሁለት ይሂዱ',
-                  'ቁጥር ለ አስራ አምስት ወደ ቆጣሪ አንድ ይሂዱ',
+                  'ቁጥር ሀ ሃያ አራት ያላችሁ ደንበኛ ወደ መስኮት ሁለት ይሂዱ',
+                  'ቁጥር ለ አስራ አምስት ወደ መስኮት አንድ ይሂዱ',
                   'Ticket number A-024, please proceed to counter 2'
                 ].map((phrase, i) => (
                   <button
@@ -1857,7 +1857,7 @@ export const AdminView: React.FC = () => {
                   {isAmharic ? 'MongoDB Atlas ዳታቤዝ ማዕከል' : 'MongoDB Atlas Cloud Database'}
                 </h2>
                 <p className="text-xs text-slate-500">
-                  {isAmharic ? 'የወረፋ፣ የአገልግሎቶች፣ የቆጣሪዎች እና የተጠቃሚዎች መረጃ በክላውድ ዳታቤዝ ማመሳሰል' : 'Cloud persistence, real-time ticket replication, and resilient synchronization'}
+                  {isAmharic ? 'የወረፋ፣ የአገልግሎቶች፣ የመስኮቶች እና የተጠቃሚዎች መረጃ በክላውድ ዳታቤዝ ማመሳሰል' : 'Cloud persistence, real-time ticket replication, and resilient synchronization'}
                 </p>
               </div>
             </div>
@@ -1867,13 +1867,45 @@ export const AdminView: React.FC = () => {
               <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
                 dbStatus?.connected
                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                  : dbStatus?.error?.includes('Authentication failed')
+                  ? 'bg-rose-100 text-rose-800 border border-rose-200'
                   : 'bg-amber-100 text-amber-800 border border-amber-200'
               }`}>
-                <span className={`w-2 h-2 rounded-full mr-1.5 ${dbStatus?.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-                {dbStatus?.connected ? 'MongoDB Atlas Active' : 'MongoDB Atlas Connecting'}
+                <span className={`w-2 h-2 rounded-full mr-1.5 ${
+                  dbStatus?.connected 
+                    ? 'bg-emerald-500 animate-pulse' 
+                    : dbStatus?.error?.includes('Authentication failed')
+                    ? 'bg-rose-500'
+                    : 'bg-amber-500'
+                }`} />
+                {dbStatus?.connected 
+                  ? 'MongoDB Atlas Active' 
+                  : dbStatus?.error?.includes('Authentication failed')
+                  ? (isAmharic ? 'የይለፍ ቃል / መለያ ልክ አይደለም (Auth Failed)' : 'Atlas Auth Failed')
+                  : (isAmharic ? 'የዳታቤዝ ግንኙነት አልተደረገም' : 'Atlas Disconnected')}
               </span>
             </div>
           </div>
+
+          {dbStatus?.error && (
+            <div className="p-4 bg-rose-50 border border-rose-200 text-rose-900 rounded-2xl text-xs space-y-2 animate-in fade-in">
+              <div className="flex items-center space-x-2 font-bold text-rose-800">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{isAmharic ? 'የ MongoDB Atlas ግንኙነት ማስታወቂያ' : 'MongoDB Atlas Connection Notice'}</span>
+              </div>
+              <p className="text-rose-700 font-medium pl-6 leading-relaxed">
+                {dbStatus.error}
+              </p>
+              <div className="pl-6 pt-1 text-[11px] text-rose-600 space-y-1">
+                <p className="font-bold">{isAmharic ? 'መፍትሄዎች (Troubleshooting Checklist):' : 'Troubleshooting Checklist:'}</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  <li>{isAmharic ? 'በ MongoDB Atlas ውስጥ Security > Database Access ስር የተፈጠረውን Database User መለያ እና የይለፍ ቃል ያስገቡ (የድረ-ገፁን መለያ አይደለም)።' : 'Use your MongoDB Database User credentials (from Security > Database Access in Atlas), not your Atlas website login.'}</li>
+                  <li>{isAmharic ? 'በ Security > Network Access ስር IP Whitelist 0.0.0.0/0 (Allow access from anywhere) መፈቀዱን ያረጋግጡ።' : 'Ensure Atlas Network Access has IP Access List set to 0.0.0.0/0 (Allow access from anywhere).'}</li>
+                  <li>{isAmharic ? 'የይለፍ ቃልዎ ልዩ ምልክቶችን (@, #, %) የያዘ ቢሆንም ስርዓቱ ራሱ አስተካክሎ ያገናኘዋል።' : 'Special characters in passwords are automatically URL-encoded safely.'}</li>
+                </ul>
+              </div>
+            </div>
+          )}
 
           {dbActionMsg && (
             <div className="p-3 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-xl text-xs font-bold flex items-center space-x-2 animate-in fade-in">
@@ -1942,7 +1974,7 @@ export const AdminView: React.FC = () => {
             <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
             <p className="text-xs text-emerald-900 font-medium leading-relaxed">
               {isAmharic
-                ? 'በዚህ ስርዓት ውስጥ የሚከናወኑ ማናቸውም ቲኬቶች፣ የአገልግሎት ለውጦች እና የቆጣሪ ጥሪዎች በቀጥታ ወደ MongoDB Atlas ዳታቤዝ ይገባሉ።'
+                ? 'በዚህ ስርዓት ውስጥ የሚከናወኑ ማናቸውም ቲኬቶች፣ የአገልግሎት ለውጦች እና የመስኮት ጥሪዎች በቀጥታ ወደ MongoDB Atlas ዳታቤዝ ይገባሉ።'
                 : 'All queue tickets, service definitions, counters, staff accounts, audit logs, and audio settings are automatically synced to MongoDB Atlas.'}
             </p>
           </div>
@@ -2691,7 +2723,7 @@ export const AdminView: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-lg border border-slate-200 space-y-3 animate-in fade-in zoom-in-95 duration-150">
             <h3 className="text-sm font-bold text-slate-900">
-              {editingCounter.id ? (isAmharic ? 'ቆጣሪ አስተካክል' : 'Edit Counter') : (isAmharic ? 'አዲስ ቆጣሪ ጨምር' : 'Add Counter')}
+              {editingCounter.id ? (isAmharic ? 'መስኮት አስተካክል' : 'Edit Counter') : (isAmharic ? 'አዲስ መስኮት ጨምር' : 'Add Counter')}
             </h3>
 
             {counterModalError && (
@@ -2703,7 +2735,7 @@ export const AdminView: React.FC = () => {
 
             <div>
               <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                {isAmharic ? 'የቆጣሪ ቁጥር' : 'Counter Number'}
+                {isAmharic ? 'የመስኮት ቁጥር' : 'Counter Number'}
               </label>
               <input
                 type="number"
@@ -2718,7 +2750,7 @@ export const AdminView: React.FC = () => {
 
             <div>
               <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                {isAmharic ? 'የቆጣሪ ስም (English)' : 'Counter Name (English)'}
+                {isAmharic ? 'የመስኮት ስም (English)' : 'Counter Name (English)'}
               </label>
               <input
                 type="text"
@@ -2841,29 +2873,29 @@ export const AdminView: React.FC = () => {
               >
                 <option value="ADMIN">ADMIN (አስተዳዳሪ)</option>
                 <option value="RECEPTIONIST">RECEPTIONIST (አስተናጋጅ / ኪዮስክ)</option>
-                <option value="SERVICE_OFFICER">SERVICE_OFFICER (ቆጣሪ ሰራተኛ)</option>
+                <option value="SERVICE_OFFICER">SERVICE_OFFICER (የመስኮት ሰራተኛ)</option>
               </select>
             </div>
 
             {editingUser.role === 'SERVICE_OFFICER' && (
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  {isAmharic ? 'የተመደበ ቆጣሪ (የስራ ጣቢያ ገደብ)' : 'Assigned Counter (Station Lock)'}
+                  {isAmharic ? 'የተመደበ መስኮት (የስራ ጣቢያ ገደብ)' : 'Assigned Counter (Station Lock)'}
                 </label>
                 <select
                   value={editingUser.assignedCounterId || ''}
                   onChange={(e) => setEditingUser({ ...editingUser, assignedCounterId: e.target.value || undefined })}
                   className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 >
-                  <option value="">{isAmharic ? '-- የተመደበ ቆጣሪ የለም (Unassigned) --' : '-- No Counter Assigned --'}</option>
+                  <option value="">{isAmharic ? '-- የተመደበ መስኮት የለም (Unassigned) --' : '-- No Counter Assigned --'}</option>
                   {counters.map(c => (
                     <option key={c.id} value={c.id}>
-                      {isAmharic ? `ቆጣሪ 0${c.number} (${c.nameAmharic || c.name})` : `Counter 0${c.number} (${c.name})`}
+                      {isAmharic ? `መስኮት 0${c.number} (${c.nameAmharic || c.name})` : `Counter 0${c.number} (${c.name})`}
                     </option>
                   ))}
                 </select>
                 <p className="text-[10px] text-slate-400 mt-1">
-                  {isAmharic ? 'ይህ ሰራተኛ በቆጣሪ ጣቢያው ላይ በዚህ ቆጣሪ ብቻ እንዲጠቀም ይገደባል።' : 'Limits this officer to only call and serve tickets at this specific counter.'}
+                  {isAmharic ? 'ይህ ሰራተኛ በመስኮት ጣቢያው ላይ በዚህ መስኮት ብቻ እንዲጠቀም ይገደባል።' : 'Limits this officer to only call and serve tickets at this specific counter.'}
                 </p>
               </div>
             )}

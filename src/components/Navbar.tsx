@@ -72,7 +72,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenC
     },
     { 
       id: 'officer', 
-      label: isAmharic ? 'የቆጣሪ ጣቢያ' : 'Counter Station', 
+      label: isAmharic ? 'መስኮት' : 'Counter Station', 
       icon: UserCheck 
     },
     { 

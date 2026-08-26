@@ -347,7 +347,7 @@ router.post('/counters', authenticate, requireAdmin, (req: AuthenticatedRequest,
       id: `cnt-${countNum}`,
       number: countNum,
       name,
-      nameAmharic: nameAmharic || `ቆጣሪ ${countNum}`,
+      nameAmharic: nameAmharic || `መስኮት ${countNum}`,
       status: 'AVAILABLE',
       updatedAt: new Date().toISOString()
     };

@@ -72,6 +72,8 @@ export interface QueueTicket {
   peopleAhead?: number;
   estimatedWaitMinutes?: number;
   ticketNumberAmharic?: string;
+  isCheckedIn?: boolean;
+  checkedInAt?: string;
 }
 
 export interface OfficeSetting {
@@ -211,4 +213,6 @@ export interface PrintTicketData {
   estimatedWaitMinutes: number;
   issuedAt: string;
   notice?: string;
+  checkInUrl?: string;
+  isCheckedIn?: boolean;
 }

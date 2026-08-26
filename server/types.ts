@@ -88,6 +88,8 @@ export interface QueueTicket {
   serviceDurationSeconds?: number;
   notes?: string;
   dateKey: string; // "YYYY-MM-DD" for daily sequence reset
+  isCheckedIn?: boolean;
+  checkedInAt?: string;
 }
 
 export interface QueueEvent {
@@ -96,6 +98,7 @@ export interface QueueEvent {
   ticketNumber: string;
   eventType: 
     | 'CREATED'
+    | 'CHECKED_IN'
     | 'CALLED'
     | 'RECALLED'
     | 'STARTED'

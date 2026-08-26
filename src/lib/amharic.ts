@@ -14,9 +14,9 @@
 // ============================================================================
 
 export const LATIN_PREFIX_TO_AMHARIC: Record<string, string> = {
-  A: 'ሀ',
-  B: 'ለ',
-  C: 'ቸ',
+  A: 'A',
+  B: 'B',
+  C: 'C',
   D: 'ደ',
   E: 'አ',
   F: 'ፈ',
@@ -86,8 +86,8 @@ export const AMHARIC_WORDS_PHONETIC_MAP: Record<string, string> = {
   'እባክዎ': 'ibakiwo',
   'እባኮን': 'ibakon',
   'ወደ': 'wode',
-  'ቆጣሪ': 'kotari',
   'መስኮት': 'meskot',
+  'መስኮት1': 'meskot',
   'ይሂዱ': 'yihidu',
   'ይቅረቡ': 'yikrebu',
   'አዲስ': 'Addis',

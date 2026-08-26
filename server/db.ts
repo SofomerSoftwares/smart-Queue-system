@@ -239,7 +239,7 @@ function seedDatabase(): DatabaseSchema {
       id: 'cnt-1',
       number: 1,
       name: 'Counter 1 (Main Registration)',
-      nameAmharic: 'ቆጣሪ 1 (ዋና ምዝገባ)',
+      nameAmharic: 'መስኮት 1 (ዋና ምዝገባ)',
       status: 'SERVING',
       currentOfficerId: 'usr-officer-1',
       currentOfficerName: 'Dawit Mengistu',
@@ -249,7 +249,7 @@ function seedDatabase(): DatabaseSchema {
       id: 'cnt-2',
       number: 2,
       name: 'Counter 2 (Applications & Renewals)',
-      nameAmharic: 'ቆጣሪ 2 (ማመልከቻ እና እድሳት)',
+      nameAmharic: 'መስኮት 2 (ማመልከቻ እና እድሳት)',
       status: 'AVAILABLE',
       currentOfficerId: 'usr-officer-2',
       currentOfficerName: 'Samrawit Bekele',
@@ -259,7 +259,7 @@ function seedDatabase(): DatabaseSchema {
       id: 'cnt-3',
       number: 3,
       name: 'Counter 3 (Cashier & Payments)',
-      nameAmharic: 'ቆጣሪ 3 (ክፍያ እና ሂሳብ)',
+      nameAmharic: 'መስኮት 3 (ክፍያ እና ሂሳብ)',
       status: 'AVAILABLE',
       currentOfficerId: 'usr-officer-3',
       currentOfficerName: 'Kassahun Worku',
@@ -269,7 +269,7 @@ function seedDatabase(): DatabaseSchema {
       id: 'cnt-4',
       number: 4,
       name: 'Counter 4 (Express Collection)',
-      nameAmharic: 'ቆጣሪ 4 (ፈጣን ሰነድ መሰብሰቢያ)',
+      nameAmharic: 'መስኮት 4 (ፈጣን ሰነድ መሰብሰቢያ)',
       status: 'CLOSED',
       updatedAt: now
     }
@@ -349,7 +349,9 @@ function seedDatabase(): DatabaseSchema {
       calledAt: new Date(Date.now() - 10 * 60000).toISOString(),
       serviceStartedAt: new Date(Date.now() - 8 * 60000).toISOString(),
       waitingDurationSeconds: 420,
-      dateKey: todayKey
+      dateKey: todayKey,
+      isCheckedIn: true,
+      checkedInAt: new Date(Date.now() - 14 * 60000).toISOString()
     },
     {
       id: 'tkt-002',
@@ -371,7 +373,9 @@ function seedDatabase(): DatabaseSchema {
       completedAt: new Date(Date.now() - 5 * 60000).toISOString(),
       waitingDurationSeconds: 480,
       serviceDurationSeconds: 720,
-      dateKey: todayKey
+      dateKey: todayKey,
+      isCheckedIn: true,
+      checkedInAt: new Date(Date.now() - 24 * 60000).toISOString()
     },
     {
       id: 'tkt-003',
@@ -384,7 +388,8 @@ function seedDatabase(): DatabaseSchema {
       status: 'WAITING',
       priority: 'NORMAL',
       issuedAt: new Date(Date.now() - 12 * 60000).toISOString(),
-      dateKey: todayKey
+      dateKey: todayKey,
+      isCheckedIn: false
     },
     {
       id: 'tkt-004',
@@ -397,7 +402,9 @@ function seedDatabase(): DatabaseSchema {
       status: 'WAITING',
       priority: 'PRIORITY',
       issuedAt: new Date(Date.now() - 8 * 60000).toISOString(),
-      dateKey: todayKey
+      dateKey: todayKey,
+      isCheckedIn: true,
+      checkedInAt: new Date(Date.now() - 7 * 60000).toISOString()
     },
     {
       id: 'tkt-005',
@@ -410,7 +417,8 @@ function seedDatabase(): DatabaseSchema {
       status: 'WAITING',
       priority: 'NORMAL',
       issuedAt: new Date(Date.now() - 4 * 60000).toISOString(),
-      dateKey: todayKey
+      dateKey: todayKey,
+      isCheckedIn: false
     }
   ];
 
@@ -880,6 +888,28 @@ class Database {
       userId: officerId,
       userName: officer?.name,
       metadata
+    });
+
+    this.save();
+    return ticket;
+  }
+
+  public checkInTicket(ticketIdOrNumber: string): QueueTicket | undefined {
+    let ticket = this.getTicketById(ticketIdOrNumber);
+    if (!ticket) {
+      ticket = this.getTicketByNumber(ticketIdOrNumber);
+    }
+    if (!ticket) return undefined;
+
+    const now = new Date().toISOString();
+    ticket.isCheckedIn = true;
+    ticket.checkedInAt = now;
+
+    this.addEvent({
+      ticketId: ticket.id,
+      ticketNumber: ticket.ticketNumber,
+      eventType: 'CHECKED_IN',
+      metadata: { checkedInAt: now }
     });
 
     this.save();

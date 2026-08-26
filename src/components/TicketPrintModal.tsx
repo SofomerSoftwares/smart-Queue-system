@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Printer, X, CheckCircle2, Clock, Users, Download, Copy, Check, Sparkles, Calendar } from 'lucide-react';
+import { Printer, X, CheckCircle2, Clock, Users, Download, Copy, Check, Sparkles, Calendar, QrCode } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { PrintTicketData } from '../types';
 import { AmharicLib } from '../lib/amharic';
 
@@ -36,7 +37,15 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
   const ethiopianDateStr = AmharicLib.calendar.formatDateString(issuedDate, { useGeez: true });
   const geezAhead = AmharicLib.numbers.toGeez(printData.peopleAhead);
 
+  const checkInUrl = typeof window !== 'undefined' 
+    ? `${window.location.origin}${window.location.pathname}?view=customer&ticket=${encodeURIComponent(printData.ticketNumber)}&checkin=true`
+    : `https://addisqueue.app?ticket=${printData.ticketNumber}&checkin=true`;
+
   const generateTicketHtml = () => {
+    // Get serialized SVG of the QR Code from the DOM if rendered, or render inline
+    const qrSvgElement = document.getElementById('modal-print-qr-svg');
+    const qrSvgMarkup = qrSvgElement ? new XMLSerializer().serializeToString(qrSvgElement) : '';
+
     return `<!DOCTYPE html>
 <html>
 <head>
@@ -114,6 +123,18 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
       justify-content: space-between;
       margin-bottom: 4px;
     }
+    .qr-section {
+      margin: 10px 0 6px 0;
+      padding: 6px;
+      border: 1px dashed #000;
+      display: inline-block;
+    }
+    .qr-caption {
+      font-size: 9px;
+      font-weight: bold;
+      margin-top: 4px;
+      text-transform: uppercase;
+    }
     .footer {
       font-size: 10px;
       margin-top: 8px;
@@ -152,6 +173,13 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
       <span>${formattedDate}</span>
     </div>
   </div>
+
+  ${qrSvgMarkup ? `
+  <div class="qr-section">
+    ${qrSvgMarkup}
+    <div class="qr-caption">SCAN TO CHECK-IN / ለመገኘት ማረጋገጫ ይቃኙ</div>
+  </div>
+  ` : ''}
 
   <div class="footer">
     እባክዎ ቁጥርዎ በስክሪን እና በድምፅ እስኪጠራ ድረስ ይጠብቁ።<br/>
@@ -326,6 +354,22 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
             <div className="flex justify-between items-center text-slate-400 text-[10px] pt-1 font-mono">
               <span>{isAmharic ? 'የተሰጠበት ሰዓት:' : 'Issued:'}</span>
               <span>{formattedDate}</span>
+            </div>
+          </div>
+
+          {/* Check-In QR Pass preview */}
+          <div className="my-3 p-3 bg-white border border-dashed border-slate-300 rounded-xl inline-block">
+            <div className="flex justify-center">
+              <QRCodeSVG
+                id="modal-print-qr-svg"
+                value={checkInUrl}
+                size={96}
+                level="M"
+                includeMargin={false}
+              />
+            </div>
+            <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-1.5 font-mono">
+              {isAmharic ? 'ለመገኘት ማረጋገጫ ይቃኙ (SCAN TO CHECK-IN)' : 'SCAN TO CONFIRM ARRIVAL'}
             </div>
           </div>
 

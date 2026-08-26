@@ -71,7 +71,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
       case 'admin':
         return {
           title: t('system_admin', 'System Administration'),
-          subtitle: isAmharic ? 'ቆጣሪዎች፣ ሰራተኞች፣ አገልግሎቶች፣ አዲስ AI ድምፅ እና ዳታቤዝ' : 'Counters, services, Addis AI Voice, Atlas DB and audit logs',
+          subtitle: isAmharic ? 'መስኮቶች፣ ሰራተኞች፣ አገልግሎቶች፣ አዲስ AI ድምፅ እና ዳታቤዝ' : 'Counters, services, Addis AI Voice, Atlas DB and audit logs',
           icon: ShieldCheck
         };
       case 'reports':
@@ -83,7 +83,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
       case 'login':
         return {
           title: isAmharic ? 'የሰራተኛ መግቢያ' : 'Staff Authentication',
-          subtitle: isAmharic ? 'የቆጣሪ ወይም የአስተዳዳሪ መግቢያ' : 'Officer & administrator secure sign in',
+          subtitle: isAmharic ? 'የመስኮት ወይም የአስተዳዳሪ መግቢያ' : 'Officer & administrator secure sign in',
           icon: LogIn
         };
       default:
