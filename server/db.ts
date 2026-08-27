@@ -292,7 +292,7 @@ function seedDatabase(): DatabaseSchema {
     language: 'AMHARIC',
     ttsProvider: 'ADDIS_AI',
     addisVoice: process.env.ADDIS_AI_DEFAULT_VOICE || 'aster',
-    addisAiSpeed: 0.75,
+    addisAiSpeed: 1.0,
     addisAiEndpoint: process.env.ADDIS_AI_ENDPOINT || 'https://api.addisassistant.com/api/v1/voice/generations',
     volume: 85,
     repeatCount: 1,

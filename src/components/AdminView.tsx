@@ -301,8 +301,7 @@ export const AdminView: React.FC = () => {
           res.audioResult?.audioBase64,
           res.audioResult?.mimeType || 'audio/mp3',
           audioForm.volume || 85,
-          res.audioResult?.phoneticText,
-          voiceSpeed
+          res.audioResult?.phoneticText
         );
         setTestVoiceStatus(isAmharic ? 'ድምፅ ተጠናቅቋል' : 'Voice playback finished');
         setTimeout(() => setTestVoiceStatus(''), 3000);
@@ -1358,8 +1357,8 @@ export const AdminView: React.FC = () => {
               </div>
             </div>
 
-            {/* Volume, Speed, Repeat, and Language Controls */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Volume, Repeat, and Language Controls */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   {isAmharic ? 'የማስታወቂያ ቋንቋ' : 'Announcement Language'}
@@ -1391,33 +1390,6 @@ export const AdminView: React.FC = () => {
                   onChange={(e) => setAudioForm({ ...audioForm, volume: parseInt(e.target.value) })}
                   className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600 mt-2"
                 />
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    {isAmharic ? 'የንግግር ፍጥነት (Speed)' : 'Speech Tempo / Speed'}
-                  </label>
-                  <span className="text-xs font-mono font-bold text-indigo-600">
-                    {voiceSpeed < 0.8 ? `${voiceSpeed}x (Slow & Clear)` : `${voiceSpeed}x`}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0.55"
-                  max="1.20"
-                  step="0.05"
-                  value={voiceSpeed}
-                  onChange={(e) => {
-                    const spd = parseFloat(e.target.value);
-                    setVoiceSpeed(spd);
-                    setAudioForm({ ...audioForm, addisAiSpeed: spd });
-                  }}
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600 mt-2"
-                />
-                <p className="text-[10px] text-slate-400 mt-1">
-                  {isAmharic ? '0.7x ለማዳመጥ የተረጋጋ እና ግልፅ ነው' : '0.7x is relaxed and clear to hear'}
-                </p>
               </div>
 
               <div>

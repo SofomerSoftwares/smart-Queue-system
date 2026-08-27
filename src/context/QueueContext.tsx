@@ -140,7 +140,7 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const announcement: AnnouncementPayload = payload.data;
             setLastAnnouncement(announcement);
 
-            // Play voice announcement with configured volume and calm phonetic speed
+            // Play voice announcement
             const textToSpeak = announcement.language === 'ENGLISH' 
               ? announcement.textEnglish 
               : announcement.textAmharic;
@@ -150,8 +150,7 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               announcement.audioBase64,
               announcement.audioMimeType || 'audio/mp3',
               audioSettingRef.current?.volume || 85,
-              announcement.phoneticText,
-              audioSettingRef.current?.addisAiSpeed || 1.0
+              announcement.phoneticText
             ).catch(err => {
               console.warn('Playback error:', err);
             });
