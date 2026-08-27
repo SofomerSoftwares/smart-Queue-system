@@ -94,7 +94,7 @@ export const AdminView: React.FC = () => {
     { id: 'dawit', name: 'Dawit (Official Amharic)', nameAmharic: 'ዳዊት (ይፋዊ የወንድ ድምፅ)', gender: 'MALE', description: 'Authoritative and formal male voice', descriptionAmharic: 'ለመንግስት እና ለባንክ ተቋማት የሚመጥን የወንድ ድምፅ' }
   ]);
   const [selectedAddisVoice, setSelectedAddisVoice] = useState<string>('aster');
-  const [selectedTtsProvider, setSelectedTtsProvider] = useState<'ADDIS_AI' | 'GEMINI_TTS'>('ADDIS_AI');
+  const [selectedTtsProvider, setSelectedTtsProvider] = useState<'ADDIS_AI'>('ADDIS_AI');
   const [voiceSpeed, setVoiceSpeed] = useState<number>(1.0);
 
   // MongoDB Atlas State
@@ -124,7 +124,7 @@ export const AdminView: React.FC = () => {
   // Audio Testing State
   const [testVoiceText, setTestVoiceText] = useState<string>('እባኮን ወደ መስኮት ቁጥር ፩ ይሂዱ');
   const [testLanguage, setTestLanguage] = useState<'AMHARIC' | 'ENGLISH'>('AMHARIC');
-  const [selectedVoice, setSelectedVoice] = useState<string>('Kore');
+  const [selectedVoice, setSelectedVoice] = useState<string>('');
   const [isTestingVoice, setIsTestingVoice] = useState<boolean>(false);
   const [testVoiceStatus, setTestVoiceStatus] = useState<string>('');
 

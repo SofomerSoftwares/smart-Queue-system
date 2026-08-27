@@ -87,7 +87,6 @@ export const AMHARIC_WORDS_PHONETIC_MAP: Record<string, string> = {
   'እባኮን': 'ibakon',
   'ወደ': 'wode',
   'መስኮት': 'meskot',
-  'መስኮት1': 'meskot',
   'ይሂዱ': 'yihidu',
   'ይቅረቡ': 'yikrebu',
   'አዲስ': 'Addis',
