@@ -202,7 +202,7 @@ export const ReceptionView: React.FC = () => {
                   <th className="py-3 px-4">{isAmharic ? 'አገልግሎት' : 'Service'}</th>
                   <th className="py-3 px-4">{isAmharic ? 'ቅድሚያ' : 'Priority'}</th>
                   <th className="py-3 px-4">{isAmharic ? 'የተሰጠበት ሰዓት' : 'Issued Time'}</th>
-                  <th className="py-3 px-4 text-right">{isAmharic ? 'ድርጊት' : 'Action'}</th>
+                  
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
@@ -226,36 +226,6 @@ export const ReceptionView: React.FC = () => {
                     </td>
                     <td className="py-3.5 px-4 text-slate-500 font-mono text-xs">
                       {new Date(t.issuedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                    <td className="py-3.5 px-4 text-right space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActivePrintData({
-                            ticketNumber: t.ticketNumber,
-                            ticketNumberAmharic: t.ticketNumberAmharic,
-                            serviceName: t.serviceName,
-                            serviceNameAmharic: t.serviceNameAmharic,
-                            peopleAhead: waitingTickets.filter(w => w.serviceId === t.serviceId && new Date(w.issuedAt).getTime() < new Date(t.issuedAt).getTime()).length,
-                            estimatedWaitMinutes: 5,
-                            issuedAt: t.issuedAt,
-                            officeName: 'City Public Services Office',
-                            officeNameAmharic: 'የከተማው አገልግሎት መስጫ ጽ/ቤት'
-                          });
-                          setIsPrintModalOpen(true);
-                        }}
-                        className="inline-flex items-center space-x-1 text-indigo-600 hover:text-indigo-800 font-bold text-xs bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition"
-                      >
-                        <Printer className="w-3 h-3" />
-                        <span>{isAmharic ? 'አትም' : 'Print'}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => cancelTicket(t.id)}
-                        className="text-rose-600 hover:text-rose-700 font-semibold text-xs px-2 py-1 rounded-lg hover:bg-rose-50 transition"
-                      >
-                        {isAmharic ? 'ሰርዝ' : 'Cancel'}
-                      </button>
                     </td>
                   </tr>
                 ))}
