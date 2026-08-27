@@ -6,6 +6,7 @@ export { transliterateToPhonetic as transliterateAmharicToPhonetic };
 class AudioManager {
   private audioCtx: AudioContext | null = null;
   private currentVoiceAudioEl: HTMLAudioElement | null = null;
+  private unlocked = false;
 
   public initContext(): AudioContext {
     if (!this.audioCtx) {
@@ -13,9 +14,36 @@ class AudioManager {
       this.audioCtx = new AudioCtxClass();
     }
     if (this.audioCtx.state === 'suspended') {
-      this.audioCtx.resume();
+      this.audioCtx.resume().catch(() => {});
     }
     return this.audioCtx;
+  }
+
+  public isUnlocked(): boolean {
+    return this.unlocked || (this.audioCtx !== null && this.audioCtx.state === 'running');
+  }
+
+  // Explicit user unlock method
+  public async unlock(): Promise<boolean> {
+    try {
+      const ctx = this.initContext();
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
+      }
+
+      // Play an inaudible 1-sample buffer to satisfy mobile/desktop autoplay policy
+      const buffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+
+      this.unlocked = true;
+      return true;
+    } catch (err) {
+      console.warn('Audio unlock notice:', err);
+      return false;
+    }
   }
 
   // Play airport / lobby chime before announcement
@@ -87,7 +115,7 @@ class AudioManager {
       try {
         const audioSrc = base64Data.startsWith('data:') 
           ? base64Data 
-          : `data:${mimeType || 'audio/wav'};base64,${base64Data}`;
+          : `data:${mimeType || 'audio/mp3'};base64,${base64Data}`;
 
         if (this.currentVoiceAudioEl) {
           try {
@@ -143,7 +171,7 @@ class AudioManager {
 
   public playBrowserSpeech(text: string, volume: number, phoneticText?: string): Promise<void> {
     return new Promise((resolve) => {
-      if (!('speechSynthesis' in window)) {
+      if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
         return resolve();
       }
 
@@ -151,65 +179,73 @@ class AudioManager {
         window.speechSynthesis.cancel();
 
         const getBestVoices = () => {
-          return window.speechSynthesis.getVoices();
+          try {
+            return window.speechSynthesis.getVoices() || [];
+          } catch {
+            return [];
+          }
         };
-
-        let voices = getBestVoices();
 
         const doSpeak = () => {
-          voices = getBestVoices();
-          const amVoice = voices.find(v => v.lang.toLowerCase().startsWith('am'));
-          
-          let textToSpeak = text;
-          let voiceToUse = amVoice;
-
-          if (!amVoice) {
-            // If no Amharic voice is installed on OS, use phonetic transliterated text with natural voice
-            textToSpeak = phoneticText || transliterateToPhonetic(text);
+          try {
+            const voices = getBestVoices();
+            const amVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('am'));
             
-            // Prefer high-quality English voice
-            voiceToUse = voices.find(v => 
-              v.name.includes('Google') || 
-              v.name.includes('Natural') || 
-              v.name.includes('Zira') || 
-              v.name.includes('Samantha') || 
-              v.lang.startsWith('en')
-            ) || voices[0];
-          }
+            let textToSpeak = text;
+            let voiceToUse = amVoice;
 
-          const utterance = new SpeechSynthesisUtterance(textToSpeak);
-          utterance.volume = Math.max(0.1, Math.min(1.0, volume / 100));
-          utterance.rate = 0.88; // Professional announcement pace
-          utterance.pitch = 1.0;
-
-          if (voiceToUse) {
-            utterance.voice = voiceToUse;
-          }
-
-          let done = false;
-          const finish = () => {
-            if (!done) {
-              done = true;
-              resolve();
+            if (!amVoice) {
+              // If no native Amharic voice is installed on OS, use phonetic transliterated text with natural voice
+              textToSpeak = phoneticText || transliterateToPhonetic(text);
+              
+              // Prefer high-quality Natural English voice
+              voiceToUse = voices.find(v => 
+                v.name.includes('Google') || 
+                v.name.includes('Natural') || 
+                v.name.includes('Neural') || 
+                v.name.includes('Zira') || 
+                v.name.includes('Samantha') || 
+                (v.lang && v.lang.startsWith('en'))
+              ) || voices[0];
             }
-          };
 
-          utterance.onend = finish;
-          utterance.onerror = finish;
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            utterance.volume = Math.max(0.1, Math.min(1.0, volume / 100));
+            utterance.rate = 0.86; // Crisp, clear announcement tempo
+            utterance.pitch = 1.0;
 
-          // Timeout safety in case synthesis hangs
-          setTimeout(finish, 12000);
+            if (voiceToUse) {
+              utterance.voice = voiceToUse;
+            }
 
-          window.speechSynthesis.speak(utterance);
+            let done = false;
+            const finish = () => {
+              if (!done) {
+                done = true;
+                resolve();
+              }
+            };
+
+            utterance.onend = finish;
+            utterance.onerror = finish;
+
+            // Timeout safety in case speech synthesis hangs
+            setTimeout(finish, 12000);
+
+            window.speechSynthesis.speak(utterance);
+          } catch (e) {
+            console.warn('Speech synthesis execution notice:', e);
+            resolve();
+          }
         };
 
-        if (voices.length === 0 && 'onvoiceschanged' in window.speechSynthesis) {
+        const initialVoices = getBestVoices();
+        if (initialVoices.length === 0 && 'onvoiceschanged' in window.speechSynthesis) {
           window.speechSynthesis.onvoiceschanged = () => {
             window.speechSynthesis.onvoiceschanged = null;
             doSpeak();
           };
-          // Fallback timer if onvoiceschanged doesn't fire
-          setTimeout(doSpeak, 250);
+          setTimeout(doSpeak, 300);
         } else {
           doSpeak();
         }

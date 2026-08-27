@@ -1,5 +1,5 @@
 import { MongoClient, Db } from 'mongodb';
-import { DatabaseSchema, User, Service, Counter, QueueTicket, QueueEvent, AuditLog, AudioAsset, CustomerReview } from './types.js';
+import { DatabaseSchema, User, Service, Counter, QueueTicket, QueueEvent, AuditLog, CustomerReview } from './types.js';
 
 export function sanitizeMongoUri(rawUri?: string | null): string {
   if (!rawUri || typeof rawUri !== 'string') return '';
@@ -10,37 +10,69 @@ export function sanitizeMongoUri(rawUri?: string | null): string {
     uri = uri.slice(1, -1).trim();
   }
 
-  // Handle mongodb+srv:// or mongodb:// credentials encoding
-  const match = uri.match(/^(mongodb(?:\+srv)?:\/\/)([^:]+):([^@]+)@(.+)$/);
-  if (match) {
-    const protocol = match[1];
-    const user = match[2];
-    const pass = match[3];
-    const rest = match[4];
+  const protoMatch = uri.match(/^(mongodb(?:\+srv)?:\/\/)(.*)$/);
+  if (!protoMatch) return uri;
 
-    try {
-      // Decode first in case parts are partially encoded, then safely encode
-      const decodedUser = decodeURIComponent(user);
-      const decodedPass = decodeURIComponent(pass);
-      const safeUser = encodeURIComponent(decodedUser);
-      const safePass = encodeURIComponent(decodedPass);
-      return `${protocol}${safeUser}:${safePass}@${rest}`;
-    } catch {
-      return uri;
-    }
+  const protocol = protoMatch[1];
+  const body = protoMatch[2];
+
+  // Look for the auth separator '@' that precedes the host
+  const slashOrQueryIdx = body.search(/[/?]/);
+  const authAndHost = slashOrQueryIdx !== -1 ? body.substring(0, slashOrQueryIdx) : body;
+  const pathAndQuery = slashOrQueryIdx !== -1 ? body.substring(slashOrQueryIdx) : '';
+
+  const lastAtIdx = authAndHost.lastIndexOf('@');
+  if (lastAtIdx === -1) {
+    // No credentials provided in URI (e.g. mongodb://localhost:27017)
+    return uri;
   }
 
-  return uri;
+  const creds = authAndHost.substring(0, lastAtIdx);
+  const host = authAndHost.substring(lastAtIdx + 1);
+
+  const colonIdx = creds.indexOf(':');
+  if (colonIdx === -1) {
+    // Only username, no password
+    const safeUser = encodeURIComponent(decodeURIComponent(creds.trim()));
+    return `${protocol}${safeUser}@${host}${pathAndQuery}`;
+  }
+
+  let rawUser = creds.substring(0, colonIdx).trim();
+  let rawPass = creds.substring(colonIdx + 1).trim();
+
+  // Strip literal surrounding angle brackets if user typed <myPassword>
+  if (rawUser.startsWith('<') && rawUser.endsWith('>') && rawUser.length > 2) {
+    rawUser = rawUser.slice(1, -1).trim();
+  }
+  if (rawPass.startsWith('<') && rawPass.endsWith('>') && rawPass.length > 2) {
+    rawPass = rawPass.slice(1, -1).trim();
+  }
+
+  try {
+    const decodedUser = decodeURIComponent(rawUser);
+    const decodedPass = decodeURIComponent(rawPass);
+    const safeUser = encodeURIComponent(decodedUser);
+    const safePass = encodeURIComponent(decodedPass);
+    return `${protocol}${safeUser}:${safePass}@${host}${pathAndQuery}`;
+  } catch {
+    return uri;
+  }
 }
 
 export function isValidMongoUri(uri?: string | null): boolean {
   if (!uri || typeof uri !== 'string') return false;
-  const trimmed = uri.trim();
+  let trimmed = uri.trim();
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    trimmed = trimmed.slice(1, -1).trim();
+  }
   if (!trimmed) return false;
-  // Guard against template placeholders
+
+  // Guard against unpopulated template placeholders
   if (
     trimmed.includes('<username>') ||
     trimmed.includes('<password>') ||
+    trimmed.includes('<db_password>') ||
+    trimmed.includes('<db_username>') ||
     trimmed.includes('xxxxx') ||
     trimmed.includes('MY_MONGODB_URI') ||
     trimmed.includes('your_username') ||
@@ -123,6 +155,28 @@ class MongoDBService {
       console.log(`✅ [MongoDB Atlas] Connected successfully to cluster database: "${this.dbName}"`);
       return true;
     } catch (err: any) {
+      // If sanitization failed with double-encoding or special chars, try with raw URI once as fallback
+      if (connectionUri !== rawUri.trim()) {
+        try {
+          const fallbackClient = new MongoClient(rawUri.trim(), {
+            serverSelectionTimeoutMS: 5000,
+            connectTimeoutMS: 5000,
+            retryWrites: true
+          });
+          await fallbackClient.connect();
+          this.client = fallbackClient;
+          this.db = fallbackClient.db(this.dbName);
+          await this.db.command({ ping: 1 });
+          this.isConnected = true;
+          this.activeUri = rawUri.trim();
+          this.lastError = null;
+          console.log(`✅ [MongoDB Atlas] Connected successfully with direct URI`);
+          return true;
+        } catch {
+          // continue with error classification
+        }
+      }
+
       this.isConnected = false;
       const rawMsg = err?.message || 'Failed to connect to MongoDB Atlas cluster';
       
@@ -180,12 +234,17 @@ class MongoDBService {
       const counters = await this.db.collection<Counter>('counters').find({}).toArray();
       const tickets = await this.db.collection<QueueTicket>('tickets').find({}).toArray();
       const events = await this.db.collection<QueueEvent>('events').find({}).sort({ timestamp: -1 }).limit(500).toArray();
-      const audioAssets = await this.db.collection<AudioAsset>('audio_assets').find({}).toArray();
       const auditLogs = await this.db.collection<AuditLog>('audit_logs').find({}).sort({ timestamp: -1 }).limit(1000).toArray();
       const customerReviews = await this.db.collection<CustomerReview>('customer_reviews').find({}).sort({ createdAt: -1 }).toArray();
 
       const officeSettingDoc = await this.db.collection('settings').findOne({ _id: 'officeSetting' as any });
-      const audioSettingDoc = await this.db.collection('settings').findOne({ _id: 'audioSetting' as any });
+      let audioSettingDoc = await this.db.collection('settings').findOne({ _id: 'audioSetting' as any });
+      if (!audioSettingDoc) {
+        const audioFromCol = await this.db.collection('audio_settings').findOne({});
+        if (audioFromCol) {
+          audioSettingDoc = { data: audioFromCol } as any;
+        }
+      }
 
       // If database is completely empty, return null to allow initial seed
       if (users.length === 0 && services.length === 0) {
@@ -206,7 +265,6 @@ class MongoDBService {
         counters: cleanDocs<Counter>(counters),
         tickets: cleanDocs<QueueTicket>(tickets),
         events: cleanDocs<QueueEvent>(events),
-        audioAssets: cleanDocs<AudioAsset>(audioAssets),
         auditLogs: cleanDocs<AuditLog>(auditLogs),
         customerReviews: cleanDocs<CustomerReview>(customerReviews),
         officeSetting: (officeSettingDoc?.data as any) || undefined,
@@ -248,7 +306,6 @@ class MongoDBService {
         syncCollection('counters', data.counters),
         syncCollection('tickets', data.tickets),
         syncCollection('events', data.events),
-        syncCollection('audio_assets', data.audioAssets),
         syncCollection('audit_logs', data.auditLogs),
         syncCollection('customer_reviews', data.customerReviews || []),
         this.db.collection('settings').updateOne(
@@ -260,10 +317,42 @@ class MongoDBService {
           { _id: 'audioSetting' as any },
           { $set: { data: data.audioSetting, updatedAt: new Date().toISOString() } },
           { upsert: true }
+        ),
+        this.db.collection('audio_settings').updateOne(
+          { id: data.audioSetting.id || 'audio-setting-1' },
+          { $set: { ...data.audioSetting, updatedAt: new Date().toISOString() } },
+          { upsert: true }
         )
       ]);
     } catch (err: any) {
       console.warn('Asynchronous MongoDB Atlas sync notice:', err.message);
+    }
+  }
+
+  /**
+   * Directly save Addis AI Voice Announcement Configuration to MongoDB
+   */
+  public async saveAudioSetting(setting: any): Promise<boolean> {
+    if (!this.isReady() || !this.db) return false;
+    try {
+      const now = new Date().toISOString();
+      await Promise.allSettled([
+        this.db.collection('settings').updateOne(
+          { _id: 'audioSetting' as any },
+          { $set: { data: setting, updatedAt: now } },
+          { upsert: true }
+        ),
+        this.db.collection('audio_settings').updateOne(
+          { id: setting.id || 'audio-setting-1' },
+          { $set: { ...setting, updatedAt: now } },
+          { upsert: true }
+        )
+      ]);
+      console.log('✅ [MongoDB Atlas] Addis AI Voice Announcement Configuration saved directly to MongoDB.');
+      return true;
+    } catch (err: any) {
+      console.warn('⚠️ [MongoDB Atlas] Error saving Addis AI voice configuration:', err.message);
+      return false;
     }
   }
 

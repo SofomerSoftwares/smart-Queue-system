@@ -220,7 +220,16 @@ export const api = {
     request<{
       success: boolean;
       text: string;
-      audioResult: { audioBase64?: string; mimeType: string; source: string; voice?: string; provider?: string; phoneticText?: string };
+      audioResult: {
+        audioBase64?: string;
+        mimeType: string;
+        source: string;
+        voice?: string;
+        provider?: string;
+        phoneticText?: string;
+        latencyMs?: number;
+        diagnostic?: string;
+      };
     }>('/api/audio/test-voice', {
       method: 'POST',
       body: JSON.stringify(data)

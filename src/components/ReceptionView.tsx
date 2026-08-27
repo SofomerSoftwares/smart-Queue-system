@@ -21,7 +21,6 @@ export const ReceptionView: React.FC = () => {
     services, 
     waitingTickets, 
     createTicket, 
-    cancelTicket, 
     uiLanguage 
   } = useQueue();
 

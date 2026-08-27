@@ -293,7 +293,7 @@ function seedDatabase(): DatabaseSchema {
     ttsProvider: 'ADDIS_AI',
     addisVoice: process.env.ADDIS_AI_DEFAULT_VOICE || 'aster',
     addisAiSpeed: 1.0,
-    addisAiEndpoint: process.env.ADDIS_AI_ENDPOINT || 'https://api.addis.ai/v1/tts',
+    addisAiEndpoint: process.env.ADDIS_AI_ENDPOINT || 'https://api.addisassistant.com/api/v1/voice/generations',
     volume: 85,
     repeatCount: 1,
     announcementDelaySeconds: 1
@@ -973,6 +973,11 @@ class Database {
 
   public updateAudioSetting(update: Partial<AudioSetting>): AudioSetting {
     this.data.audioSetting = { ...this.data.audioSetting, ...update };
+    if (mongoService.isReady()) {
+      mongoService.saveAudioSetting(this.data.audioSetting).catch(err => {
+        console.warn('MongoDB direct saveAudioSetting warning:', err.message);
+      });
+    }
     this.save();
     return this.data.audioSetting;
   }

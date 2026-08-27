@@ -152,7 +152,7 @@ export interface OfficeSetting {
   displayFontSize?: 'COMPACT' | 'NORMAL' | 'LARGE' | 'XLARGE' | 'MASSIVE';
 }
 
-export type TTSProviderType = 'ADDIS_AI' | 'BROWSER_SYNTHESIS';
+export type TTSProviderType = 'ADDIS_AI';
 
 export interface AudioSetting {
   id: string;
@@ -204,6 +204,6 @@ export interface AnnouncementPayload {
   phoneticText?: string;
   audioBase64?: string;
   audioMimeType?: string;
-  source?: 'ADDIS_AI' | 'GEMINI_TTS' | 'CACHE' | 'SYNTHESIS_FALLBACK';
+  source?: 'ADDIS_AI' | 'CACHE' | 'SYNTHESIS_FALLBACK';
   timestamp: string;
 }

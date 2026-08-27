@@ -45,7 +45,7 @@ async function triggerVoiceAnnouncement(
       timestamp: new Date().toISOString()
     };
 
-    // Asynchronous Voice generation via Addis AI Voice / Gemini TTS
+    // Asynchronous Voice generation via Addis AI Voice
     const speechText = audioSettings.language === 'ENGLISH' ? textEnglish : textAmharic;
     const audioResult = await addisVoiceProvider.generateSpeech(
       speechText,

@@ -82,10 +82,32 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
-  const unlockAudio = useCallback(() => {
+  const unlockAudio = useCallback(async () => {
     setIsAudioUnlocked(true);
     audioUnlockedRef.current = true;
-    audioManager.playChime();
+    await audioManager.unlock();
+    await audioManager.playChime();
+  }, []);
+
+  // Global user interaction listener to seamlessly unlock browser audio context
+  useEffect(() => {
+    const handleUserGesture = () => {
+      if (!audioUnlockedRef.current) {
+        audioUnlockedRef.current = true;
+        setIsAudioUnlocked(true);
+        audioManager.unlock().catch(() => {});
+      }
+    };
+
+    window.addEventListener('click', handleUserGesture, { passive: true });
+    window.addEventListener('touchstart', handleUserGesture, { passive: true });
+    window.addEventListener('keydown', handleUserGesture, { passive: true });
+
+    return () => {
+      window.removeEventListener('click', handleUserGesture);
+      window.removeEventListener('touchstart', handleUserGesture);
+      window.removeEventListener('keydown', handleUserGesture);
+    };
   }, []);
 
   // Initial load and periodic safety sync
@@ -118,20 +140,20 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const announcement: AnnouncementPayload = payload.data;
             setLastAnnouncement(announcement);
 
-            // Play voice announcement if audio is unlocked
-            if (audioUnlockedRef.current) {
-              const textToSpeak = announcement.language === 'ENGLISH' 
-                ? announcement.textEnglish 
-                : announcement.textAmharic;
+            // Play voice announcement
+            const textToSpeak = announcement.language === 'ENGLISH' 
+              ? announcement.textEnglish 
+              : announcement.textAmharic;
 
-              audioManager.playAnnouncement(
-                textToSpeak,
-                announcement.audioBase64,
-                announcement.audioMimeType || 'audio/wav',
-                audioSettingRef.current?.volume || 85,
-                announcement.phoneticText
-              );
-            }
+            audioManager.playAnnouncement(
+              textToSpeak,
+              announcement.audioBase64,
+              announcement.audioMimeType || 'audio/mp3',
+              audioSettingRef.current?.volume || 85,
+              announcement.phoneticText
+            ).catch(err => {
+              console.warn('Playback error:', err);
+            });
           }
         } catch (e) {
           console.warn('SSE parsing error:', e);
