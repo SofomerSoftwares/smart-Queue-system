@@ -143,14 +143,22 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             // Play voice announcement
             const textToSpeak = announcement.language === 'ENGLISH' 
               ? announcement.textEnglish 
-              : announcement.textAmharic;
+              : announcement.language === 'BOTH'
+                ? `${announcement.textAmharic} ${announcement.textEnglish}`
+                : announcement.textAmharic;
+
+            const repeatCount = audioSettingRef.current?.repeatCount || 1;
+            const delaySec = audioSettingRef.current?.announcementDelaySeconds || 0;
+            const volume = audioSettingRef.current?.volume || 85;
 
             audioManager.playAnnouncement(
               textToSpeak,
               announcement.audioBase64,
               announcement.audioMimeType || 'audio/mp3',
-              audioSettingRef.current?.volume || 85,
-              announcement.phoneticText
+              volume,
+              announcement.phoneticText,
+              repeatCount,
+              delaySec
             ).catch(err => {
               console.warn('Playback error:', err);
             });

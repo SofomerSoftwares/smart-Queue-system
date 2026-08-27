@@ -58,9 +58,13 @@ router.post('/test-voice', authenticate, requireAdmin, async (req: Request, res:
     
     let phrase = text;
     if (!phrase) {
-      phrase = language === 'AMHARIC' 
-        ? buildAmharicAnnouncementText('A-024', 2, 'አዲስ ማመልከቻ')
-        : buildEnglishAnnouncementText('A-024', 2, 'New Application');
+      if (language === 'ENGLISH') {
+        phrase = buildEnglishAnnouncementText('A-001', 1, 'Cashier');
+      } else if (language === 'BOTH') {
+        phrase = `${buildAmharicAnnouncementText('A-001', 1, 'ክፍያ')} ${buildEnglishAnnouncementText('A-001', 1, 'Cashier')}`;
+      } else {
+        phrase = buildAmharicAnnouncementText('A-001', 1, 'ክፍያ');
+      }
     }
 
     // Addis AI Voice synthesis

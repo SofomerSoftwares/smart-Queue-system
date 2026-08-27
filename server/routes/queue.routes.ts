@@ -28,7 +28,7 @@ async function triggerVoiceAnnouncement(
 
     const textAmharic = buildAmharicAnnouncementText(ticketNumber, counterNumber, serviceNameAmharic);
     const textEnglish = buildEnglishAnnouncementText(ticketNumber, counterNumber, serviceName);
-    const phoneticText = buildPhoneticAnnouncementText(ticketNumber, counterNumber, serviceName);
+    const phoneticText = buildPhoneticAnnouncementText(ticketNumber, counterNumber, serviceNameAmharic || serviceName);
     const ticketAmharic = getAmharicTicketNumber(ticketNumber);
 
     // Initial announcement payload
@@ -41,12 +41,22 @@ async function triggerVoiceAnnouncement(
       language: audioSettings.language,
       textAmharic,
       textEnglish,
-      phoneticText,
+      phoneticText: audioSettings.language === 'ENGLISH' 
+        ? textEnglish 
+        : audioSettings.language === 'BOTH' 
+          ? `${phoneticText} ${textEnglish}` 
+          : phoneticText,
       timestamp: new Date().toISOString()
     };
 
-    // Asynchronous Voice generation via Addis AI Voice
-    const speechText = audioSettings.language === 'ENGLISH' ? textEnglish : textAmharic;
+    // Voice generation text resolution
+    let speechText = textAmharic;
+    if (audioSettings.language === 'ENGLISH') {
+      speechText = textEnglish;
+    } else if (audioSettings.language === 'BOTH') {
+      speechText = `${textAmharic} ${textEnglish}`;
+    }
+
     const audioResult = await addisVoiceProvider.generateSpeech(
       speechText,
       audioSettings.language,
@@ -58,6 +68,9 @@ async function triggerVoiceAnnouncement(
       if (audioResult.audioBase64) {
         payload.audioBase64 = audioResult.audioBase64;
         payload.audioMimeType = audioResult.mimeType;
+      }
+      if (audioResult.phoneticText) {
+        payload.phoneticText = audioResult.phoneticText;
       }
       payload.source = audioResult.source;
     }

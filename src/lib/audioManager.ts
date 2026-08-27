@@ -85,21 +85,35 @@ class AudioManager {
     audioBase64?: string, 
     mimeType: string = 'audio/wav',
     volume: number = 85,
-    phoneticText?: string
+    phoneticText?: string,
+    repeatCount: number = 1,
+    delaySeconds: number = 0
   ): Promise<void> {
     try {
-      // 1. Play lobby chime
-      await this.playChime();
-
-      // 2. Play voice audio
-      let playedSuccessfully = false;
-      if (audioBase64 && audioBase64.trim().length > 0) {
-        playedSuccessfully = await this.playBase64Audio(audioBase64, mimeType, volume);
+      if (delaySeconds > 0) {
+        await new Promise(r => setTimeout(r, delaySeconds * 1000));
       }
-      
-      if (!playedSuccessfully) {
-        // Fallback to browser Web Speech API with Amharic / Phonetic handling
-        await this.playBrowserSpeech(text, volume, phoneticText);
+
+      const totalPlays = Math.max(1, Math.min(3, repeatCount || 1));
+
+      for (let i = 0; i < totalPlays; i++) {
+        if (i > 0) {
+          await new Promise(r => setTimeout(r, 800));
+        }
+
+        // 1. Play lobby chime
+        await this.playChime();
+
+        // 2. Play voice audio
+        let playedSuccessfully = false;
+        if (audioBase64 && audioBase64.trim().length > 0) {
+          playedSuccessfully = await this.playBase64Audio(audioBase64, mimeType, volume);
+        }
+        
+        if (!playedSuccessfully) {
+          // Fallback to browser Web Speech API with Amharic / Phonetic handling
+          await this.playBrowserSpeech(text, volume, phoneticText);
+        }
       }
     } catch (err) {
       console.warn('Announcement playback notice:', err);

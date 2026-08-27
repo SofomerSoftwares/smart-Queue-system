@@ -3,32 +3,32 @@
  */
 
 export const LATIN_PREFIX_TO_AMHARIC: Record<string, string> = {
-  A: 'A',
-  B: 'B',
-  C: 'C',
-  D: 'D',
-  E: 'አ',
-  F: 'ፈ',
-  G: 'ገ',
-  H: 'ሐ',
-  I: 'ኢ',
-  J: 'ጀ',
-  K: 'ከ',
-  L: 'ለ',
-  M: 'መ',
-  N: 'ነ',
+  A: 'ኤ',
+  B: 'ቢ',
+  C: 'ሲ',
+  D: 'ዲ',
+  E: 'ኢ',
+  F: 'ኤፍ',
+  G: 'ጂ',
+  H: 'ኤች',
+  I: 'አይ',
+  J: 'ጄ',
+  K: 'ኬ',
+  L: 'ኤል',
+  M: 'ኤም',
+  N: 'ኤን',
   O: 'ኦ',
-  P: 'ፓ',
-  Q: 'ቀ',
-  R: 'ረ',
-  S: 'ሰ',
-  T: 'ተ',
-  U: 'ኡ',
-  V: 'ቨ',
-  W: 'ወ',
-  X: 'ኀ',
-  Y: 'የ',
-  Z: 'ዘ'
+  P: 'ፒ',
+  Q: 'ኪው',
+  R: 'አር',
+  S: 'ኤስ',
+  T: 'ቲ',
+  U: 'ዩ',
+  V: 'ቪ',
+  W: 'ደብልዩ',
+  X: 'ኤክስ',
+  Y: 'ዋይ',
+  Z: 'ዜድ'
 };
 
 export const AMHARIC_WORDS_PHONETIC_MAP: Record<string, string> = {
@@ -51,7 +51,43 @@ export const AMHARIC_WORDS_PHONETIC_MAP: Record<string, string> = {
   'ፈጣን': 'fetan',
   'አገልግሎት': 'ageliglot',
   'መስተንግዶ': 'mestengdo',
-  'ተጠናቋል': 'tetennakwal'
+  'ተጠናቋል': 'tetennakwal',
+  'ኤ-': 'A-',
+  'ቢ-': 'B-',
+  'ሲ-': 'C-',
+  'ዲ-': 'D-',
+  'ኢ-': 'E-',
+  'ኤፍ-': 'F-',
+  'ጂ-': 'G-',
+  'ኤች-': 'H-',
+  'አይ-': 'I-',
+  'ጄ-': 'J-',
+  'ኬ-': 'K-',
+  'ኤል-': 'L-',
+  'ኤም-': 'M-',
+  'ኤን-': 'N-',
+  'ኦ-': 'O-',
+  'ፒ-': 'P-',
+  'ኪው-': 'Q-',
+  'አር-': 'R-',
+  'ኤስ-': 'S-',
+  'ቲ-': 'T-',
+  'ዩ-': 'U-',
+  'ቪ-': 'V-',
+  'ደብልዩ-': 'W-',
+  'ኤክስ-': 'X-',
+  'ዋይ-': 'Y-',
+  'ዜድ-': 'Z-',
+  '፩': '1',
+  '፪': '2',
+  '፫': '3',
+  '፬': '4',
+  '፭': '5',
+  '፮': '6',
+  '፯': '7',
+  '፰': '8',
+  '፱': '9',
+  '፲': '10'
 };
 
 export const AMHARIC_TO_LATIN_PHONETIC: Record<string, string> = {
@@ -147,13 +183,23 @@ export function formatTicketNumberAmharic(ticketNumber: string): string {
 
 export function buildAmharicAnnouncement(ticketNumber: string, counterNumber: number | string, serviceName?: string): string {
   const ticketAmharic = formatTicketNumberAmharic(ticketNumber);
-  const counterStr = counterNumber.toString().padStart(2, '0');
-  const servicePart = serviceName ? ` ለ${serviceName}` : '';
-  return `ቲኬት ቁጥር ${ticketAmharic}${servicePart} እባክዎ ወደ መስኮት ${counterStr} ይሂዱ።`;
+  const counterNum = typeof counterNumber === 'number' ? counterNumber : parseInt(counterNumber, 10) || counterNumber;
+  const servicePart = serviceName && serviceName.trim().length > 0 ? ` ለ${serviceName.trim()}` : '';
+  return `ቲኬት ቁጥር ${ticketAmharic}${servicePart} እባክዎ ወደ መስኮት ${counterNum} ይቅረቡ።`;
 }
 
 export function buildEnglishAnnouncement(ticketNumber: string, counterNumber: number | string, serviceName?: string): string {
-  const counterStr = counterNumber.toString().padStart(2, '0');
-  const servicePart = serviceName ? ` for ${serviceName}` : '';
-  return `Ticket number ${ticketNumber}${servicePart}, please proceed to counter ${counterStr}.`;
+  const counterNum = typeof counterNumber === 'number' ? counterNumber : parseInt(counterNumber, 10) || counterNumber;
+  const servicePart = serviceName && serviceName.trim().length > 0 ? ` for ${serviceName.trim()}` : '';
+  return `Ticket number ${ticketNumber}${servicePart}, please proceed to counter ${counterNum}.`;
+}
+
+export function buildBilingualAnnouncement(ticketNumber: string, counterNumber: number | string, serviceNameAmharic?: string, serviceNameEnglish?: string): { amharic: string; english: string; combined: string } {
+  const am = buildAmharicAnnouncement(ticketNumber, counterNumber, serviceNameAmharic);
+  const en = buildEnglishAnnouncement(ticketNumber, counterNumber, serviceNameEnglish);
+  return {
+    amharic: am,
+    english: en,
+    combined: `${am} ${en}`
+  };
 }

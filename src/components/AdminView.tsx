@@ -116,7 +116,7 @@ export const AdminView: React.FC = () => {
   const [showUserPassword, setShowUserPassword] = useState<boolean>(false);
 
   // Audio Testing State
-  const [testVoiceText, setTestVoiceText] = useState<string>('እባኮን ወደ መስኮት ቁጥር ፩ ይሂዱ');
+  const [testVoiceText, setTestVoiceText] = useState<string>('ቲኬት ቁጥር ኤ-001 እባክዎ ወደ መስኮት 1 ይቅረቡ።');
   const [testLanguage, setTestLanguage] = useState<'AMHARIC' | 'ENGLISH'>('AMHARIC');
   const [isTestingVoice, setIsTestingVoice] = useState<boolean>(false);
   const [testVoiceStatus, setTestVoiceStatus] = useState<string>('');
@@ -1465,17 +1465,19 @@ export const AdminView: React.FC = () => {
               {/* Sample Preset Phrases */}
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  'ቁጥር ሀ ሃያ አራት ያላችሁ ደንበኛ ወደ መስኮት ሁለት ይሂዱ',
-                  'ቁጥር ለ አስራ አምስት ወደ መስኮት አንድ ይሂዱ',
-                  'Ticket number A-024, please proceed to counter 2'
-                ].map((phrase, i) => (
+                  { label: isAmharic ? 'መደበኛ ጥሪ' : 'Standard Call', phrase: 'ቲኬት ቁጥር ኤ-001 እባክዎ ወደ መስኮት 1 ይቅረቡ።' },
+                  { label: isAmharic ? 'ከአገልግሎት ጋር' : 'With Service', phrase: 'ቲኬት ቁጥር ኤ-001 ለፈጣን ክፍያ እባክዎ ወደ መስኮት 1 ይቅረቡ።' },
+                  { label: 'English Call', phrase: 'Ticket number A-001, please proceed to counter 1.' },
+                  { label: isAmharic ? 'ሁለቱም ቋንቋ' : 'Bilingual', phrase: 'ቲኬት ቁጥር ኤ-001 እባክዎ ወደ መስኮት 1 ይቅረቡ። Ticket number A-001, please proceed to counter 1.' }
+                ].map((item, i) => (
                   <button
                     key={i}
                     type="button"
-                    onClick={() => setTestVoiceText(phrase)}
-                    className="text-[10px] px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition truncate max-w-full font-medium shadow-2xs text-left"
+                    onClick={() => setTestVoiceText(item.phrase)}
+                    className="text-[10px] px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 transition font-medium shadow-2xs text-left cursor-pointer"
                   >
-                    {phrase}
+                    <span className="font-bold text-slate-900 block">{item.label}</span>
+                    <span className="text-[9px] text-slate-500 truncate block max-w-[200px]">{item.phrase}</span>
                   </button>
                 ))}
               </div>
