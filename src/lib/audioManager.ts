@@ -85,7 +85,8 @@ class AudioManager {
     audioBase64?: string, 
     mimeType: string = 'audio/wav',
     volume: number = 85,
-    phoneticText?: string
+    phoneticText?: string,
+    speed: number = 1.0
   ): Promise<void> {
     try {
       // 1. Play lobby chime
@@ -94,19 +95,19 @@ class AudioManager {
       // 2. Play voice audio
       let playedSuccessfully = false;
       if (audioBase64 && audioBase64.trim().length > 0) {
-        playedSuccessfully = await this.playBase64Audio(audioBase64, mimeType, volume);
+        playedSuccessfully = await this.playBase64Audio(audioBase64, mimeType, volume, speed);
       }
       
       if (!playedSuccessfully) {
-        // Fallback to browser Web Speech API with Amharic / Phonetic handling
-        await this.playBrowserSpeech(text, volume, phoneticText);
+        // Fallback to browser Web Speech API with Amharic / Phonetic handling (calibrated slower rate for clear comprehension)
+        await this.playBrowserSpeech(text, volume, phoneticText, speed);
       }
     } catch (err) {
       console.warn('Announcement playback notice:', err);
     }
   }
 
-  private playBase64Audio(base64Data: string, mimeType: string, volume: number): Promise<boolean> {
+  private playBase64Audio(base64Data: string, mimeType: string, volume: number, speed: number = 1.0): Promise<boolean> {
     return new Promise((resolve) => {
       if (!base64Data || base64Data.trim() === '') {
         return resolve(false);
@@ -129,6 +130,9 @@ class AudioManager {
         const audio = new Audio();
         this.currentVoiceAudioEl = audio;
         audio.volume = Math.max(0.1, Math.min(1.0, volume / 100));
+        if (speed && speed > 0.4 && speed <= 2.0) {
+          audio.playbackRate = speed;
+        }
 
         let isSettled = false;
         const cleanup = (success: boolean) => {
@@ -169,7 +173,7 @@ class AudioManager {
     });
   }
 
-  public playBrowserSpeech(text: string, volume: number, phoneticText?: string): Promise<void> {
+  public playBrowserSpeech(text: string, volume: number, phoneticText?: string, speed: number = 1.0): Promise<void> {
     return new Promise((resolve) => {
       if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
         return resolve();
@@ -211,8 +215,12 @@ class AudioManager {
 
             const utterance = new SpeechSynthesisUtterance(textToSpeak);
             utterance.volume = Math.max(0.1, Math.min(1.0, volume / 100));
-            utterance.rate = 0.86; // Crisp, clear announcement tempo
-            utterance.pitch = 1.0;
+
+            // Calibrate speech rate to be slower and highly comprehensible (0.70 base)
+            const baseRate = 0.70;
+            const multiplier = typeof speed === 'number' && speed > 0.4 ? speed : 1.0;
+            utterance.rate = Math.max(0.45, Math.min(1.15, baseRate * multiplier));
+            utterance.pitch = 0.98;
 
             if (voiceToUse) {
               utterance.voice = voiceToUse;
@@ -230,7 +238,7 @@ class AudioManager {
             utterance.onerror = finish;
 
             // Timeout safety in case speech synthesis hangs
-            setTimeout(finish, 12000);
+            setTimeout(finish, 14000);
 
             window.speechSynthesis.speak(utterance);
           } catch (e) {

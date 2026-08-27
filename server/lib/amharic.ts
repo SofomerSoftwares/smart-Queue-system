@@ -32,26 +32,26 @@ export const LATIN_PREFIX_TO_AMHARIC: Record<string, string> = {
 };
 
 export const AMHARIC_WORDS_PHONETIC_MAP: Record<string, string> = {
-  'ቲኬት': 'Ticket',
-  'ቁጥር': 'Kutir',
-  'ያላችሁ': 'yalachu',
-  'ደንበኛ': 'denbenya',
-  'እባክዎ': 'ibakiwo',
-  'እባኮን': 'ibakon',
+  'ቲኬት': 'Ticket,',
+  'ቁጥር': 'Kootir,',
+  'ያላችሁ': 'yaalaachoo,',
+  'ደንበኛ': 'denbenyaa,',
+  'እባክዎ': 'ibaakiwo,',
+  'እባኮን': 'ibaakon,',
   'ወደ': 'wode',
-  'ቆጣሪ': 'kotari',
-  'መስኮት': 'meskot',
-  'ይሂዱ': 'yihidu',
-  'ይቅረቡ': 'yikrebu',
-  'አዲስ': 'Addis',
-  'ማመልከቻ': 'mamelkecha',
-  'ክፍያ': 'kifiya',
-  'ምዝገባ': 'mizgeba',
-  'ማረጋገጫ': 'maregagecha',
-  'ፈጣን': 'fetan',
-  'አገልግሎት': 'ageliglot',
+  'ቆጣሪ': 'kotari,',
+  'መስኮት': 'meskot,',
+  'ይሂዱ': 'yee-heedoo.',
+  'ይቅረቡ': 'yeek-re-boo.',
+  'አዲስ': 'Ahdees',
+  'ማመልከቻ': 'maamelkechaa',
+  'ክፍያ': 'kiffiyaa',
+  'ምዝገባ': 'mizgebaa',
+  'ማረጋገጫ': 'maaragegechaa',
+  'ፈጣን': 'fettaan',
+  'አገልግሎት': 'ageliglot,',
   'መስተንግዶ': 'mestengdo',
-  'ተጠናቋል': 'tetennakwal'
+  'ተጠናቋል': 'tetennakwal.'
 };
 
 export const AMHARIC_TO_LATIN_PHONETIC: Record<string, string> = {
@@ -127,11 +127,34 @@ export function arabicToGeez(num: number): string {
 export function transliterateToPhonetic(text: string): string {
   if (!text) return '';
   let result = text;
+
+  // 1. Replace Amharic punctuation with natural English pauses
+  result = result
+    .replace(/።/g, '. ')
+    .replace(/፣/g, ', ')
+    .replace(/፤/g, '; ')
+    .replace(/፦/g, ': ');
+
+  // 2. Format ticket codes and number sequences (e.g. A-001 -> A, 0, 0, 1) so TTS reads digits distinctly
+  result = result.replace(/([A-Za-zሀ-ፐ])\s*[-–]\s*([0-9]+)/g, (_, prefix, digits) => {
+    const spacedDigits = digits.split('').join(', ');
+    return `${prefix}, ${spacedDigits}`;
+  });
+
+  // 3. Spaced multi-digit numbers (like "01" -> "0, 1") when after "meskot" or "መስኮት"
+  result = result.replace(/(\b[0-9]{2,}\b)/g, (match) => {
+    return match.split('').join(', ');
+  });
+
+  // 4. Replace known full words first
   Object.keys(AMHARIC_WORDS_PHONETIC_MAP).forEach((word) => {
     result = result.split(word).join(AMHARIC_WORDS_PHONETIC_MAP[word]);
   });
+
+  // 5. Replace individual Ethiopic characters
   const chars = Array.from(result);
-  return chars.map((char) => AMHARIC_TO_LATIN_PHONETIC[char] || char).join('');
+  const transformed = chars.map((char) => AMHARIC_TO_LATIN_PHONETIC[char] || char);
+  return transformed.join('').replace(/\s+,/g, ',').replace(/\s+/g, ' ').trim();
 }
 
 export function formatTicketNumberAmharic(ticketNumber: string): string {
