@@ -84,7 +84,7 @@ async function startServer() {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`====================================================`);
     console.log(` Small Office Queue Management System is running`);
-    console.log(` Local URL: http://0.0.0.0:${PORT}`);
+    console.log(` Local URL: http://localhost:${PORT}`);
     console.log(` Mode: ${process.env.NODE_ENV || 'development'}`);
     console.log(`====================================================`);
   });

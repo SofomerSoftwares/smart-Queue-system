@@ -13,7 +13,7 @@ export interface AudioResult {
   mimeType: string;
   text: string;
   phoneticText?: string;
-  source: 'ADDIS_AI' | 'GEMINI_TTS' | 'CACHE' | 'SYNTHESIS_FALLBACK';
+  source: 'ADDIS_AI'  | 'CACHE' | 'SYNTHESIS_FALLBACK';
   voice?: string;
   provider?: string;
   durationEstimateSeconds?: number;
@@ -39,33 +39,7 @@ export const ADDIS_AI_VOICES: AddisVoiceOption[] = [
     description: 'Crisp, calm female Amharic voice optimized for public halls and counters',
     descriptionAmharic: 'ለአዳራሽ እና ለመስኮት ጥሪዎች የተዘጋጀ የሴት ድምፅ'
   },
-  {
-    id: 'abebe',
-    name: 'Abebe (Clear Amharic)',
-    nameAmharic: 'አበበ (ግልፅ የወንድ ድምፅ)',
-    gender: 'MALE',
-    geminiVoice: 'Charon',
-    description: 'Deep and clear male Amharic voice with high speech intelligibility',
-    descriptionAmharic: 'ግልፅ እና ጎላ ያለ ይፋዊ የወንድ ድምፅ'
-  },
-  {
-    id: 'selam',
-    name: 'Selam (Expressive Amharic)',
-    nameAmharic: 'ሰላም (ደማቅ የሴት ድምፅ)',
-    gender: 'FEMALE',
-    geminiVoice: 'Zephyr',
-    description: 'Warm and welcoming female voice for customer service desks',
-    descriptionAmharic: 'ሞቅ ያለ እና እንግዳ ተቀባይ የሴት ድምፅ'
-  },
-  {
-    id: 'dawit',
-    name: 'Dawit (Official Amharic)',
-    nameAmharic: 'ዳዊት (ይፋዊ የወንድ ድምፅ)',
-    gender: 'MALE',
-    geminiVoice: 'Puck',
-    description: 'Authoritative and formal male voice suitable for government and banking',
-    descriptionAmharic: 'ለመንግስት እና ለባንክ ተቋማት የሚመጥን የወንድ ድምፅ'
-  }
+
 ];
 
 // Prefix letter to Amharic letter map
@@ -210,67 +184,67 @@ export class AddisAIVoiceProvider {
           }
         }
       } catch (err: any) {
-        console.warn(`⚠️ [Addis AI Voice] Remote API response notice (${err.message}). Trying Gemini TTS engine.`);
+        console.warn(`⚠️ [Addis AI Voice] Remote API response notice (${err.message})`);
       }
     }
 
-    // 3. Try Gemini Text-to-Speech API
-    const ai = this.getGenAI();
-    if (ai) {
-      try {
-        console.log(`🎙️ [Gemini TTS Engine] Synthesizing announcement voice (${matchedVoice.geminiVoice})...`);
-        const promptInstruction = language === 'AMHARIC'
-          ? `Read the following queue announcement clearly in a professional public service announcement tone: "${cleanText}"`
-          : `Read the following queue announcement clearly and politely: "${cleanText}"`;
+    // // 3. Try Gemini Text-to-Speech API
+    // const ai = this.getGenAI();
+    // if (ai) {
+    //   try {
+    //     console.log(`🎙️ [Gemini TTS Engine] Synthesizing announcement voice (${matchedVoice.geminiVoice})...`);
+    //     const promptInstruction = language === 'AMHARIC'
+    //       ? `Read the following queue announcement clearly in a professional public service announcement tone: "${cleanText}"`
+    //       : `Read the following queue announcement clearly and politely: "${cleanText}"`;
 
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.1-flash-tts-preview',
-          contents: [{ parts: [{ text: promptInstruction }] }],
-          config: {
-            responseModalities: [Modality.AUDIO],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: matchedVoice.geminiVoice }
-              }
-            }
-          }
-        });
+    //     const response = await ai.models.generateContent({
+    //       model: 'gemini-3.1-flash-tts-preview',
+    //       contents: [{ parts: [{ text: promptInstruction }] }],
+    //       config: {
+    //         responseModalities: [Modality.AUDIO],
+    //         speechConfig: {
+    //           voiceConfig: {
+    //             prebuiltVoiceConfig: { voiceName: matchedVoice.geminiVoice }
+    //           }
+    //         }
+    //       }
+    //     });
 
-        const part = response.candidates?.[0]?.content?.parts?.[0];
-        const rawAudioBase64 = part?.inlineData?.data;
-        const responseMime = part?.inlineData?.mimeType || 'audio/pcm;rate=24000';
+    //     const part = response.candidates?.[0]?.content?.parts?.[0];
+    //     const rawAudioBase64 = part?.inlineData?.data;
+    //     const responseMime = part?.inlineData?.mimeType || 'audio/pcm;rate=24000';
 
-        if (rawAudioBase64 && rawAudioBase64.length > 0) {
-          let playableBase64 = rawAudioBase64;
-          let finalMime = responseMime;
+    //     if (rawAudioBase64 && rawAudioBase64.length > 0) {
+    //       let playableBase64 = rawAudioBase64;
+    //       let finalMime = responseMime;
 
-          // Convert raw PCM into standard WAV container if needed
-          if (responseMime.includes('pcm') || !responseMime.includes('wav') && !responseMime.includes('mp3')) {
-            const rawPcm = Buffer.from(rawAudioBase64, 'base64');
-            playableBase64 = pcmToWavBase64(rawPcm, 24000, 1, 16);
-            finalMime = 'audio/wav';
-          }
+    //       // Convert raw PCM into standard WAV container if needed
+    //       if (responseMime.includes('pcm') || !responseMime.includes('wav') && !responseMime.includes('mp3')) {
+    //         const rawPcm = Buffer.from(rawAudioBase64, 'base64');
+    //         playableBase64 = pcmToWavBase64(rawPcm, 24000, 1, 16);
+    //         finalMime = 'audio/wav';
+    //       }
 
-          this.cache.set(cacheKey, {
-            audioBase64: playableBase64,
-            mimeType: finalMime,
-            timestamp: Date.now()
-          });
+    //       this.cache.set(cacheKey, {
+    //         audioBase64: playableBase64,
+    //         mimeType: finalMime,
+    //         timestamp: Date.now()
+    //       });
 
-          return {
-            audioBase64: playableBase64,
-            mimeType: finalMime,
-            text: cleanText,
-            source: 'GEMINI_TTS',
-            voice: voiceId,
-            provider: `Addis AI Voice • Powered by Gemini (${matchedVoice.name})`,
-            durationEstimateSeconds: 4
-          };
-        }
-      } catch (err: any) {
-        console.warn(`⚠️ [Gemini TTS Engine] Notice (${err.message}). Using client speech synthesis fallback.`);
-      }
-    }
+    //       return {
+    //         audioBase64: playableBase64,
+    //         mimeType: finalMime,
+    //         text: cleanText,
+    //         source: 'GEMINI_TTS',
+    //         voice: voiceId,
+    //         provider: `Addis AI Voice • Powered by Gemini (${matchedVoice.name})`,
+    //         durationEstimateSeconds: 4
+    //       };
+    //     }
+    //   } catch (err: any) {
+    //     console.warn(`⚠️ [Gemini TTS Engine] Notice (${err.message}). Using client speech synthesis fallback.`);
+    //   }
+    // }
 
     // 4. Fallback for client-side browser speech synthesis & acoustic announcement
     return {

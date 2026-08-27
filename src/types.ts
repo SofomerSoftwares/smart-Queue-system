@@ -151,7 +151,7 @@ export interface AnnouncementPayload {
   phoneticText?: string;
   audioBase64?: string;
   audioMimeType?: string;
-  source?: 'ADDIS_AI' | 'CACHE' | 'SYNTHESIS_FALLBACK';
+  source?: 'ADDIS_AI';
   timestamp: string;
 }
 

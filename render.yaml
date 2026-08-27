@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: ethiopian-smart-queue
+    name: fhcb1-smart-queue
     runtime: node
     plan: free
     region: oregon
@@ -19,10 +19,5 @@ services:
       - key: MONGODB_URI
         sync: false
       - key: MONGODB_DB_NAME
-        value: office_queue_db
-      - key: GEMINI_TTS_MODEL
-        value: gemini-3.1-flash-tts-preview
-      - key: GEMINI_TTS_VOICE
-        value: Kore
-      - key: GEMINI_MUSIC_MODEL
-        value: lyria-3-clip-preview
+        value: SmartQ
+     
