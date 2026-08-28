@@ -307,7 +307,7 @@ export function buildAmharicAnnouncement(ticketNumber: string, counterNumber: nu
   const ticketAmharic = formatTicketNumberAmharic(ticketNumber);
   const counterNum = typeof counterNumber === 'number' ? counterNumber : parseInt(counterNumber, 10) || counterNumber;
   const servicePart = serviceName && serviceName.trim().length > 0 ? ` ለ${serviceName.trim()}` : '';
-  return `ቲኬት ቁጥር ${ticketAmharic}${servicePart} እባክዎ ወደ መስኮት ${counterNum} ይቅረቡ።`;
+  return `ቲኬት ቁጥር ${ticketAmharic}${servicePart} እባክዎ ወደ መስኮት ${counterNum} ይሂዱ...`;
 }
 
 /**

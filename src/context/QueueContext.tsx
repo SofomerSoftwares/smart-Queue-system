@@ -11,6 +11,7 @@ import {
 } from '../types';
 import { api } from '../lib/api';
 import { audioManager } from '../lib/audioManager';
+import { notificationManager, NotificationPermissionState } from '../lib/notificationManager';
 
 interface QueueContextType {
   waitingTickets: QueueTicket[];
@@ -27,6 +28,11 @@ interface QueueContextType {
   setUiLanguage: (lang: 'AMHARIC' | 'ENGLISH') => void;
   isAudioUnlocked: boolean;
   unlockAudio: () => void;
+  notificationPermission: NotificationPermissionState;
+  isNotificationsEnabled: boolean;
+  requestNotificationPermission: () => Promise<boolean>;
+  toggleNotifications: (enabled?: boolean) => void;
+  sendTestNotification: () => void;
   callNextTicket: (counterId: string, specificTicketId?: string) => Promise<{ success: boolean; ticket?: QueueTicket | null; message?: string }>;
   recallTicket: (ticketId: string) => Promise<void>;
   startService: (ticketId: string) => Promise<void>;
@@ -56,10 +62,35 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [lastAnnouncement, setLastAnnouncement] = useState<AnnouncementPayload | null>(null);
   const [uiLanguage, setUiLanguage] = useState<'AMHARIC' | 'ENGLISH'>('AMHARIC');
   const [isAudioUnlocked, setIsAudioUnlocked] = useState<boolean>(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>(() => notificationManager.getPermission());
+  const [isNotificationsEnabled, setIsNotificationsEnabled] = useState<boolean>(() => notificationManager.isEnabled());
 
   const audioUnlockedRef = useRef<boolean>(false);
   const audioSettingRef = useRef<AudioSetting | null>(null);
   audioSettingRef.current = audioSetting;
+
+  const notificationsEnabledRef = useRef<boolean>(isNotificationsEnabled);
+  notificationsEnabledRef.current = isNotificationsEnabled;
+
+  const requestNotificationPermission = useCallback(async (): Promise<boolean> => {
+    const granted = await notificationManager.requestPermission();
+    setNotificationPermission(notificationManager.getPermission());
+    setIsNotificationsEnabled(granted);
+    return granted;
+  }, []);
+
+  const toggleNotifications = useCallback((enabled?: boolean) => {
+    const nextState = typeof enabled === 'boolean' ? enabled : !isNotificationsEnabled;
+    notificationManager.setEnabled(nextState);
+    setIsNotificationsEnabled(nextState);
+    if (nextState && notificationPermission !== 'granted') {
+      requestNotificationPermission();
+    }
+  }, [isNotificationsEnabled, notificationPermission, requestNotificationPermission]);
+
+  const sendTestNotification = useCallback(() => {
+    notificationManager.sendTestNotification(uiLanguage === 'AMHARIC');
+  }, [uiLanguage]);
 
   const refreshQueue = useCallback(async () => {
     try {
@@ -162,6 +193,15 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             ).catch(err => {
               console.warn('Playback error:', err);
             });
+
+            // Trigger Browser Push Notification if enabled
+            if (notificationsEnabledRef.current) {
+              notificationManager.notifyTicketCalled({
+                ticketNumber: announcement.ticketNumber,
+                counterNumber: announcement.counterNumber,
+                language: announcement.language
+              });
+            }
           }
         } catch (e) {
           console.warn('SSE parsing error:', e);
@@ -262,6 +302,11 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setUiLanguage,
         isAudioUnlocked,
         unlockAudio,
+        notificationPermission,
+        isNotificationsEnabled,
+        requestNotificationPermission,
+        toggleNotifications,
+        sendTestNotification,
         callNextTicket,
         recallTicket,
         startService,
