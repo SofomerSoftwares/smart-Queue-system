@@ -3,6 +3,7 @@ import {
   Service, 
   Counter, 
   QueueTicket, 
+  PriorityLevel,
   OfficeSetting, 
   AudioSetting, 
   AuditLog, 
@@ -146,13 +147,23 @@ export const api = {
     }>(`/api/queue/reviews?${queryParam}`);
   },
 
-  createTicket: (data: { serviceId: string; priority?: 'NORMAL' | 'PRIORITY' }) =>
+  createTicket: (data: { serviceId: string; priority?: PriorityLevel; urgencyReason?: string; notes?: string }) =>
     request<{
       success: boolean;
       ticket: QueueTicket;
       printData: PrintTicketData;
     }>('/api/queue/ticket', {
       method: 'POST',
+      body: JSON.stringify(data)
+    }),
+
+  updateTicketPriority: (ticketId: string, data: { priority: PriorityLevel; urgencyReason?: string; notes?: string }) =>
+    request<{
+      success: boolean;
+      ticket: QueueTicket;
+      message: string;
+    }>(`/api/queue/ticket/${ticketId}/priority`, {
+      method: 'PATCH',
       body: JSON.stringify(data)
     }),
 

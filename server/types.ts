@@ -9,7 +9,7 @@ export type TicketStatus =
   | 'NO_SHOW' 
   | 'TRANSFERRED';
 
-export type PriorityLevel = 'NORMAL' | 'PRIORITY';
+export type PriorityLevel = 'NORMAL' | 'PRIORITY' | 'URGENT';
 
 export type AnnouncementLanguage = 'AMHARIC' | 'ENGLISH' | 'BOTH';
 
@@ -80,6 +80,10 @@ export interface QueueTicket {
   officerName?: string;
   status: TicketStatus;
   priority: PriorityLevel;
+  urgencyReason?: string;
+  isUrgent?: boolean;
+  priorityFlaggedAt?: string;
+  priorityFlaggedBy?: string;
   issuedAt: string;
   calledAt?: string;
   serviceStartedAt?: string;
@@ -120,7 +124,8 @@ export interface QueueEvent {
     | 'COMPLETED'
     | 'NO_SHOW'
     | 'TRANSFERRED'
-    | 'CANCELLED';
+    | 'CANCELLED'
+    | 'PRIORITY_CHANGED';
   counterId?: string;
   counterNumber?: number;
   userId?: string;

@@ -20,12 +20,18 @@ import {
   ArrowRight, 
   Eye, 
   EyeOff, 
-  ShieldAlert 
+  ShieldAlert,
+  Flame,
+  Zap,
+  Edit3,
+  X,
+  Check,
+  FileText
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
-import { Service, QueueTicket } from '../types';
+import { Service, QueueTicket, PriorityLevel } from '../types';
 
 export const OfficerStationView: React.FC = () => {
   const { user, login, logout, hasPermission, isLoading: isAuthLoading } = useAuth();
@@ -41,6 +47,7 @@ export const OfficerStationView: React.FC = () => {
     completeTicket, 
     markNoShow, 
     transferTicket,
+    updateTicketPriority,
     uiLanguage 
   } = useQueue();
 
@@ -73,6 +80,13 @@ export const OfficerStationView: React.FC = () => {
   const [transferTargetServiceId, setTransferTargetServiceId] = useState<string>('');
   const [serviceTimerSeconds, setServiceTimerSeconds] = useState<number>(0);
   const [stationNotice, setStationNotice] = useState<string>('');
+
+  // Priority triage state for officer station
+  const [officerTriageTicket, setOfficerTriageTicket] = useState<QueueTicket | null>(null);
+  const [officerTriagePriority, setOfficerTriagePriority] = useState<PriorityLevel>('URGENT');
+  const [officerTriageReason, setOfficerTriageReason] = useState<string>('');
+  const [officerTriageNotes, setOfficerTriageNotes] = useState<string>('');
+  const [isOfficerUpdatingPriority, setIsOfficerUpdatingPriority] = useState<boolean>(false);
 
   // Keep officer locked to assigned counter whenever user or counters change
   useEffect(() => {
@@ -115,6 +129,56 @@ export const OfficerStationView: React.FC = () => {
     const mins = Math.floor(totalSeconds / 60);
     const secs = totalSeconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Priority-sorted queue: URGENT (score 3) > PRIORITY (score 2) > NORMAL (score 1), then issuedAt
+  const sortedWaitingTickets = [...waitingTickets].sort((a, b) => {
+    const scoreA = a.priority === 'URGENT' ? 3 : a.priority === 'PRIORITY' ? 2 : 1;
+    const scoreB = b.priority === 'URGENT' ? 3 : b.priority === 'PRIORITY' ? 2 : 1;
+    if (scoreA !== scoreB) return scoreB - scoreA;
+    return new Date(a.issuedAt).getTime() - new Date(b.issuedAt).getTime();
+  });
+
+  // Eligible tickets for active counter
+  const eligibleTickets = sortedWaitingTickets.filter(t => {
+    if (!activeCounter?.serviceIds || activeCounter.serviceIds.length === 0) return true;
+    return activeCounter.serviceIds.includes(t.serviceId);
+  });
+
+  const nextEligibleTicket = eligibleTickets[0];
+  const hasUrgentWaiting = eligibleTickets.some(t => t.priority === 'URGENT');
+
+  const handleOpenOfficerTriage = (ticket: QueueTicket) => {
+    setOfficerTriageTicket(ticket);
+    setOfficerTriagePriority(ticket.priority || 'URGENT');
+    setOfficerTriageReason(ticket.urgencyReason || '');
+    setOfficerTriageNotes(ticket.notes || '');
+  };
+
+  const handleSaveOfficerTriage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!officerTriageTicket) return;
+    try {
+      setIsOfficerUpdatingPriority(true);
+      await updateTicketPriority(
+        officerTriageTicket.id,
+        officerTriagePriority,
+        officerTriageReason || undefined,
+        officerTriageNotes || undefined
+      );
+      setStationNotice(
+        isAmharic 
+          ? `የቲኬት ${officerTriageTicket.ticketNumber} ቅድሚያ ወደ ${officerTriagePriority} ተቀይሯል` 
+          : `Ticket ${officerTriageTicket.ticketNumber} priority updated to ${officerTriagePriority}`
+      );
+      setTimeout(() => setStationNotice(''), 4000);
+      setOfficerTriageTicket(null);
+    } catch (err: any) {
+      setStationNotice(err.message || 'Failed to update priority');
+      setTimeout(() => setStationNotice(''), 5000);
+    } finally {
+      setIsOfficerUpdatingPriority(false);
+    }
   };
 
   const handleInlineLogin = async (e: React.FormEvent) => {
@@ -634,6 +698,40 @@ export const OfficerStationView: React.FC = () => {
         </div>
       )}
 
+      {/* Urgent Ticket Ready Alert */}
+      {nextEligibleTicket && nextEligibleTicket.priority === 'URGENT' && (
+        <div className="p-4 bg-rose-50 border-2 border-rose-400 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-in fade-in">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center font-black shadow-xs animate-pulse shrink-0">
+              <Flame className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-black uppercase tracking-wider text-rose-700">
+                  {isAmharic ? '⚡ አስቸኳይ ተገልጋይ በቀጣይነት ተዘጋጅቷል' : '⚡ URGENT TICKET IN QUEUE'}
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-rose-200 text-rose-900 font-mono font-black text-xs">
+                  {nextEligibleTicket.ticketNumber}
+                </span>
+              </div>
+              <p className="text-xs text-rose-800 font-medium mt-0.5">
+                {nextEligibleTicket.urgencyReason 
+                  ? `${isAmharic ? 'የአስቸኳይ ምክንያት:' : 'Urgency reason:'} ${nextEligibleTicket.urgencyReason}` 
+                  : (isAmharic ? 'በመስተንግዶ ክፍል አስቸኳይ ቅድሚያ ተሰጥቶታል' : 'Urgent priority flagged by reception')}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => handleCallNext(nextEligibleTicket.id)}
+            disabled={isCalling}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black shadow-xs transition flex items-center space-x-1.5 cursor-pointer whitespace-nowrap"
+          >
+            <PhoneCall className="w-3.5 h-3.5" />
+            <span>{isAmharic ? 'አስቸኳዩን አሁኑኑ ጥራ' : 'Call Urgent Ticket Now'}</span>
+          </button>
+        </div>
+      )}
+
       {/* Main Grid: Officer Station Left & Live Preview / Upcoming Queue Right */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
@@ -666,6 +764,29 @@ export const OfficerStationView: React.FC = () => {
 
               {currentTicket ? (
                 <div>
+                  {currentTicket.priority === 'URGENT' && (
+                    <div className="inline-flex items-center space-x-2 bg-rose-600 text-white px-3 py-1 rounded-xl text-xs font-black shadow-xs uppercase tracking-wider mb-2 animate-pulse">
+                      <Flame className="w-3.5 h-3.5" />
+                      <span>{isAmharic ? '⚡ አስቸኳይ ቅድሚያ የተሰጠው ደንበኛ' : '⚡ URGENT ESCALATED TICKET'}</span>
+                      {currentTicket.urgencyReason && (
+                        <span className="font-normal normal-case border-l border-rose-400 pl-2">
+                          {currentTicket.urgencyReason}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {currentTicket.priority === 'PRIORITY' && (
+                    <div className="inline-flex items-center space-x-2 bg-amber-500 text-slate-950 px-3 py-1 rounded-xl text-xs font-black shadow-xs uppercase tracking-wider mb-2">
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>{isAmharic ? '★ ቅድሚያ የሚሰጠው ተገልጋይ (VIP)' : '★ PRIORITY SERVICE (VIP)'}</span>
+                      {currentTicket.urgencyReason && (
+                        <span className="font-medium normal-case border-l border-amber-600 pl-2">
+                          {currentTicket.urgencyReason}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex items-baseline gap-4 mt-2">
                     <span className="text-7xl sm:text-8xl lg:text-9xl font-black text-slate-900 tracking-tighter font-mono">
                       {currentTicket.ticketNumber}
@@ -711,11 +832,20 @@ export const OfficerStationView: React.FC = () => {
                 id="btn-call-next"
                 disabled={isCalling}
                 onClick={() => handleCallNext()}
-                className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-bold py-5 rounded-xl shadow-lg shadow-indigo-100 flex flex-col items-center justify-center gap-1 transition"
+                className={`text-white font-bold py-5 rounded-xl shadow-lg active:scale-[0.99] flex flex-col items-center justify-center gap-1 transition ${
+                  nextEligibleTicket?.priority === 'URGENT'
+                    ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200 ring-2 ring-rose-400 ring-offset-2'
+                    : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'
+                }`}
               >
-                <span className="text-lg uppercase tracking-wider">
-                  {isAmharic ? 'ቀጣይ ጥራ' : 'Call Next'}
-                </span>
+                <div className="flex items-center space-x-1.5">
+                  {nextEligibleTicket?.priority === 'URGENT' && <Flame className="w-5 h-5 text-yellow-300 animate-pulse" />}
+                  <span className="text-lg uppercase tracking-wider">
+                    {nextEligibleTicket?.priority === 'URGENT'
+                      ? (isAmharic ? `አስቸኳይ ጥራ (${nextEligibleTicket.ticketNumber})` : `Call Next (${nextEligibleTicket.ticketNumber} Urgent)`)
+                      : (isAmharic ? 'ቀጣይ ጥራ' : 'Call Next')}
+                  </span>
+                </div>
                 <span className="text-xs opacity-80 font-normal italic">
                   {isAmharic ? 'Call Next Customer' : 'ቀጣዩን ጥራ'}
                 </span>
@@ -842,20 +972,44 @@ export const OfficerStationView: React.FC = () => {
               </div>
               
               <div className="w-full grid grid-cols-2 gap-3 mt-4">
-                <div className="bg-slate-800/60 p-3.5 rounded-xl border border-slate-700/80">
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">
-                    {isAmharic ? 'ቀጣይ ተራ' : 'Next Up'}
-                  </p>
+                <div className="bg-slate-800/60 p-3.5 rounded-xl border border-slate-700/80 relative overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">
+                      {isAmharic ? 'ቀጣይ ተራ' : 'Next Up'}
+                    </p>
+                    {sortedWaitingTickets[0]?.priority === 'URGENT' && (
+                      <span className="text-[9px] font-black bg-rose-600 text-white px-1.5 py-0.5 rounded-sm uppercase tracking-wider flex items-center gap-0.5 animate-pulse">
+                        <Flame className="w-2.5 h-2.5" /> URGENT
+                      </span>
+                    )}
+                    {sortedWaitingTickets[0]?.priority === 'PRIORITY' && (
+                      <span className="text-[9px] font-black bg-amber-500 text-slate-950 px-1.5 py-0.5 rounded-sm uppercase tracking-wider flex items-center gap-0.5">
+                        <Zap className="w-2.5 h-2.5" /> VIP
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xl font-bold font-mono text-white mt-0.5">
-                    {waitingTickets[0]?.ticketNumber || '--'}
+                    {sortedWaitingTickets[0]?.ticketNumber || '--'}
                   </p>
                 </div>
-                <div className="bg-slate-800/60 p-3.5 rounded-xl border border-slate-700/80">
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">
-                    {isAmharic ? 'ቀጣይ ተራ' : 'Next Up'}
-                  </p>
+                <div className="bg-slate-800/60 p-3.5 rounded-xl border border-slate-700/80 relative overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">
+                      {isAmharic ? 'ቀጣይ ተራ' : 'Next Up'}
+                    </p>
+                    {sortedWaitingTickets[1]?.priority === 'URGENT' && (
+                      <span className="text-[9px] font-black bg-rose-600 text-white px-1.5 py-0.5 rounded-sm uppercase tracking-wider flex items-center gap-0.5 animate-pulse">
+                        <Flame className="w-2.5 h-2.5" /> URGENT
+                      </span>
+                    )}
+                    {sortedWaitingTickets[1]?.priority === 'PRIORITY' && (
+                      <span className="text-[9px] font-black bg-amber-500 text-slate-950 px-1.5 py-0.5 rounded-sm uppercase tracking-wider flex items-center gap-0.5">
+                        <Zap className="w-2.5 h-2.5" /> VIP
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xl font-bold font-mono text-white mt-0.5">
-                    {waitingTickets[1]?.ticketNumber || '--'}
+                    {sortedWaitingTickets[1]?.ticketNumber || '--'}
                   </p>
                 </div>
               </div>
@@ -878,58 +1032,105 @@ export const OfficerStationView: React.FC = () => {
           </div>
 
           {/* Upcoming Queue List */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col h-[340px] overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col h-[380px] overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <h3 className="text-sm font-bold text-slate-900">
-                {isAmharic ? 'የሚጠባበቁ ደንበኞች' : 'Upcoming Queue'}
-              </h3>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span>{isAmharic ? 'የሚጠባበቁ ደንበኞች' : 'Upcoming Queue'}</span>
+                  {hasUrgentWaiting && (
+                    <span className="px-2 py-0.5 text-[10px] bg-rose-100 text-rose-700 font-black rounded-full uppercase tracking-wider animate-pulse flex items-center gap-1">
+                      <Flame className="w-3 h-3 text-rose-600" />
+                      {isAmharic ? 'አስቸኳይ አለ' : 'Urgent In Queue'}
+                    </span>
+                  )}
+                </h3>
+              </div>
               <span className="text-xs text-slate-500 font-semibold">
-                {waitingTickets.length} {isAmharic ? 'በወረፋ ውስጥ' : 'People in Queue'}
+                {sortedWaitingTickets.length} {isAmharic ? 'በወረፋ ውስጥ' : 'People in Queue'}
               </span>
             </div>
 
             <div className="flex-1 p-3 overflow-y-auto space-y-2">
-              {waitingTickets.length > 0 ? (
-                waitingTickets.map((ticket) => (
+              {sortedWaitingTickets.length > 0 ? (
+                sortedWaitingTickets.map((ticket) => (
                   <div 
                     key={ticket.id}
-                    className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-100 transition"
+                    className={`flex flex-col p-3 rounded-xl border transition ${
+                      ticket.priority === 'URGENT' 
+                        ? 'bg-rose-50/70 border-rose-200 shadow-xs' 
+                        : ticket.priority === 'PRIORITY'
+                        ? 'bg-amber-50/60 border-amber-200'
+                        : 'bg-slate-50 hover:bg-slate-100/80 border-slate-100'
+                    }`}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <span className="font-bold text-slate-800 font-mono text-sm">
-                        {ticket.ticketNumber}
-                      </span>
-                      <span className="text-xs px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-medium uppercase border border-indigo-100">
-                        {ticket.serviceName.split(' ')[0]}
-                      </span>
-                      {ticket.priority === 'PRIORITY' && (
-                        <span className="text-[10px] px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded font-bold">
-                          VIP
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-slate-900 font-mono text-sm">
+                          {ticket.ticketNumber}
                         </span>
-                      )}
-                      {ticket.isCheckedIn ? (
-                        <span className="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold flex items-center space-x-1" title="Customer checked-in with QR code">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          <span>{isAmharic ? 'ተገኝተዋል' : 'Checked-In'}</span>
+                        <span className="text-xs px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md font-medium uppercase border border-indigo-100">
+                          {ticket.serviceName.split(' ')[0]}
                         </span>
-                      ) : (
-                        <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-full font-medium" title="Awaiting QR check-in">
-                          {isAmharic ? 'አልተረጋገጠም' : 'Pending QR'}
+                        {ticket.priority === 'URGENT' && (
+                          <span className="text-[10px] px-2 py-0.5 bg-rose-600 text-white rounded-md font-black flex items-center gap-1 shadow-2xs animate-pulse">
+                            <Flame className="w-3 h-3" />
+                            {isAmharic ? 'አስቸኳይ' : 'URGENT'}
+                          </span>
+                        )}
+                        {ticket.priority === 'PRIORITY' && (
+                          <span className="text-[10px] px-2 py-0.5 bg-amber-500 text-slate-950 rounded-md font-extrabold flex items-center gap-1">
+                            <Zap className="w-3 h-3" />
+                            VIP
+                          </span>
+                        )}
+                        {ticket.isCheckedIn ? (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold flex items-center space-x-1" title="Customer checked-in with QR code">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            <span>{isAmharic ? 'ተገኝተዋል' : 'Checked-In'}</span>
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-full font-medium" title="Awaiting QR check-in">
+                            {isAmharic ? 'አልተረጋገጠም' : 'Pending QR'}
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-xs text-slate-400 italic mr-1">
+                          {ticket.ticketNumberAmharic || ''}
                         </span>
-                      )}
+
+                        {/* Priority Triage Quick Action */}
+                        <button
+                          onClick={() => handleOpenOfficerTriage(ticket)}
+                          title={isAmharic ? 'ቅድሚያ ሁኔታ ቀይር' : 'Change Ticket Priority'}
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          onClick={() => handleCallNext(ticket.id)}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold transition shadow-xs ${
+                            ticket.priority === 'URGENT'
+                              ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                              : 'bg-white hover:bg-indigo-600 hover:text-white text-indigo-600 border border-indigo-200'
+                          }`}
+                        >
+                          {isAmharic ? 'ጥራ' : 'Call'}
+                        </button>
+                      </div>
                     </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-slate-400 italic">
-                        {ticket.ticketNumberAmharic || ''}
-                      </span>
-                      <button
-                        onClick={() => handleCallNext(ticket.id)}
-                        className="px-2.5 py-1 bg-white hover:bg-indigo-600 hover:text-white text-indigo-600 border border-indigo-200 rounded-lg text-xs font-bold transition shadow-xs"
-                      >
-                        {isAmharic ? 'ጥራ' : 'Call'}
-                      </button>
-                    </div>
+
+                    {/* Urgency Reason Subtitle */}
+                    {(ticket.urgencyReason || ticket.notes) && (
+                      <div className="mt-1.5 pt-1.5 border-t border-slate-200/60 flex items-center gap-1.5 text-[11px] text-slate-600">
+                        {ticket.priority === 'URGENT' && <Flame className="w-3 h-3 text-rose-500 shrink-0" />}
+                        <span className="font-semibold text-slate-700">
+                          {ticket.urgencyReason ? ticket.urgencyReason : ticket.notes}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ))
               ) : (
@@ -983,6 +1184,153 @@ export const OfficerStationView: React.FC = () => {
                 {isAmharic ? 'አስተላልፍ' : 'Transfer'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Officer Ticket Priority Triage Modal */}
+      {officerTriageTicket && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-200 space-y-6">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black">
+                  <Flame className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {isAmharic ? 'የቲኬት ቅድሚያ ሁኔታ አስተካክል' : 'Manage Ticket Priority'}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-mono">
+                    Ticket: <strong className="text-slate-800">{officerTriageTicket.ticketNumber}</strong> ({officerTriageTicket.serviceName})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setOfficerTriageTicket(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveOfficerTriage} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  {isAmharic ? 'የቅድሚያ ደረጃ ይምረጡ' : 'Select Priority Level'}
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOfficerTriagePriority('NORMAL')}
+                    className={`p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1.5 transition ${
+                      officerTriagePriority === 'NORMAL'
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Users className="w-4 h-4" />
+                    <span>{isAmharic ? 'መደበኛ' : 'Normal'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setOfficerTriagePriority('PRIORITY')}
+                    className={`p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1.5 transition ${
+                      officerTriagePriority === 'PRIORITY'
+                        ? 'bg-amber-500 text-slate-950 border-amber-600 shadow-xs'
+                        : 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100/70'
+                    }`}
+                  >
+                    <Zap className="w-4 h-4" />
+                    <span>{isAmharic ? 'ቅድሚያ (VIP)' : 'Priority (VIP)'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setOfficerTriagePriority('URGENT')}
+                    className={`p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1.5 transition ${
+                      officerTriagePriority === 'URGENT'
+                        ? 'bg-rose-600 text-white border-rose-700 shadow-xs'
+                        : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100/70'
+                    }`}
+                  >
+                    <Flame className="w-4 h-4" />
+                    <span>{isAmharic ? 'አስቸኳይ' : 'Urgent'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Urgency Reason Field */}
+              {(officerTriagePriority === 'URGENT' || officerTriagePriority === 'PRIORITY') && (
+                <div className="space-y-1.5 animate-in fade-in">
+                  <label className="block text-xs font-bold text-slate-700">
+                    {isAmharic ? 'የአስቸኳይ ወይም የቅድሚያ ምክንያት' : 'Urgency / Priority Reason'}
+                  </label>
+                  <input
+                    type="text"
+                    value={officerTriageReason}
+                    onChange={(e) => setOfficerTriageReason(e.target.value)}
+                    placeholder={
+                      isAmharic
+                        ? 'ምሳሌ፡ የጤና እክል፣ አረጋዊ፣ አስቸኳይ የጉዞ ሰነድ...'
+                        : 'e.g. Medical distress, Elderly, Emergency document...'
+                    }
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                  {/* Quick Preset Buttons */}
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {[
+                      { en: 'Medical condition', am: 'የጤና እክል' },
+                      { en: 'Elderly / Special assistance', am: 'አረጋዊ / ልዩ ድጋፍ' },
+                      { en: 'Urgent document', am: 'አስቸኳይ ሰነድ' },
+                      { en: 'Transit passenger', am: 'ተላላፊ መንገደኛ' }
+                    ].map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setOfficerTriageReason(isAmharic ? preset.am : preset.en)}
+                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-[10px] font-medium transition"
+                      >
+                        {isAmharic ? preset.am : preset.en}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Internal Notes */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700">
+                  {isAmharic ? 'ተጨማሪ ማስታወሻ (አማራጭ)' : 'Additional Officer Notes (Optional)'}
+                </label>
+                <textarea
+                  rows={2}
+                  value={officerTriageNotes}
+                  onChange={(e) => setOfficerTriageNotes(e.target.value)}
+                  placeholder={isAmharic ? 'ለባለሙያዎች ማስታወሻ...' : 'Notes for officers or reception staff...'}
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setOfficerTriageTicket(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 transition"
+                >
+                  {isAmharic ? 'ተመለስ' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isOfficerUpdatingPriority}
+                  className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-xl shadow-xs transition flex items-center space-x-1.5"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{isOfficerUpdatingPriority ? (isAmharic ? 'በመቀየር ላይ...' : 'Saving...') : (isAmharic ? 'አስቀምጥ' : 'Save Priority')}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

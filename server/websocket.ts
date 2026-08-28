@@ -10,6 +10,7 @@ export interface RealtimeEvent<T = any> {
     | 'ticket:completed'
     | 'ticket:transferred'
     | 'ticket:no-show'
+    | 'ticket:priority_changed'
     | 'counter:updated'
     | 'announcement:play'
     | 'settings:updated';

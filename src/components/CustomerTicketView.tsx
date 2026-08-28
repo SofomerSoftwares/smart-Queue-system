@@ -25,13 +25,16 @@ import {
   ThumbsUp,
   Smile,
   Edit3,
-  MessageCircleHeart
+  MessageCircleHeart,
+  BellRing,
+  Flame
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../lib/api';
 import { useQueue } from '../context/QueueContext';
 import { QueueTicket, CustomerReview } from '../types';
 import { AmharicLib } from '../lib/amharic';
+import { notificationManager } from '../lib/notificationManager';
 
 interface FeedbackTagOption {
   id: string;
@@ -60,7 +63,16 @@ const RATING_DESCRIPTIONS: Record<number, { en: string; am: string; badgeColor: 
 };
 
 export const CustomerTicketView: React.FC = () => {
-  const { uiLanguage, officeSetting, waitingTickets, checkInTicket } = useQueue();
+  const { 
+    uiLanguage, 
+    officeSetting, 
+    waitingTickets, 
+    checkInTicket,
+    isNotificationsEnabled,
+    requestNotificationPermission,
+    toggleNotifications,
+    sendTestNotification
+  } = useQueue();
   
   // Read initial query params from URL if present
   const getInitialTicket = (): string => {
@@ -100,7 +112,31 @@ export const CustomerTicketView: React.FC = () => {
   const [isEditingReview, setIsEditingReview] = useState<boolean>(false);
 
   const hasAutoCheckedInRef = useRef<boolean>(false);
+  const prevStatusRef = useRef<string | undefined>(undefined);
   const isAmharic = uiLanguage === 'AMHARIC';
+
+  // Watch for ticket status changing to CALLED or SERVING and trigger browser notification
+  useEffect(() => {
+    if (ticketData?.status) {
+      if (
+        (ticketData.status === 'CALLED' || ticketData.status === 'SERVING') &&
+        prevStatusRef.current &&
+        prevStatusRef.current !== 'CALLED' &&
+        prevStatusRef.current !== 'SERVING'
+      ) {
+        if (isNotificationsEnabled) {
+          notificationManager.notifyTicketCalled({
+            ticketNumber: ticketData.ticketNumber,
+            counterNumber: ticketData.counterNumber || 1,
+            serviceName: ticketData.serviceName,
+            serviceNameAmharic: ticketData.serviceNameAmharic,
+            language: isAmharic ? 'AMHARIC' : 'ENGLISH'
+          });
+        }
+      }
+      prevStatusRef.current = ticketData.status;
+    }
+  }, [ticketData?.status, ticketData?.counterNumber, ticketData?.ticketNumber, isNotificationsEnabled, isAmharic]);
 
   // Construct current check-in URL for QR code
   const getCheckInUrl = (ticketNum?: string): string => {
@@ -415,17 +451,89 @@ export const CustomerTicketView: React.FC = () => {
               {isAmharic ? (ticketData.serviceNameAmharic || ticketData.serviceName) : ticketData.serviceName}
             </div>
 
-            <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-slate-100 text-slate-800 border border-slate-200">
-              <span className={`w-2 h-2 rounded-full ${
-                isCompleted 
-                  ? 'bg-emerald-500' 
-                  : isCalled 
-                  ? 'bg-indigo-600 animate-ping' 
-                  : 'bg-amber-500'
-              }`} />
-              <span>{ticketData.status}</span>
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-slate-100 text-slate-800 border border-slate-200">
+                <span className={`w-2 h-2 rounded-full ${
+                  isCompleted 
+                    ? 'bg-emerald-500' 
+                    : isCalled 
+                    ? 'bg-indigo-600 animate-ping' 
+                    : 'bg-amber-500'
+                }`} />
+                <span>{ticketData.status}</span>
+              </div>
+
+              {ticketData.priority === 'URGENT' && (
+                <div className="inline-flex items-center gap-1 px-3 py-1 bg-rose-600 text-white rounded-full text-xs font-black uppercase tracking-wider shadow-xs animate-pulse">
+                  <Flame className="w-3.5 h-3.5" />
+                  <span>{isAmharic ? 'አስቸኳይ ተገልጋይ' : 'Urgent Priority'}</span>
+                </div>
+              )}
+
+              {ticketData.priority === 'PRIORITY' && (
+                <div className="inline-flex items-center gap-1 px-3 py-1 bg-amber-500 text-slate-950 rounded-full text-xs font-black uppercase tracking-wider">
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>{isAmharic ? 'ቅድሚያ (VIP)' : 'VIP Priority'}</span>
+                </div>
+              )}
             </div>
+
+            {ticketData.urgencyReason && (
+              <p className="text-xs text-rose-600 font-semibold bg-rose-50 px-3 py-1 rounded-xl border border-rose-100 inline-block">
+                {ticketData.urgencyReason}
+              </p>
+            )}
           </div>
+
+          {/* Browser Push Notification Banner for Customer */}
+          {!isCalled && !isCompleted && (
+            <div className="mt-4 p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 flex items-center justify-between gap-3">
+              <div className="flex items-center space-x-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <BellRing className="w-4.5 h-4.5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-indigo-950">
+                    {isAmharic ? 'የብሮውዘር ጥሪ ማሳወቂያ' : 'Browser Call Notification'}
+                  </p>
+                  <p className="text-[11px] text-indigo-700 truncate">
+                    {isNotificationsEnabled
+                      ? (isAmharic ? 'ነቅቷል፡ ተራዎ ሲደርስ ድምፅና ማሳወቂያ ይደርስዎታል' : 'Active: Instant sound & notification when called')
+                      : (isAmharic ? 'ስክሪን ቢያንቀላፉም እንኳ ተራዎ እንዳያመልጥዎት ማሳወቂያ ያንቁ' : 'Get alerted with chime even if tab is minimized')}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!isNotificationsEnabled) {
+                    const granted = await requestNotificationPermission();
+                    if (granted) sendTestNotification();
+                  } else {
+                    toggleNotifications();
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-xs shrink-0 flex items-center space-x-1.5 cursor-pointer ${
+                  isNotificationsEnabled
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                }`}
+              >
+                {isNotificationsEnabled ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{isAmharic ? 'ነቅቷል' : 'Enabled'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Bell className="w-3.5 h-3.5" />
+                    <span>{isAmharic ? 'አንቃ' : 'Enable Alert'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
 
           {/* ========================================================= */}
           {/* QR CODE & AUTOMATIC ARRIVAL CHECK-IN SECTION */}

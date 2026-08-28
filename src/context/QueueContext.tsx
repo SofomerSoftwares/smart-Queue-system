@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { 
   QueueTicket, 
+  PriorityLevel,
   Counter, 
   Service, 
   OfficeSetting, 
@@ -40,7 +41,18 @@ interface QueueContextType {
   markNoShow: (ticketId: string) => Promise<void>;
   transferTicket: (ticketId: string, targetServiceId: string) => Promise<void>;
   cancelTicket: (ticketId: string) => Promise<void>;
-  createTicket: (serviceId: string, priority?: 'NORMAL' | 'PRIORITY') => Promise<{ ticket: QueueTicket; printData: PrintTicketData }>;
+  createTicket: (
+    serviceId: string, 
+    priority?: PriorityLevel, 
+    urgencyReason?: string, 
+    notes?: string
+  ) => Promise<{ ticket: QueueTicket; printData: PrintTicketData }>;
+  updateTicketPriority: (
+    ticketId: string, 
+    priority: PriorityLevel, 
+    urgencyReason?: string, 
+    notes?: string
+  ) => Promise<{ success: boolean; ticket: QueueTicket; message: string }>;
   checkInTicket: (ticketNumber: string) => Promise<{ success: boolean; message: string; ticket: QueueTicket }>;
   updateOfficeSettingAction: (updates: Partial<OfficeSetting>) => Promise<OfficeSetting>;
   resetDailyQueue: () => Promise<void>;
@@ -226,12 +238,31 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const callNextTicket = async (counterId: string, specificTicketId?: string) => {
     const res = await api.callNextTicket({ counterId, specificTicketId });
     await refreshQueue();
+    if (res?.success && res.ticket && notificationsEnabledRef.current) {
+      notificationManager.notifyTicketCalled({
+        ticketNumber: res.ticket.ticketNumber,
+        counterNumber: res.counter?.number || res.ticket.counterNumber || 1,
+        serviceName: res.ticket.serviceName,
+        serviceNameAmharic: res.ticket.serviceNameAmharic,
+        language: uiLanguage === 'AMHARIC' ? 'AMHARIC' : 'BOTH'
+      });
+    }
     return res;
   };
 
   const recallTicket = async (ticketId: string) => {
-    await api.recallTicket(ticketId);
+    const res = await api.recallTicket(ticketId);
     await refreshQueue();
+    if (res?.success && res.ticket && notificationsEnabledRef.current) {
+      notificationManager.notifyTicketCalled({
+        ticketNumber: res.ticket.ticketNumber,
+        counterNumber: res.ticket.counterNumber || 1,
+        serviceName: res.ticket.serviceName,
+        serviceNameAmharic: res.ticket.serviceNameAmharic,
+        language: uiLanguage === 'AMHARIC' ? 'AMHARIC' : 'BOTH'
+      });
+    }
+    return res;
   };
 
   const startService = async (ticketId: string) => {
@@ -259,10 +290,26 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await refreshQueue();
   };
 
-  const createTicket = async (serviceId: string, priority?: 'NORMAL' | 'PRIORITY') => {
-    const res = await api.createTicket({ serviceId, priority });
+  const createTicket = async (
+    serviceId: string, 
+    priority?: PriorityLevel, 
+    urgencyReason?: string, 
+    notes?: string
+  ) => {
+    const res = await api.createTicket({ serviceId, priority, urgencyReason, notes });
     await refreshQueue();
     return { ticket: res.ticket, printData: res.printData };
+  };
+
+  const updateTicketPriority = async (
+    ticketId: string, 
+    priority: PriorityLevel, 
+    urgencyReason?: string, 
+    notes?: string
+  ) => {
+    const res = await api.updateTicketPriority(ticketId, { priority, urgencyReason, notes });
+    await refreshQueue();
+    return res;
   };
 
   const checkInTicket = async (ticketNumber: string) => {
@@ -315,6 +362,7 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         transferTicket,
         cancelTicket,
         createTicket,
+        updateTicketPriority,
         checkInTicket,
         updateOfficeSettingAction,
         resetDailyQueue,

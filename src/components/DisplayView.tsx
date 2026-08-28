@@ -14,7 +14,9 @@ import {
   Layers,
   Sliders,
   ChevronDown,
-  LayoutGrid
+  LayoutGrid,
+  Flame,
+  Zap
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
 import { motion, AnimatePresence } from 'motion/react';
@@ -166,6 +168,14 @@ export const DisplayView: React.FC = () => {
   const primaryCalledTicket = servingTickets.length > 0 
     ? servingTickets[servingTickets.length - 1] 
     : null;
+
+  // Priority sorted waiting tickets: URGENT (3) > PRIORITY (2) > NORMAL (1), then issuedAt
+  const sortedWaitingTickets = [...waitingTickets].sort((a, b) => {
+    const scoreA = a.priority === 'URGENT' ? 3 : a.priority === 'PRIORITY' ? 2 : 1;
+    const scoreB = b.priority === 'URGENT' ? 3 : b.priority === 'PRIORITY' ? 2 : 1;
+    if (scoreA !== scoreB) return scoreB - scoreA;
+    return new Date(a.issuedAt).getTime() - new Date(b.issuedAt).getTime();
+  });
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-950 text-white flex flex-col justify-between p-3 sm:p-6 lg:p-8 select-none">
@@ -371,6 +381,20 @@ export const DisplayView: React.FC = () => {
                       className="space-y-3 sm:space-y-4"
                     >
                       <div className="inline-block">
+                        {/* Priority Badge on TV display if urgent or priority */}
+                        {primaryCalledTicket.priority === 'URGENT' && (
+                          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-rose-600 text-white rounded-full text-xs font-black uppercase tracking-wider shadow-lg shadow-rose-950/60 animate-pulse border border-rose-400 mb-2">
+                            <Flame className="w-3.5 h-3.5" />
+                            <span>{isAmharic ? '⚡ አስቸኳይ ተገልጋይ' : '⚡ URGENT PRIORITY'}</span>
+                          </div>
+                        )}
+                        {primaryCalledTicket.priority === 'PRIORITY' && (
+                          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-amber-500 text-slate-950 rounded-full text-xs font-extrabold uppercase tracking-wider shadow-md mb-2">
+                            <Zap className="w-3.5 h-3.5" />
+                            <span>{isAmharic ? '★ ቅድሚያ (VIP)' : '★ VIP PRIORITY'}</span>
+                          </div>
+                        )}
+
                         <div className="text-6xl sm:text-7xl lg:text-8xl font-black tracking-tight text-white font-mono leading-none">
                           {primaryCalledTicket.ticketNumber}
                         </div>
@@ -447,11 +471,17 @@ export const DisplayView: React.FC = () => {
 
               {/* Waiting Ticket Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-32 overflow-y-auto pr-1">
-                {waitingTickets.length > 0 ? (
-                  waitingTickets.slice(0, 6).map((ticket, idx) => (
+                {sortedWaitingTickets.length > 0 ? (
+                  sortedWaitingTickets.slice(0, 6).map((ticket, idx) => (
                     <div
                       key={ticket.id}
-                      className="p-2 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between"
+                      className={`p-2 rounded-xl border flex items-center justify-between ${
+                        ticket.priority === 'URGENT'
+                          ? 'bg-rose-950/40 border-rose-600/60'
+                          : ticket.priority === 'PRIORITY'
+                          ? 'bg-amber-950/30 border-amber-500/50'
+                          : 'bg-slate-950 border-slate-800'
+                      }`}
                     >
                       <div className="flex items-center space-x-1.5 min-w-0">
                         <span className="w-4 h-4 rounded bg-slate-800 text-slate-300 font-bold text-[9px] flex items-center justify-center font-mono shrink-0">
@@ -461,6 +491,11 @@ export const DisplayView: React.FC = () => {
                           {ticket.ticketNumber}
                         </span>
                       </div>
+                      {ticket.priority === 'URGENT' && (
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-rose-600 text-white shrink-0 flex items-center gap-0.5 animate-pulse">
+                          <Flame className="w-2.5 h-2.5" /> URGENT
+                        </span>
+                      )}
                       {ticket.priority === 'PRIORITY' && (
                         <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-amber-500/20 text-amber-300 shrink-0">
                           VIP
@@ -589,6 +624,20 @@ export const DisplayView: React.FC = () => {
                     className="space-y-4"
                   >
                     <div className="inline-block">
+                      {/* Priority Badge on Fullscreen display */}
+                      {primaryCalledTicket.priority === 'URGENT' && (
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-rose-600 text-white rounded-full text-sm font-black uppercase tracking-wider shadow-xl shadow-rose-950/60 animate-pulse border border-rose-400 mb-3">
+                          <Flame className="w-4 h-4" />
+                          <span>{isAmharic ? '⚡ አስቸኳይ ተገልጋይ' : '⚡ URGENT PRIORITY'}</span>
+                        </div>
+                      )}
+                      {primaryCalledTicket.priority === 'PRIORITY' && (
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-500 text-slate-950 rounded-full text-sm font-extrabold uppercase tracking-wider shadow-lg mb-3">
+                          <Zap className="w-4 h-4" />
+                          <span>{isAmharic ? '★ ቅድሚያ (VIP)' : '★ VIP PRIORITY'}</span>
+                        </div>
+                      )}
+
                       <div className="text-7xl sm:text-9xl lg:text-[11rem] font-black tracking-tight text-white font-mono leading-none">
                         {primaryCalledTicket.ticketNumber}
                       </div>
@@ -682,19 +731,37 @@ export const DisplayView: React.FC = () => {
                 </div>
 
                 <div className="space-y-2 max-h-[300px] lg:max-h-[360px] overflow-y-auto pr-1">
-                  {waitingTickets.length > 0 ? (
-                    waitingTickets.slice(0, 8).map((ticket, idx) => (
+                  {sortedWaitingTickets.length > 0 ? (
+                    sortedWaitingTickets.slice(0, 8).map((ticket, idx) => (
                       <div
                         key={ticket.id}
-                        className="flex items-center justify-between p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 hover:border-indigo-500/30 transition"
+                        className={`flex items-center justify-between p-3 rounded-xl border transition ${
+                          ticket.priority === 'URGENT'
+                            ? 'bg-rose-950/40 border-rose-600/60'
+                            : ticket.priority === 'PRIORITY'
+                            ? 'bg-amber-950/30 border-amber-500/50'
+                            : 'bg-slate-950/80 border-slate-800/80 hover:border-indigo-500/30'
+                        }`}
                       >
                         <div className="flex items-center space-x-3">
                           <div className="w-6 h-6 rounded-lg bg-slate-800 text-slate-300 font-bold text-xs flex items-center justify-center font-mono">
                             {idx + 1}
                           </div>
                           <div>
-                            <div className="text-lg font-black text-white font-mono tracking-wide">
-                              {ticket.ticketNumber}
+                            <div className="flex items-center space-x-2">
+                              <span className="text-lg font-black text-white font-mono tracking-wide">
+                                {ticket.ticketNumber}
+                              </span>
+                              {ticket.priority === 'URGENT' && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-600 text-white flex items-center gap-0.5 animate-pulse">
+                                  <Flame className="w-2.5 h-2.5" /> URGENT
+                                </span>
+                              )}
+                              {ticket.priority === 'PRIORITY' && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300">
+                                  VIP
+                                </span>
+                              )}
                             </div>
                             <div className="text-xs text-slate-400 truncate max-w-[140px]">
                               {isAmharic ? (ticket.serviceNameAmharic || ticket.serviceName) : ticket.serviceName}

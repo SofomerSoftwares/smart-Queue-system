@@ -12,6 +12,7 @@ import {
   AuditLog,
   CustomerReview,
   RoleName,
+  PriorityLevel,
   DatabaseSchema
 } from './types.js';
 import { mongoService } from './mongodb.js';
@@ -26,6 +27,7 @@ export const PERMISSIONS: Permission[] = [
   { id: 'ticket.start', name: 'Start Service', description: 'Start serving the customer' },
   { id: 'ticket.complete', name: 'Complete Ticket', description: 'Mark ticket as finished' },
   { id: 'ticket.transfer', name: 'Transfer Ticket', description: 'Transfer ticket to another service or counter' },
+  { id: 'ticket.priority', name: 'Manage Ticket Priority', description: 'Flag urgent tickets for prioritized service in the officer dashboard' },
   { id: 'ticket.cancel', name: 'Cancel Ticket', description: 'Cancel an active ticket' },
   { id: 'ticket.no_show', name: 'Mark No-Show', description: 'Mark customer as absent' },
   { id: 'services.view', name: 'View Services', description: 'View service configurations' },
@@ -61,6 +63,7 @@ export const ROLES: Record<RoleName, Role> = {
       'dashboard.view',
       'queue.view',
       'ticket.create',
+      'ticket.priority',
       'ticket.cancel',
       'ticket.transfer',
       'services.view'
@@ -78,6 +81,7 @@ export const ROLES: Record<RoleName, Role> = {
       'ticket.start',
       'ticket.complete',
       'ticket.no_show',
+      'ticket.priority',
       'ticket.transfer'
     ]
   }
@@ -675,7 +679,13 @@ class Database {
   /**
    * Transactional sequential ticket generator with atomic daily increment
    */
-  public generateTicket(serviceId: string, priority: 'NORMAL' | 'PRIORITY' = 'NORMAL'): QueueTicket {
+  public generateTicket(
+    serviceId: string, 
+    priority: PriorityLevel = 'NORMAL',
+    urgencyReason?: string,
+    notes?: string,
+    flaggedBy?: string
+  ): QueueTicket {
     const service = this.getServiceById(serviceId);
     if (!service) {
       throw new Error(`Service with ID ${serviceId} not found`);
@@ -691,6 +701,8 @@ class Database {
 
     const nextSeq = ticketsForPrefixToday.reduce((max, t) => Math.max(max, t.sequenceNumber), 0) + 1;
     const formattedNum = `${prefix}-${String(nextSeq).padStart(3, '0')}`;
+    const isUrgent = priority === 'URGENT' || priority === 'PRIORITY';
+    const now = new Date().toISOString();
 
     const newTicket: QueueTicket = {
       id: `tkt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -702,7 +714,12 @@ class Database {
       serviceNameAmharic: service.nameAmharic,
       status: 'WAITING',
       priority,
-      issuedAt: new Date().toISOString(),
+      urgencyReason: urgencyReason || (priority === 'URGENT' ? 'Urgent Priority / አስቸኳይ' : (priority === 'PRIORITY' ? 'Priority / ቅድሚያ' : undefined)),
+      isUrgent,
+      priorityFlaggedAt: isUrgent ? now : undefined,
+      priorityFlaggedBy: isUrgent ? (flaggedBy || 'Reception') : undefined,
+      notes,
+      issuedAt: now,
       dateKey: today
     };
 
@@ -711,11 +728,67 @@ class Database {
       ticketId: newTicket.id,
       ticketNumber: newTicket.ticketNumber,
       eventType: 'CREATED',
-      metadata: { priority, serviceId, serviceName: service.name }
+      metadata: { priority, urgencyReason: newTicket.urgencyReason, isUrgent, serviceId, serviceName: service.name }
     });
 
     this.save();
     return newTicket;
+  }
+
+  /**
+   * Update priority on an existing waiting ticket (e.g. reception triage or escalation)
+   */
+  public setTicketPriority(
+    ticketId: string, 
+    priority: PriorityLevel, 
+    urgencyReason?: string, 
+    flaggedBy?: string, 
+    notes?: string
+  ): QueueTicket {
+    const ticket = this.getTicketById(ticketId);
+    if (!ticket) {
+      throw new Error(`Ticket ${ticketId} not found`);
+    }
+
+    const previousPriority = ticket.priority;
+    const isUrgent = priority === 'URGENT' || priority === 'PRIORITY';
+    const now = new Date().toISOString();
+
+    ticket.priority = priority;
+    ticket.urgencyReason = urgencyReason !== undefined ? urgencyReason : ticket.urgencyReason;
+    if (!ticket.urgencyReason && priority === 'URGENT') {
+      ticket.urgencyReason = 'Urgent Priority / አስቸኳይ';
+    } else if (!ticket.urgencyReason && priority === 'PRIORITY') {
+      ticket.urgencyReason = 'Priority / ቅድሚያ';
+    } else if (priority === 'NORMAL' && !urgencyReason) {
+      ticket.urgencyReason = undefined;
+    }
+    ticket.isUrgent = isUrgent;
+    ticket.priorityFlaggedAt = isUrgent ? now : undefined;
+    ticket.priorityFlaggedBy = isUrgent ? (flaggedBy || 'Reception') : undefined;
+
+    if (notes) {
+      ticket.notes = ticket.notes ? `${ticket.notes}\n${notes}` : notes;
+    }
+
+    this.addEvent({
+      ticketId: ticket.id,
+      ticketNumber: ticket.ticketNumber,
+      eventType: 'PRIORITY_CHANGED',
+      counterId: ticket.counterId,
+      counterNumber: ticket.counterNumber,
+      userName: flaggedBy,
+      metadata: {
+        previousPriority,
+        newPriority: priority,
+        urgencyReason: ticket.urgencyReason,
+        isUrgent,
+        notes
+      }
+    });
+
+    this.save();
+    return ticket;
   }
 
   /**
@@ -745,23 +818,34 @@ class Database {
           t => t.id === specificTicketId && t.status === 'WAITING'
         );
       } else {
-        // FIFO queue with Priority first
-        // 1. Check priority WAITING tickets
-        const priorityWaiting = this.data.tickets
-          .filter(t => t.dateKey === today && t.status === 'WAITING' && t.priority === 'PRIORITY')
-          .sort((a, b) => new Date(a.issuedAt).getTime() - new Date(b.issuedAt).getTime());
-
-        if (priorityWaiting.length > 0) {
-          targetTicket = priorityWaiting[0];
-        } else {
-          // 2. Normal WAITING tickets
-          const normalWaiting = this.data.tickets
-            .filter(t => t.dateKey === today && t.status === 'WAITING')
-            .sort((a, b) => new Date(a.issuedAt).getTime() - new Date(b.issuedAt).getTime());
-
-          if (normalWaiting.length > 0) {
-            targetTicket = normalWaiting[0];
+        // Find waiting tickets for today, filtered by counter services if assigned
+        const eligibleTickets = this.data.tickets.filter(t => {
+          if (t.dateKey !== today || t.status !== 'WAITING') return false;
+          if (counter.serviceIds && counter.serviceIds.length > 0) {
+            return counter.serviceIds.includes(t.serviceId);
           }
+          return true;
+        });
+
+        // Priority Score: URGENT (3) -> PRIORITY (2) -> NORMAL (1)
+        const getPriorityScore = (t: QueueTicket): number => {
+          if (t.priority === 'URGENT') return 3;
+          if (t.priority === 'PRIORITY' || t.isUrgent) return 2;
+          return 1;
+        };
+
+        // Sort higher priority first, then FIFO by issuedAt
+        eligibleTickets.sort((a, b) => {
+          const scoreA = getPriorityScore(a);
+          const scoreB = getPriorityScore(b);
+          if (scoreB !== scoreA) {
+            return scoreB - scoreA; // Urgent first, then Priority, then Normal
+          }
+          return new Date(a.issuedAt).getTime() - new Date(b.issuedAt).getTime();
+        });
+
+        if (eligibleTickets.length > 0) {
+          targetTicket = eligibleTickets[0];
         }
       }
 

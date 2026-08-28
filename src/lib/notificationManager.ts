@@ -8,6 +8,7 @@ export type NotificationPermissionState = 'granted' | 'denied' | 'default' | 'un
 class NotificationManager {
   private isNotificationSupported: boolean;
   private audioContext: AudioContext | null = null;
+  private lastNotifiedMap: Map<string, number> = new Map();
 
   constructor() {
     this.isNotificationSupported = typeof window !== 'undefined' && 'Notification' in window;
@@ -140,6 +141,14 @@ class NotificationManager {
       customBody
     } = params;
 
+    // Deduplicate within 4 seconds for the same ticket call
+    const now = Date.now();
+    const lastTime = this.lastNotifiedMap.get(ticketNumber) || 0;
+    if (now - lastTime < 4000) {
+      return null;
+    }
+    this.lastNotifiedMap.set(ticketNumber, now);
+
     const counterStr = counterNumber.toString().padStart(2, '0');
     const isAmharic = language === 'AMHARIC';
     const isBilingual = language === 'BOTH';
@@ -149,10 +158,10 @@ class NotificationManager {
 
     if (isAmharic) {
       title = `📢 ቲኬት ቁጥር ${ticketNumber} ተጠርቷል! (መስኮት ${counterStr})`;
-      body = `እባክዎ ወደ መስኮት ${counterStr}${serviceNameAmharic || serviceName ? ` ለ${serviceNameAmharic || serviceName}` : ''} ይቅረቡ።`;
+      body = `እባክዎ ወደ መስኮት ${counterStr}${serviceNameAmharic || serviceName ? ` ለ${serviceNameAmharic || serviceName}` : ''} ይሂዱ።`;
     } else if (isBilingual) {
       title = `📢 Ticket ${ticketNumber} / ቲኬት ${ticketNumber}`;
-      body = `ወደ መስኮት ${counterStr} ይቅረቡ | Proceed to Counter ${counterStr}${serviceName ? ` (${serviceName})` : ''}.`;
+      body = `ወደ መስኮት ${counterStr} ይሂዱ | Proceed to Counter ${counterStr}${serviceName ? ` (${serviceName})` : ''}.`;
     }
 
     if (customBody) {

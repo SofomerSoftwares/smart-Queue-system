@@ -9,7 +9,7 @@ export type TicketStatus =
   | 'NO_SHOW' 
   | 'TRANSFERRED';
 
-export type PriorityLevel = 'NORMAL' | 'PRIORITY';
+export type PriorityLevel = 'NORMAL' | 'PRIORITY' | 'URGENT';
 
 export type AnnouncementLanguage = 'AMHARIC' | 'ENGLISH' | 'BOTH';
 
@@ -61,6 +61,10 @@ export interface QueueTicket {
   officerName?: string;
   status: TicketStatus;
   priority: PriorityLevel;
+  urgencyReason?: string;
+  isUrgent?: boolean;
+  priorityFlaggedAt?: string;
+  priorityFlaggedBy?: string;
   issuedAt: string;
   calledAt?: string;
   serviceStartedAt?: string;
@@ -217,4 +221,7 @@ export interface PrintTicketData {
   notice?: string;
   checkInUrl?: string;
   isCheckedIn?: boolean;
+  priority?: PriorityLevel;
+  urgencyReason?: string;
+  isUrgent?: boolean;
 }

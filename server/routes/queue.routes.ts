@@ -9,7 +9,7 @@ import {
   buildPhoneticAnnouncementText,
   getAmharicTicketNumber 
 } from '../services/addis-voice.service.js';
-import { AnnouncementPayload } from '../types.js';
+import { AnnouncementPayload, PriorityLevel } from '../types.js';
 
 const router = Router();
 
@@ -87,11 +87,20 @@ router.get('/status', (req: Request, res: Response) => {
   try {
     const today = new Date().toISOString().split('T')[0];
     const allTickets = db.getTickets({ dateKey: today });
+    const getPriorityScore = (t: any): number => {
+      if (t.priority === 'URGENT') return 3;
+      if (t.priority === 'PRIORITY' || t.isUrgent) return 2;
+      return 1;
+    };
+
     const waitingTickets = allTickets
       .filter(t => t.status === 'WAITING')
       .sort((a, b) => {
-        if (a.priority === 'PRIORITY' && b.priority !== 'PRIORITY') return -1;
-        if (a.priority !== 'PRIORITY' && b.priority === 'PRIORITY') return 1;
+        const scoreA = getPriorityScore(a);
+        const scoreB = getPriorityScore(b);
+        if (scoreB !== scoreA) {
+          return scoreB - scoreA;
+        }
         return new Date(a.issuedAt).getTime() - new Date(b.issuedAt).getTime();
       });
 
@@ -139,10 +148,19 @@ router.get('/ticket/:ticketNumber', (req: Request, res: Response) => {
     }
 
     const today = ticket.dateKey;
+    const getPriorityScore = (p?: string, isUrg?: boolean) => {
+      if (p === 'URGENT') return 3;
+      if (p === 'PRIORITY' || isUrg) return 2;
+      return 1;
+    };
+
     const allWaitingToday = db.getTickets({ dateKey: today, status: 'WAITING' })
       .sort((a, b) => {
-        if (a.priority === 'PRIORITY' && b.priority !== 'PRIORITY') return -1;
-        if (a.priority !== 'PRIORITY' && b.priority === 'PRIORITY') return 1;
+        const scoreA = getPriorityScore(a.priority, a.isUrgent);
+        const scoreB = getPriorityScore(b.priority, b.isUrgent);
+        if (scoreB !== scoreA) {
+          return scoreB - scoreA;
+        }
         return new Date(a.issuedAt).getTime() - new Date(b.issuedAt).getTime();
       });
 
@@ -172,6 +190,10 @@ router.get('/ticket/:ticketNumber', (req: Request, res: Response) => {
         serviceNameAmharic: ticket.serviceNameAmharic,
         status: ticket.status,
         priority: ticket.priority,
+        urgencyReason: ticket.urgencyReason,
+        isUrgent: ticket.isUrgent,
+        priorityFlaggedAt: ticket.priorityFlaggedAt,
+        priorityFlaggedBy: ticket.priorityFlaggedBy,
         issuedAt: ticket.issuedAt,
         calledAt: ticket.calledAt,
         counterNumber: ticket.counterNumber,
@@ -308,7 +330,7 @@ router.get('/reviews', optionalAuthenticate, (req: AuthenticatedRequest, res: Re
 // 3. POST /api/queue/ticket - Receptionist / Kiosk ticket creation (Anonymous self-service or staff logged)
 router.post('/ticket', optionalAuthenticate, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { serviceId, priority } = req.body;
+    const { serviceId, priority, urgencyReason, notes } = req.body;
 
     if (!serviceId) {
       return res.status(400).json({
@@ -317,7 +339,17 @@ router.post('/ticket', optionalAuthenticate, (req: AuthenticatedRequest, res: Re
       });
     }
 
-    const ticket = db.generateTicket(serviceId, priority === 'PRIORITY' ? 'PRIORITY' : 'NORMAL');
+    let validatedPriority: PriorityLevel = 'NORMAL';
+    if (priority === 'URGENT') validatedPriority = 'URGENT';
+    else if (priority === 'PRIORITY') validatedPriority = 'PRIORITY';
+
+    const ticket = db.generateTicket(
+      serviceId, 
+      validatedPriority, 
+      urgencyReason, 
+      notes, 
+      req.user?.name || req.user?.username || 'Reception'
+    );
     const officeSetting = db.getOfficeSetting();
 
     // Calculate people ahead & estimated wait
@@ -332,13 +364,21 @@ router.post('/ticket', optionalAuthenticate, (req: AuthenticatedRequest, res: Re
       action: 'CREATE_TICKET',
       entity: 'QueueTicket',
       entityId: ticket.id,
-      metadata: { ticketNumber: ticket.ticketNumber, serviceId }
+      metadata: { 
+        ticketNumber: ticket.ticketNumber, 
+        serviceId,
+        priority: ticket.priority,
+        urgencyReason: ticket.urgencyReason,
+        isUrgent: ticket.isUrgent
+      }
     });
 
     // Realtime broadcast
     broadcaster.broadcast('queue:updated', {
       action: 'TICKET_CREATED',
-      ticketNumber: ticket.ticketNumber
+      ticketNumber: ticket.ticketNumber,
+      priority: ticket.priority,
+      isUrgent: ticket.isUrgent
     });
 
     return res.status(201).json({
@@ -359,7 +399,10 @@ router.post('/ticket', optionalAuthenticate, (req: AuthenticatedRequest, res: Re
         peopleAhead,
         estimatedWaitMinutes: estimatedWait,
         issuedAt: ticket.issuedAt,
-        notice: officeSetting.displayNotice
+        notice: officeSetting.displayNotice,
+        priority: ticket.priority,
+        urgencyReason: ticket.urgencyReason,
+        isUrgent: ticket.isUrgent
       }
     });
   } catch (err: any) {
@@ -690,6 +733,136 @@ router.post('/reset-daily', authenticate, authorize('queue.manage'), (req: Authe
 
     broadcaster.broadcast('queue:updated', { action: 'QUEUE_RESET' });
     return res.json({ success: true, message: 'Queue has been reset for today.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 12. PATCH /api/queue/ticket/:id/priority - Flag urgent/priority ticket
+router.patch('/ticket/:id/priority', authenticate, authorize('ticket.priority'), (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { priority, urgencyReason, notes } = req.body;
+
+    if (!priority || !['NORMAL', 'PRIORITY', 'URGENT'].includes(priority)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid priority level. Must be NORMAL, PRIORITY, or URGENT.'
+      });
+    }
+
+    const ticket = db.getTicketById(id);
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: 'Ticket not found.' });
+    }
+
+    const flaggedBy = req.user?.name || req.user?.username || 'Staff';
+    const updated = db.setTicketPriority(
+      id, 
+      priority as PriorityLevel, 
+      urgencyReason, 
+      flaggedBy, 
+      notes
+    );
+
+    // Audit log
+    db.addAuditLog({
+      userId: req.user?.id,
+      userName: flaggedBy,
+      action: 'SET_TICKET_PRIORITY',
+      entity: 'QueueTicket',
+      entityId: updated.id,
+      metadata: { 
+        ticketNumber: updated.ticketNumber, 
+        priority: updated.priority, 
+        urgencyReason: updated.urgencyReason,
+        isUrgent: updated.isUrgent,
+        notes
+      }
+    });
+
+    // Real-time broadcast
+    broadcaster.broadcast('ticket:priority_changed', { ticket: updated });
+    broadcaster.broadcast('queue:updated', { 
+      action: 'TICKET_PRIORITY_CHANGED', 
+      ticketNumber: updated.ticketNumber,
+      priority: updated.priority,
+      isUrgent: updated.isUrgent
+    });
+
+    return res.json({
+      success: true,
+      ticket: {
+        ...updated,
+        ticketNumberAmharic: getAmharicTicketNumber(updated.ticketNumber)
+      },
+      message: `Ticket ${updated.ticketNumber} priority updated to ${updated.priority}.`
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Alias: POST /api/queue/ticket/:id/priority
+router.post('/ticket/:id/priority', authenticate, authorize('ticket.priority'), (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { priority, urgencyReason, notes } = req.body;
+
+    if (!priority || !['NORMAL', 'PRIORITY', 'URGENT'].includes(priority)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid priority level. Must be NORMAL, PRIORITY, or URGENT.'
+      });
+    }
+
+    const ticket = db.getTicketById(id);
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: 'Ticket not found.' });
+    }
+
+    const flaggedBy = req.user?.name || req.user?.username || 'Staff';
+    const updated = db.setTicketPriority(
+      id, 
+      priority as PriorityLevel, 
+      urgencyReason, 
+      flaggedBy, 
+      notes
+    );
+
+    // Audit log
+    db.addAuditLog({
+      userId: req.user?.id,
+      userName: flaggedBy,
+      action: 'SET_TICKET_PRIORITY',
+      entity: 'QueueTicket',
+      entityId: updated.id,
+      metadata: { 
+        ticketNumber: updated.ticketNumber, 
+        priority: updated.priority, 
+        urgencyReason: updated.urgencyReason,
+        isUrgent: updated.isUrgent,
+        notes
+      }
+    });
+
+    // Real-time broadcast
+    broadcaster.broadcast('ticket:priority_changed', { ticket: updated });
+    broadcaster.broadcast('queue:updated', { 
+      action: 'TICKET_PRIORITY_CHANGED', 
+      ticketNumber: updated.ticketNumber,
+      priority: updated.priority,
+      isUrgent: updated.isUrgent
+    });
+
+    return res.json({
+      success: true,
+      ticket: {
+        ...updated,
+        ticketNumberAmharic: getAmharicTicketNumber(updated.ticketNumber)
+      },
+      message: `Ticket ${updated.ticketNumber} priority updated to ${updated.priority}.`
+    });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: err.message });
   }

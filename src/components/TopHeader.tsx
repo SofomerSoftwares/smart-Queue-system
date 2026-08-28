@@ -13,7 +13,9 @@ import {
   Volume2, 
   Music, 
   Globe,
-  Radio
+  Radio,
+  Bell,
+  BellRing
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
 import { useAuth } from '../context/AuthContext';
@@ -25,9 +27,21 @@ interface TopHeaderProps {
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileSidebar }) => {
-  const { uiLanguage, officeSetting, stats, isAudioUnlocked, unlockAudio, isMusicPlaying } = useQueue();
+  const { 
+    uiLanguage, 
+    officeSetting, 
+    stats, 
+    isAudioUnlocked, 
+    unlockAudio, 
+    isMusicPlaying,
+    isNotificationsEnabled,
+    requestNotificationPermission,
+    sendTestNotification,
+    toggleNotifications
+  } = useQueue();
   const { user } = useAuth();
   const [timeStr, setTimeStr] = useState<string>('');
+  const [showNotificationToast, setShowNotificationToast] = useState<boolean>(false);
 
   const isAmharic = uiLanguage === 'AMHARIC';
   const t = (key: string, defaultText?: string) => AmharicLib.i18n.t(key, uiLanguage, defaultText);
@@ -137,6 +151,44 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
       {/* Right: Real-time Clock & Live Telemetry Pills */}
       <div className="flex items-center gap-2 sm:gap-3">
         
+        {/* Browser Call Notifications Toggle */}
+        <button
+          id="btn-browser-notifications"
+          onClick={async () => {
+            if (!isNotificationsEnabled) {
+              const granted = await requestNotificationPermission();
+              if (granted) {
+                sendTestNotification();
+              }
+            } else {
+              // Trigger test notification
+              sendTestNotification();
+            }
+          }}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-bold transition cursor-pointer ${
+            isNotificationsEnabled
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+              : 'bg-slate-100/80 text-slate-600 border-slate-200/60 hover:bg-slate-200'
+          }`}
+          title={
+            isNotificationsEnabled
+              ? (isAmharic ? 'የብሮውዘር ጥሪ ማሳወቂያ ነቅቷል (ለመሞከር ይጫኑ)' : 'Browser notifications enabled (Click to test call alert)')
+              : (isAmharic ? 'ቲኬት ሲጠራ በብሮውዘር እንዲያሳውቅዎ ያንቁ' : 'Click to enable browser call notifications')
+          }
+        >
+          {isNotificationsEnabled ? (
+            <>
+              <BellRing className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+              <span className="text-[11px] hidden sm:inline">{isAmharic ? 'ማሳወቂያ' : 'Alerts'}</span>
+            </>
+          ) : (
+            <>
+              <Bell className="w-3.5 h-3.5 text-slate-500" />
+              <span className="text-[11px] hidden sm:inline">{isAmharic ? 'ማሳወቂያ አንቃ' : 'Enable Alerts'}</span>
+            </>
+          )}
+        </button>
+
         {/* Live Audio Status */}
         {!isAudioUnlocked && (
           <button
