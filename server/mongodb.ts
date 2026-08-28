@@ -1,5 +1,5 @@
 import { MongoClient, Db } from 'mongodb';
-import { DatabaseSchema, User, Service, Counter, QueueTicket, QueueEvent, AuditLog, CustomerReview } from './types.js';
+import { DatabaseSchema, User, Role, PriorityPolicy, Service, Counter, QueueTicket, QueueEvent, AuditLog, CustomerReview } from './types.js';
 
 export function sanitizeMongoUri(rawUri?: string | null): string {
   if (!rawUri || typeof rawUri !== 'string') return '';
@@ -230,6 +230,7 @@ class MongoDBService {
 
     try {
       const users = await this.db.collection<User>('users').find({}).toArray();
+      const roles = await this.db.collection<Role>('roles').find({}).toArray();
       const services = await this.db.collection<Service>('services').find({}).toArray();
       const counters = await this.db.collection<Counter>('counters').find({}).toArray();
       const tickets = await this.db.collection<QueueTicket>('tickets').find({}).toArray();
@@ -238,6 +239,7 @@ class MongoDBService {
       const customerReviews = await this.db.collection<CustomerReview>('customer_reviews').find({}).sort({ createdAt: -1 }).toArray();
 
       const officeSettingDoc = await this.db.collection('settings').findOne({ _id: 'officeSetting' as any });
+      const priorityPolicyDoc = await this.db.collection('settings').findOne({ _id: 'priorityPolicy' as any });
       let audioSettingDoc = await this.db.collection('settings').findOne({ _id: 'audioSetting' as any });
       if (!audioSettingDoc) {
         const audioFromCol = await this.db.collection('audio_settings').findOne({});
@@ -261,6 +263,7 @@ class MongoDBService {
 
       return {
         users: cleanDocs<User>(users),
+        roles: cleanDocs<Role>(roles),
         services: cleanDocs<Service>(services),
         counters: cleanDocs<Counter>(counters),
         tickets: cleanDocs<QueueTicket>(tickets),
@@ -268,7 +271,8 @@ class MongoDBService {
         auditLogs: cleanDocs<AuditLog>(auditLogs),
         customerReviews: cleanDocs<CustomerReview>(customerReviews),
         officeSetting: (officeSettingDoc?.data as any) || undefined,
-        audioSetting: (audioSettingDoc?.data as any) || undefined
+        audioSetting: (audioSettingDoc?.data as any) || undefined,
+        priorityPolicy: (priorityPolicyDoc?.data as any) || undefined
       } as DatabaseSchema;
     } catch (err: any) {
       console.error('Error loading data from MongoDB Atlas:', err);
@@ -302,6 +306,7 @@ class MongoDBService {
 
       await Promise.allSettled([
         syncCollection('users', data.users),
+        syncCollection('roles', data.roles || []),
         syncCollection('services', data.services),
         syncCollection('counters', data.counters),
         syncCollection('tickets', data.tickets),
@@ -316,6 +321,11 @@ class MongoDBService {
         this.db.collection('settings').updateOne(
           { _id: 'audioSetting' as any },
           { $set: { data: data.audioSetting, updatedAt: new Date().toISOString() } },
+          { upsert: true }
+        ),
+        this.db.collection('settings').updateOne(
+          { _id: 'priorityPolicy' as any },
+          { $set: { data: data.priorityPolicy, updatedAt: new Date().toISOString() } },
           { upsert: true }
         ),
         this.db.collection('audio_settings').updateOne(

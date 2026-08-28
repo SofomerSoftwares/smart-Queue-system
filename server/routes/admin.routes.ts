@@ -1,9 +1,9 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import { db } from '../db.js';
+import { db, PERMISSIONS } from '../db.js';
 import { authenticate, authorize, requireAdmin, AuthenticatedRequest } from '../middleware/auth.js';
 import { broadcaster } from '../websocket.js';
-import { User, Service, Counter, OfficeSetting } from '../types.js';
+import { User, Service, Counter, OfficeSetting, Role, RoleName, PriorityPolicy } from '../types.js';
 
 const router = Router();
 
@@ -18,6 +18,8 @@ router.get('/users', authenticate, requireAdmin, (req: Request, res: Response) =
     role: u.role,
     status: u.status,
     assignedCounterId: u.assignedCounterId,
+    canManagePriority: u.canManagePriority,
+    permissions: db.getUserPermissions(u),
     lastLoginAt: u.lastLoginAt,
     createdAt: u.createdAt
   }));
@@ -27,7 +29,7 @@ router.get('/users', authenticate, requireAdmin, (req: Request, res: Response) =
 // POST /api/users (Strict Admin only)
 router.post('/users', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { name, username, password, role, assignedCounterId } = req.body;
+    const { name, username, password, role, assignedCounterId, canManagePriority } = req.body;
 
     if (!name || !username || !password || !role) {
       return res.status(400).json({ success: false, message: 'Name, username, password, and role are required.' });
@@ -50,6 +52,7 @@ router.post('/users', authenticate, requireAdmin, (req: AuthenticatedRequest, re
       role,
       status: 'ACTIVE',
       assignedCounterId,
+      canManagePriority: canManagePriority !== undefined ? canManagePriority : undefined,
       createdAt: now,
       updatedAt: now
     };
@@ -62,11 +65,14 @@ router.post('/users', authenticate, requireAdmin, (req: AuthenticatedRequest, re
       action: 'CREATE_USER',
       entity: 'User',
       entityId: newUser.id,
-      metadata: { username, role }
+      metadata: { username, role, canManagePriority: newUser.canManagePriority }
     });
 
     const { passwordHash: _, ...safeUser } = newUser;
-    res.status(201).json({ success: true, user: safeUser });
+    res.status(201).json({ 
+      success: true, 
+      user: { ...safeUser, permissions: db.getUserPermissions(newUser) } 
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -76,7 +82,7 @@ router.post('/users', authenticate, requireAdmin, (req: AuthenticatedRequest, re
 router.put('/users/:id', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, username, role, status, assignedCounterId, password } = req.body;
+    const { name, username, role, status, assignedCounterId, password, canManagePriority } = req.body;
 
     const existingUser = db.getUserById(id);
     if (!existingUser) {
@@ -100,6 +106,9 @@ router.put('/users/:id', authenticate, requireAdmin, (req: AuthenticatedRequest,
     }
     if (status) updates.status = status;
     if (assignedCounterId !== undefined) updates.assignedCounterId = assignedCounterId;
+    if (canManagePriority !== undefined) {
+      updates.canManagePriority = canManagePriority === null ? undefined : canManagePriority;
+    }
 
     if (password && password.trim()) {
       if (password.trim().length < 6) {
@@ -124,7 +133,38 @@ router.put('/users/:id', authenticate, requireAdmin, (req: AuthenticatedRequest,
     });
 
     const { passwordHash: _, ...safeUser } = updated;
-    res.json({ success: true, user: safeUser });
+    broadcaster.broadcast('user:updated', { user: { ...safeUser, permissions: db.getUserPermissions(updated) } });
+    res.json({ success: true, user: { ...safeUser, permissions: db.getUserPermissions(updated) } });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PATCH /api/users/:id/priority (Toggle or set custom priority management access)
+router.patch('/users/:id/priority', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { canManagePriority } = req.body;
+
+    const updated = db.setUserPriorityAccess(id, canManagePriority === undefined ? null : canManagePriority);
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const { passwordHash: _, ...safeUser } = updated;
+    const userPayload = { ...safeUser, permissions: db.getUserPermissions(updated) };
+
+    broadcaster.broadcast('user:updated', { user: userPayload });
+    db.addAuditLog({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      action: 'UPDATE_USER_PRIORITY_PERMISSION',
+      entity: 'User',
+      entityId: id,
+      metadata: { canManagePriority: updated.canManagePriority, username: updated.username }
+    });
+
+    res.json({ success: true, user: userPayload });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -565,6 +605,114 @@ router.post('/database/sync', authenticate, requireAdmin, async (req: Authentica
   try {
     const result = await db.syncMongoNow();
     res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ==================== ROLE & PRIORITY MANAGEMENT ====================
+
+// GET /api/admin/roles (Admin only)
+router.get('/admin/roles', authenticate, requireAdmin, (req: Request, res: Response) => {
+  try {
+    const roles = db.getRoles();
+    res.json({
+      success: true,
+      roles,
+      permissions: PERMISSIONS,
+      priorityPolicy: db.getPriorityPolicy()
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PUT /api/admin/roles/:roleName (Admin only)
+router.put('/admin/roles/:roleName', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { roleName } = req.params;
+    const { permissions } = req.body;
+
+    if (!Array.isArray(permissions)) {
+      return res.status(400).json({ success: false, message: 'Permissions array is required.' });
+    }
+
+    const updatedRole = db.updateRolePermissions(roleName as RoleName, permissions);
+
+    broadcaster.broadcast('role:updated', { role: updatedRole });
+    db.addAuditLog({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      action: 'UPDATE_ROLE_PERMISSIONS',
+      entity: 'Role',
+      entityId: updatedRole.id,
+      metadata: { roleName, permissionCount: permissions.length, permissions }
+    });
+
+    res.json({ success: true, role: updatedRole });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PATCH /api/admin/roles/:roleName/priority (Admin only - toggle priority triage permission)
+router.patch('/admin/roles/:roleName/priority', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { roleName } = req.params;
+    const { enabled } = req.body;
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'enabled boolean flag is required.' });
+    }
+
+    const updatedRole = db.toggleRolePriority(roleName as RoleName, enabled);
+
+    broadcaster.broadcast('role:updated', { role: updatedRole });
+    db.addAuditLog({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      action: 'TOGGLE_ROLE_PRIORITY',
+      entity: 'Role',
+      entityId: updatedRole.id,
+      metadata: { roleName, enabled }
+    });
+
+    res.json({ success: true, role: updatedRole });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/admin/priority-policy (Admin or authenticated staff)
+router.get('/admin/priority-policy', authenticate, (req: Request, res: Response) => {
+  try {
+    const policy = db.getPriorityPolicy();
+    res.json({ success: true, policy });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PUT /api/admin/priority-policy (Admin only)
+router.put('/api/admin/priority-policy', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const updates = req.body;
+    const updatedPolicy = db.updatePriorityPolicy(updates);
+
+    broadcaster.broadcast('settings:updated', { priorityPolicy: updatedPolicy });
+    db.addAuditLog({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      action: 'UPDATE_PRIORITY_POLICY',
+      entity: 'PriorityPolicy',
+      metadata: updates
+    });
+
+    res.json({ 
+      success: true, 
+      policy: updatedPolicy,
+      roles: db.getRoles() 
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }

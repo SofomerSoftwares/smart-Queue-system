@@ -10,7 +10,11 @@ import {
   QueueStats,
   PrintTicketData,
   AddisVoiceOption,
-  CustomerReview
+  CustomerReview,
+  Role,
+  RoleName,
+  PriorityPolicy,
+  PermissionDefinition
 } from '../types';
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -356,5 +360,41 @@ export const api = {
   syncDatabase: () =>
     request<{ success: boolean; message: string }>('/api/database/sync', {
       method: 'POST'
+    }),
+
+  // --- ROLES & PRIORITY MANAGEMENT ---
+  getRoles: () =>
+    request<{
+      success: boolean;
+      roles: Role[];
+      permissions: PermissionDefinition[];
+      priorityPolicy: PriorityPolicy;
+    }>('/api/admin/roles'),
+
+  updateRolePermissions: (roleName: RoleName, permissions: string[]) =>
+    request<{ success: boolean; role: Role }>(`/api/admin/roles/${roleName}`, {
+      method: 'PUT',
+      body: JSON.stringify({ permissions })
+    }),
+
+  toggleRolePriority: (roleName: RoleName, enabled: boolean) =>
+    request<{ success: boolean; role: Role }>(`/api/admin/roles/${roleName}/priority`, {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled })
+    }),
+
+  getPriorityPolicy: () =>
+    request<{ success: boolean; policy: PriorityPolicy }>('/api/admin/priority-policy'),
+
+  updatePriorityPolicy: (updates: Partial<PriorityPolicy>) =>
+    request<{ success: boolean; policy: PriorityPolicy; roles: Role[] }>('/api/admin/priority-policy', {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    }),
+
+  updateUserPriorityAccess: (userId: string, canManagePriority: boolean | null) =>
+    request<{ success: boolean; user: User }>(`/api/users/${userId}/priority`, {
+      method: 'PATCH',
+      body: JSON.stringify({ canManagePriority })
     })
 };

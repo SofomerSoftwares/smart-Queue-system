@@ -13,7 +13,9 @@ export interface RealtimeEvent<T = any> {
     | 'ticket:priority_changed'
     | 'counter:updated'
     | 'announcement:play'
-    | 'settings:updated';
+    | 'settings:updated'
+    | 'role:updated'
+    | 'user:updated';
   data: T;
   timestamp: string;
 }

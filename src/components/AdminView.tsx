@@ -43,13 +43,27 @@ import {
   HardDrive,
   FolderOpen,
   FileVideo,
-  Download
+  Download,
+  Ticket,
+  Flame
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { audioManager } from '../lib/audioManager';
-import { Service, Counter, User, AudioSetting, OfficeSetting, AuditLog, AddisVoiceOption } from '../types';
+import { 
+  Service, 
+  Counter, 
+  User, 
+  AudioSetting, 
+  OfficeSetting, 
+  AuditLog, 
+  AddisVoiceOption,
+  Role,
+  RoleName,
+  PriorityPolicy,
+  PermissionDefinition
+} from '../types';
 import { PRESET_VIDEOS } from './DisplayVideoPlayer';
 import { videoStorage, StoredVideo, formatBytes } from '../lib/videoStorage';
 
@@ -66,7 +80,7 @@ export const AdminView: React.FC = () => {
   } = useQueue();
 
   const { user, login, demoLogin } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'counters' | 'staff' | 'audio' | 'database' | 'office' | 'audit'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'counters' | 'staff' | 'roles' | 'audio' | 'database' | 'office' | 'audit'>('overview');
 
   const isAmharic = uiLanguage === 'AMHARIC';
 
@@ -79,6 +93,22 @@ export const AdminView: React.FC = () => {
   // State for Users & Audit
   const [usersList, setUsersList] = useState<User[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+
+  // Role Management & Priority Policy State
+  const [rolesList, setRolesList] = useState<Role[]>([]);
+  const [permissionsList, setPermissionsList] = useState<PermissionDefinition[]>([]);
+  const [priorityPolicy, setPriorityPolicy] = useState<PriorityPolicy>({
+    requireReasonForUrgent: true,
+    allowOfficerTriage: true,
+    allowReceptionTriage: true,
+    autoAuditPriorityChanges: true
+  });
+  const [isSavingPolicy, setIsSavingPolicy] = useState<boolean>(false);
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState<boolean>(false);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [selectedRolePerms, setSelectedRolePerms] = useState<string[]>([]);
+  const [isSavingRolePerms, setIsSavingRolePerms] = useState<boolean>(false);
+  const [roleModalError, setRoleModalError] = useState<string>('');
 
   // Addis AI Voice Options & DB Status
   const [addisVoices, setAddisVoices] = useState<AddisVoiceOption[]>([
@@ -247,19 +277,120 @@ export const AdminView: React.FC = () => {
 
   const loadAdminData = async () => {
     try {
-      const [uRes, aRes, vRes, dbRes] = await Promise.all([
+      const [uRes, aRes, vRes, dbRes, rRes] = await Promise.all([
         api.getUsers().catch(() => ({ success: false, users: [] })),
         api.getAuditLogs().catch(() => ({ success: false, logs: [] })),
         api.getAddisVoices().catch(() => ({ success: false, voices: [] })),
-        api.getDatabaseStatus().catch(() => ({ success: false }))
+        api.getDatabaseStatus().catch(() => ({ success: false })),
+        api.getRoles().catch(() => ({ success: false, roles: [], permissions: [], priorityPolicy: null }))
       ]);
 
       if (uRes.success) setUsersList(uRes.users);
       if (aRes.success) setAuditLogs(aRes.logs);
       if (vRes.success && vRes.voices?.length > 0) setAddisVoices(vRes.voices);
       if (dbRes.success) setDbStatus(dbRes);
+      if (rRes.success) {
+        if (rRes.roles) setRolesList(rRes.roles);
+        if (rRes.permissions) setPermissionsList(rRes.permissions);
+        if (rRes.priorityPolicy) setPriorityPolicy(rRes.priorityPolicy);
+      }
     } catch (err) {
       console.warn('Error loading admin data:', err);
+    }
+  };
+
+  // Toggle role-level priority management permission
+  const handleToggleRolePriority = async (roleName: RoleName, currentEnabled: boolean) => {
+    try {
+      const res = await api.toggleRolePriority(roleName, !currentEnabled);
+      if (res.success) {
+        setRolesList(prev => prev.map(r => r.name === roleName ? res.role : r));
+        setSaveSuccessMsg(
+          isAmharic 
+            ? `የ ${roleName} የቅድሚያ አስተዳደር ፈቃድ ተቀይሯል!` 
+            : `Priority management for ${roleName} updated!`
+        );
+        setTimeout(() => setSaveSuccessMsg(''), 3000);
+        loadAdminData();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to update role priority access');
+    }
+  };
+
+  // Save global priority policy
+  const handleSavePriorityPolicy = async () => {
+    try {
+      setIsSavingPolicy(true);
+      const res = await api.updatePriorityPolicy(priorityPolicy);
+      if (res.success) {
+        setPriorityPolicy(res.policy);
+        if (res.roles) setRolesList(res.roles);
+        setSaveSuccessMsg(
+          isAmharic 
+            ? 'የቢሮው የቅድሚያ አሰራር ፖሊሲ በተሳካ ሁኔታ ተቀምጧል!' 
+            : 'Office priority triage policy saved successfully!'
+        );
+        setTimeout(() => setSaveSuccessMsg(''), 3500);
+        loadAdminData();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to save priority policy');
+    } finally {
+      setIsSavingPolicy(false);
+    }
+  };
+
+  // Open role permissions modal
+  const handleOpenRoleModal = (role: Role) => {
+    setEditingRole(role);
+    setSelectedRolePerms([...role.permissions]);
+    setRoleModalError('');
+    setIsRoleModalOpen(true);
+  };
+
+  // Save updated permissions for a role
+  const handleSaveRolePermissions = async () => {
+    if (!editingRole) return;
+    try {
+      setIsSavingRolePerms(true);
+      setRoleModalError('');
+      const res = await api.updateRolePermissions(editingRole.name, selectedRolePerms);
+      if (res.success) {
+        setRolesList(prev => prev.map(r => r.name === editingRole.name ? res.role : r));
+        setIsRoleModalOpen(false);
+        setEditingRole(null);
+        setSaveSuccessMsg(
+          isAmharic 
+            ? `የ ${editingRole.name} ፈቃዶች በተሳካ ሁኔታ ተሻሽለዋል!` 
+            : `Role permissions for ${editingRole.name} updated successfully!`
+        );
+        setTimeout(() => setSaveSuccessMsg(''), 3500);
+        loadAdminData();
+      }
+    } catch (err: any) {
+      setRoleModalError(err.message || 'Failed to update role permissions');
+    } finally {
+      setIsSavingRolePerms(false);
+    }
+  };
+
+  // Toggle user-level priority management access override
+  const handleToggleUserPriority = async (userId: string, currentVal: boolean | undefined) => {
+    try {
+      const nextVal = currentVal === true ? false : true;
+      const res = await api.updateUserPriorityAccess(userId, nextVal);
+      if (res.success) {
+        setUsersList(prev => prev.map(u => u.id === userId ? res.user : u));
+        setSaveSuccessMsg(
+          isAmharic 
+            ? 'የሰራተኛው የቅድሚያ መብት ተሻሽሏል!' 
+            : 'Staff priority access updated!'
+        );
+        setTimeout(() => setSaveSuccessMsg(''), 3000);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to update user priority');
     }
   };
 
@@ -838,7 +969,8 @@ export const AdminView: React.FC = () => {
           { id: 'overview', label: isAmharic ? 'አጠቃላይ እይታ' : 'Overview', icon: Activity },
           { id: 'services', label: isAmharic ? 'አገልግሎቶች' : 'Services', icon: Layers },
           { id: 'counters', label: isAmharic ? 'መስኮቶች' : 'Counters', icon: Tv },
-          { id: 'staff', label: isAmharic ? 'ሰራተኞች' : 'Staff & Roles', icon: Users },
+          { id: 'staff', label: isAmharic ? 'ሰራተኞች' : 'Staff Accounts', icon: Users },
+          { id: 'roles', label: isAmharic ? 'የስልጣን እና የቅድሚያ ቁጥጥር' : 'Roles & Priority Policy', icon: Sliders },
           { id: 'audio', label: isAmharic ? 'የድምፅ ስቱዲዮ (Addis AI)' : 'Voice & Audio (Addis AI)', icon: Volume2 },
           { id: 'database', label: isAmharic ? 'ዳታቤዝ (MongoDB)' : 'Database (MongoDB Atlas)', icon: Database },
           { id: 'office', label: isAmharic ? 'የቢሮ ቅንብር' : 'Office Settings', icon: Settings },
@@ -1098,6 +1230,7 @@ export const AdminView: React.FC = () => {
                   <th className="py-3 px-4">Username</th>
                   <th className="py-3 px-4">Role</th>
                   <th className="py-3 px-4">{isAmharic ? 'የተመደበ መስኮት' : 'Assigned Station'}</th>
+                  <th className="py-3 px-4">{isAmharic ? 'የቅድሚያ ፈቃድ' : 'Priority Access'}</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -1105,6 +1238,7 @@ export const AdminView: React.FC = () => {
               <tbody className="divide-y divide-slate-100 font-medium">
                 {usersList.map((u) => {
                   const assignedCnt = counters.find(cnt => cnt.id === u.assignedCounterId);
+                  const hasPriority = u.canManagePriority === true || (u.canManagePriority === undefined && u.permissions?.includes('ticket.priority'));
                   return (
                     <tr key={u.id} className="hover:bg-slate-50">
                       <td className="py-3.5 px-4 font-bold text-slate-900">{u.name}</td>
@@ -1122,6 +1256,32 @@ export const AdminView: React.FC = () => {
                           </span>
                         ) : (
                           <span className="text-slate-400 text-xs italic">{isAmharic ? 'አልተመደበም' : 'Unassigned'}</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {u.role === 'ADMIN' ? (
+                          <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                            <Shield className="w-3 h-3" />
+                            <span>{isAmharic ? 'ሙሉ ፈቃድ' : 'Unrestricted'}</span>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleUserPriority(u.id, u.canManagePriority)}
+                            title={isAmharic ? 'የቅድሚያ አስተዳደር መብት ይቀይሩ' : 'Toggle user priority access'}
+                            className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
+                              hasPriority
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                                : 'bg-slate-100 text-slate-500 border-slate-300 hover:bg-slate-200'
+                            }`}
+                          >
+                            <Sliders className="w-3 h-3" />
+                            <span>
+                              {hasPriority
+                                ? (isAmharic ? 'ፈቃድ አለው' : 'Priority Granted')
+                                : (isAmharic ? 'የተከለከለ' : 'Standard Only')}
+                            </span>
+                          </button>
                         )}
                       </td>
                       <td className="py-3.5 px-4">
@@ -1185,6 +1345,300 @@ export const AdminView: React.FC = () => {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: ROLES & PRIORITY POLICY MANAGEMENT */}
+      {activeTab === 'roles' && (
+        <div className="space-y-6 animate-in fade-in">
+          {/* Header Banner */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="p-2 rounded-xl bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                  <Sliders className="w-5 h-5" />
+                </span>
+                <h2 className="text-base font-bold text-slate-900">
+                  {isAmharic ? 'የስልጣን እና የቅድሚያ ቁጥጥር ማዕከል' : 'Role Management & Priority Policy'}
+                </h2>
+              </div>
+              <p className="text-xs text-slate-500 mt-1 max-w-2xl">
+                {isAmharic 
+                  ? 'የተጠቃሚ ሚናዎችን ፈቃዶች ያስተካክሉ፣ ለአስቸኳይ እና ልዩ ፍላጎት ላላቸው ደንበኞች ቅድሚያ የመስጠት መመሪያዎችን ያዋቅሩ፣ እንዲሁም የቢሮውን የቅድሚያ አሰራር ደንቦች ይቆጣጠሩ።'
+                  : 'Manage dynamic role permissions, configure ticket urgency triage policies, and control customer prioritization rules across reception and service counters.'}
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                id="btn-save-priority-policy"
+                onClick={handleSavePriorityPolicy}
+                disabled={isSavingPolicy}
+                className="flex items-center space-x-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs disabled:opacity-50"
+              >
+                {isSavingPolicy ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>{isAmharic ? 'በማስቀመጥ ላይ...' : 'Saving Policy...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>{isAmharic ? 'ፖሊሲውን አስቀምጥ' : 'Save Policy'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Section 1: Office Priority Policy & Triage Rules */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center space-x-2">
+                <Shield className="w-5 h-5 text-amber-600" />
+                <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+                  {isAmharic ? 'የቢሮው የቅድሚያ አሰራር ፖሊሲ እና ደንቦች' : 'Office Priority Policy & Triage Rules'}
+                </h3>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                {isAmharic ? 'ቅድሚያ ደንቦች' : 'Triage Rules'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Policy 1: Require Reason for Urgent */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 transition flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-bold text-xs text-slate-900">
+                      {isAmharic ? 'ለአስቸኳይ ትኬቶች አስገዳጅ ምክንያት' : 'Require Specific Reason for Urgent Tickets'}
+                    </span>
+                    {priorityPolicy.requireReasonForUrgent && (
+                      <span className="px-1.5 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-bold rounded-md">
+                        {isAmharic ? 'አስገዳጅ' : 'Mandatory'}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    {isAmharic 
+                      ? 'ትኬት እንደ «አስቸኳይ» (Urgent) ሲመደብ የተረጋገጠ ምክንያት (የህክምና፣ አረጋውያን፣ ነፍሰ ጡር፣ አካል ጉዳት) እንዲገባ ያስገድዳል። ያለ ምክንያት መቀየር አይፈቀድም።'
+                      : 'Enforces mandatory concrete reason (medical, elderly, pregnant, disability, or official escalation) when classifying a ticket as Urgent.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPriorityPolicy(prev => ({ ...prev, requireReasonForUrgent: !prev.requireReasonForUrgent }))}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-200 shrink-0 cursor-pointer ${
+                    priorityPolicy.requireReasonForUrgent ? 'bg-amber-600 justify-end' : 'bg-slate-300 justify-start'
+                  }`}
+                >
+                  <span className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
+                </button>
+              </div>
+
+              {/* Policy 2: Allow Officer Triage */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 transition flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-bold text-xs text-slate-900">
+                      {isAmharic ? 'የመስኮት ሰራተኛ ቅድሚያ የመስጠት ፈቃድ' : 'Counter Officer Priority Triage'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    {isAmharic 
+                      ? 'የመስኮት አገልግሎት ሰራተኞች በመስኮት ጣቢያቸው ላይ ሆነው ወረፋ ላይ ያሉ ደንበኞችን አስቸኳይ ወይም ቅድሚያ እንዲሰጣቸው ማድረግ ይችላሉ።'
+                      : 'Allows Counter Service Officers to triage and escalate ticket priorities directly from their station screen.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPriorityPolicy(prev => ({ ...prev, allowOfficerTriage: !prev.allowOfficerTriage }))}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-200 shrink-0 cursor-pointer ${
+                    priorityPolicy.allowOfficerTriage ? 'bg-amber-600 justify-end' : 'bg-slate-300 justify-start'
+                  }`}
+                >
+                  <span className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
+                </button>
+              </div>
+
+              {/* Policy 3: Allow Reception Triage */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 transition flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-bold text-xs text-slate-900">
+                      {isAmharic ? 'የመስተንግዶ እና ኪዮስክ ቅድሚያ የመስጠት ፈቃድ' : 'Reception & Kiosk Priority Intake'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    {isAmharic 
+                      ? 'የመስተንግዶ ዴስክ እና ኪዮስክ ኦፕሬተሮች ትኬት ሲቆርጡ ቅድሚያ ወይም አስቸኳይ ትኬት በቀጥታ እንዲያወጡ ይፈቅዳል።'
+                      : 'Permits front desk staff and reception intake to assign Priority or Urgent classification during ticket creation.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPriorityPolicy(prev => ({ ...prev, allowReceptionTriage: !prev.allowReceptionTriage }))}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-200 shrink-0 cursor-pointer ${
+                    priorityPolicy.allowReceptionTriage ? 'bg-amber-600 justify-end' : 'bg-slate-300 justify-start'
+                  }`}
+                >
+                  <span className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
+                </button>
+              </div>
+
+              {/* Policy 4: Auto-Audit Priority Changes */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 transition flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-bold text-xs text-slate-900">
+                      {isAmharic ? 'የቅድሚያ ለውጦችን በራስ-ሰር ኦዲት መመዝገብ' : 'Auto-Audit Priority Actions'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    {isAmharic 
+                      ? 'ማናቸውም የትኬት ቅድሚያ ለውጦች፣ ምክንያቶች እና ያሻሻለው ሰራተኛ ስም በማይሰረዝ የእንቅስቃሴ መዝገብ (Audit Trail) ውስጥ እንዲቀመጥ ያደርጋል።'
+                      : 'Automatically writes an immutable audit trail record whenever a ticket is flagged, upgraded, or reset.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPriorityPolicy(prev => ({ ...prev, autoAuditPriorityChanges: !prev.autoAuditPriorityChanges }))}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-200 shrink-0 cursor-pointer ${
+                    priorityPolicy.autoAuditPriorityChanges ? 'bg-amber-600 justify-end' : 'bg-slate-300 justify-start'
+                  }`}
+                >
+                  <span className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Roles & Permissions Matrix */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  {isAmharic ? 'የተጠቃሚ ሚናዎች እና የፈቃድ መዋቅር' : 'System Roles & Permissions Matrix'}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {isAmharic 
+                    ? 'ለእያንዳንዱ ሚና የተሰጡ ዝርዝር ፈቃዶችን ይመልከቱ እና የቅድሚያ አስተዳደር ስልጣን ይስጡ ወይም ያግዱ።' 
+                    : 'Configure access controls and toggle priority triage capabilities per role.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {rolesList.map((role) => {
+                const isRoleAdmin = role.name === 'ADMIN';
+                const hasPriorityPerm = role.permissions.includes('ticket.priority');
+                const members = usersList.filter(u => u.role === role.name);
+
+                return (
+                  <div 
+                    key={role.name} 
+                    className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between space-y-4 hover:border-slate-300 transition"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center space-x-1.5">
+                            <span className="font-bold text-sm text-slate-900">
+                              {role.displayName || role.name}
+                            </span>
+                            {isRoleAdmin && (
+                              <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                                SYSTEM
+                              </span>
+                            )}
+                          </div>
+                          <span className="font-mono text-[10px] text-slate-400">
+                            {role.name}
+                          </span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">
+                          {members.length} {isAmharic ? 'ሰራተኞች' : 'Users'}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-slate-600 leading-relaxed min-h-[36px]">
+                        {isAmharic && role.descriptionAmharic ? role.descriptionAmharic : role.description}
+                      </p>
+
+                      {/* Priority Management Privilege Box */}
+                      <div className={`p-3 rounded-xl border transition ${
+                        hasPriorityPerm || isRoleAdmin
+                          ? 'bg-amber-50/70 border-amber-200 text-amber-900'
+                          : 'bg-slate-50 border-slate-200 text-slate-600'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-1.5">
+                            <Sliders className={`w-3.5 h-3.5 ${hasPriorityPerm || isRoleAdmin ? 'text-amber-600' : 'text-slate-400'}`} />
+                            <span className="text-xs font-bold">
+                              {isAmharic ? 'የቅድሚያ ትኬት አስተዳደር' : 'Priority Management'}
+                            </span>
+                          </div>
+                          {isRoleAdmin ? (
+                            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                              {isAmharic ? 'ሁሌም ነቅቷል' : 'Always Active'}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleRolePriority(role.name, hasPriorityPerm)}
+                              className={`w-10 h-5 flex items-center rounded-full p-0.5 transition-colors duration-200 cursor-pointer ${
+                                hasPriorityPerm ? 'bg-amber-600 justify-end' : 'bg-slate-300 justify-start'
+                              }`}
+                            >
+                              <span className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          {hasPriorityPerm || isRoleAdmin
+                            ? (isAmharic ? 'ይህ ሚና አስቸኳይ እና ቅድሚያ ትኬቶችን መመደብ ይችላል።' : 'Members of this role can assign and adjust ticket priority levels.')
+                            : (isAmharic ? 'ይህ ሚና የቅድሚያ ትኬቶችን መቀየር አይችልም።' : 'Members of this role cannot triage or escalate ticket priorities.')}
+                        </p>
+                      </div>
+
+                      {/* Permissions Summary Badges */}
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-semibold text-slate-500">
+                            {isAmharic ? 'የፈቃዶች ብዛት:' : 'Active Permissions:'}
+                          </span>
+                          <span className="font-bold text-slate-800">
+                            {isRoleAdmin ? (permissionsList.length || 22) : role.permissions.length} / {permissionsList.length || 22}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {role.permissions.slice(0, 4).map(p => (
+                            <span key={p} className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-700 font-mono">
+                              {p}
+                            </span>
+                          ))}
+                          {role.permissions.length > 4 && (
+                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-500">
+                              +{role.permissions.length - 4} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenRoleModal(role)}
+                      className="w-full mt-2 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 cursor-pointer"
+                    >
+                      <Lock className="w-3.5 h-3.5 text-slate-500" />
+                      <span>{isAmharic ? 'ሁሉንም ፈቃዶች አዋቅር' : 'Configure Permissions'}</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
@@ -2597,6 +3051,43 @@ export const AdminView: React.FC = () => {
               </div>
             )}
 
+            {editingUser.role !== 'ADMIN' && (
+              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-amber-950 flex items-center gap-1">
+                    <Sliders className="w-3.5 h-3.5 text-amber-600" />
+                    <span>{isAmharic ? 'የቅድሚያ ትኬት አስተዳደር ፈቃድ' : 'Priority Management Access'}</span>
+                  </span>
+                  <select
+                    value={
+                      editingUser.canManagePriority === true 
+                        ? 'ALLOWED' 
+                        : editingUser.canManagePriority === false 
+                        ? 'DENIED' 
+                        : 'ROLE_DEFAULT'
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEditingUser({
+                        ...editingUser,
+                        canManagePriority: val === 'ALLOWED' ? true : val === 'DENIED' ? false : undefined
+                      });
+                    }}
+                    className="p-1 text-[11px] font-bold bg-white border border-amber-300 rounded-lg text-amber-900 focus:outline-none"
+                  >
+                    <option value="ROLE_DEFAULT">{isAmharic ? 'የሚና ነባሪ (Role Default)' : 'Role Default'}</option>
+                    <option value="ALLOWED">{isAmharic ? 'ተፈቅዷል (Granted)' : 'Granted'}</option>
+                    <option value="DENIED">{isAmharic ? 'ተከልክሏል (Denied)' : 'Denied'}</option>
+                  </select>
+                </div>
+                <p className="text-[10px] text-amber-800 leading-tight">
+                  {isAmharic 
+                    ? 'የዚህን ሰራተኛ የሚና ፈቃድ በመሻር አስቸኳይ ትኬቶችን የመመደብ ወይም ቅድሚያ የመስጠት መብት ይስጡ/ይከልክሉ።' 
+                    : 'Grant or deny this specific user ability to prioritize tickets regardless of role default.'}
+                </p>
+              </div>
+            )}
+
             <div className="flex justify-end space-x-2 pt-2">
               <button
                 type="button"
@@ -2767,6 +3258,286 @@ export const AdminView: React.FC = () => {
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ROLE PERMISSIONS CONFIGURATION MODAL */}
+      {isRoleModalOpen && editingRole && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center font-bold">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h3 className="text-base font-bold text-slate-900">
+                      {isAmharic ? 'የሚና ፈቃዶች ማስተካከያ' : 'Configure Role Permissions'}
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      {editingRole.name}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {isAmharic && editingRole.descriptionAmharic ? editingRole.descriptionAmharic : editingRole.description}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRoleModalOpen(false);
+                  setEditingRole(null);
+                }}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {roleModalError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center space-x-2 font-medium">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{roleModalError}</span>
+              </div>
+            )}
+
+            {/* Quick Actions Bar */}
+            <div className="flex items-center justify-between px-1 text-xs">
+              <span className="font-semibold text-slate-600">
+                {selectedRolePerms.length} {isAmharic ? 'ፈቃዶች ተመርጠዋል' : 'permissions selected'}
+              </span>
+              {editingRole.name !== 'ADMIN' && (
+                <div className="space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRolePerms(permissionsList.map(p => p.id))}
+                    className="text-indigo-600 hover:text-indigo-800 font-bold text-xs cursor-pointer"
+                  >
+                    {isAmharic ? 'ሁሉንም ምረጥ' : 'Select All'}
+                  </button>
+                  <span className="text-slate-300">|</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRolePerms([])}
+                    className="text-slate-500 hover:text-slate-700 font-bold text-xs cursor-pointer"
+                  >
+                    {isAmharic ? 'ሁሉንም አፅዳ' : 'Clear All'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Categorized Permissions Scrollable Area */}
+            <div className="overflow-y-auto pr-1 space-y-5 flex-1 max-h-[50vh]">
+              {/* Category 1: Priority & Escalation */}
+              <div className="space-y-2.5">
+                <div className="flex items-center space-x-2 text-xs font-bold text-amber-900 border-b border-amber-100 pb-1">
+                  <Flame className="w-4 h-4 text-amber-600" />
+                  <span>{isAmharic ? 'የቅድሚያ እና የአስቸኳይ ሁኔታ ቁጥጥር (Priority & Triage)' : 'Priority & Triage Management'}</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {permissionsList.filter(p => p.id.startsWith('ticket.priority')).map(perm => {
+                    const isChecked = selectedRolePerms.includes(perm.id);
+                    return (
+                      <label 
+                        key={perm.id} 
+                        className={`flex items-start space-x-2.5 p-2.5 rounded-xl border transition cursor-pointer ${
+                          isChecked 
+                            ? 'bg-amber-50/60 border-amber-300 text-amber-950' 
+                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          disabled={editingRole.name === 'ADMIN'}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedRolePerms(prev => [...prev, perm.id]);
+                            } else {
+                              setSelectedRolePerms(prev => prev.filter(id => id !== perm.id));
+                            }
+                          }}
+                          className="mt-0.5 rounded text-amber-600 focus:ring-amber-500"
+                        />
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-bold block">{perm.name}</span>
+                          <span className="text-[10px] text-slate-500 leading-tight block">{perm.description}</span>
+                          <span className="font-mono text-[9px] text-slate-400 block">{perm.id}</span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Category 2: Queue & Ticket Operations */}
+              <div className="space-y-2.5">
+                <div className="flex items-center space-x-2 text-xs font-bold text-slate-800 border-b border-slate-100 pb-1">
+                  <Ticket className="w-4 h-4 text-indigo-600" />
+                  <span>{isAmharic ? 'የትኬት እና የወረፋ አገልግሎት ስራዎች' : 'Queue & Ticket Operations'}</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {permissionsList.filter(p => p.id.startsWith('ticket.') && !p.id.startsWith('ticket.priority')).map(perm => {
+                    const isChecked = selectedRolePerms.includes(perm.id);
+                    return (
+                      <label 
+                        key={perm.id} 
+                        className={`flex items-start space-x-2.5 p-2.5 rounded-xl border transition cursor-pointer ${
+                          isChecked 
+                            ? 'bg-indigo-50/60 border-indigo-200 text-indigo-950' 
+                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          disabled={editingRole.name === 'ADMIN'}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedRolePerms(prev => [...prev, perm.id]);
+                            } else {
+                              setSelectedRolePerms(prev => prev.filter(id => id !== perm.id));
+                            }
+                          }}
+                          className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-bold block">{perm.name}</span>
+                          <span className="text-[10px] text-slate-500 leading-tight block">{perm.description}</span>
+                          <span className="font-mono text-[9px] text-slate-400 block">{perm.id}</span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Category 3: Services & Counter Stations */}
+              <div className="space-y-2.5">
+                <div className="flex items-center space-x-2 text-xs font-bold text-slate-800 border-b border-slate-100 pb-1">
+                  <Layers className="w-4 h-4 text-emerald-600" />
+                  <span>{isAmharic ? 'የአገልግሎቶች እና የመስኮቶች አስተዳደር' : 'Services & Counter Stations'}</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {permissionsList.filter(p => p.id.startsWith('services.') || p.id.startsWith('counters.')).map(perm => {
+                    const isChecked = selectedRolePerms.includes(perm.id);
+                    return (
+                      <label 
+                        key={perm.id} 
+                        className={`flex items-start space-x-2.5 p-2.5 rounded-xl border transition cursor-pointer ${
+                          isChecked 
+                            ? 'bg-emerald-50/60 border-emerald-200 text-emerald-950' 
+                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          disabled={editingRole.name === 'ADMIN'}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedRolePerms(prev => [...prev, perm.id]);
+                            } else {
+                              setSelectedRolePerms(prev => prev.filter(id => id !== perm.id));
+                            }
+                          }}
+                          className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-bold block">{perm.name}</span>
+                          <span className="text-[10px] text-slate-500 leading-tight block">{perm.description}</span>
+                          <span className="font-mono text-[9px] text-slate-400 block">{perm.id}</span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Category 4: Staff, Reports & Settings */}
+              <div className="space-y-2.5">
+                <div className="flex items-center space-x-2 text-xs font-bold text-slate-800 border-b border-slate-100 pb-1">
+                  <Settings className="w-4 h-4 text-purple-600" />
+                  <span>{isAmharic ? 'ሰራተኞች፣ ሪፖርቶች እና የስርዓት ቅንብሮች' : 'Staff, Reports & System Settings'}</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {permissionsList.filter(p => p.id.startsWith('staff.') || p.id.startsWith('reports.') || p.id.startsWith('settings.') || p.id.startsWith('audio.')).map(perm => {
+                    const isChecked = selectedRolePerms.includes(perm.id);
+                    return (
+                      <label 
+                        key={perm.id} 
+                        className={`flex items-start space-x-2.5 p-2.5 rounded-xl border transition cursor-pointer ${
+                          isChecked 
+                            ? 'bg-purple-50/60 border-purple-200 text-purple-950' 
+                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          disabled={editingRole.name === 'ADMIN'}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedRolePerms(prev => [...prev, perm.id]);
+                            } else {
+                              setSelectedRolePerms(prev => prev.filter(id => id !== perm.id));
+                            }
+                          }}
+                          className="mt-0.5 rounded text-purple-600 focus:ring-purple-500"
+                        />
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-bold block">{perm.name}</span>
+                          <span className="text-[10px] text-slate-500 leading-tight block">{perm.description}</span>
+                          <span className="font-mono text-[9px] text-slate-400 block">{perm.id}</span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+              <p className="text-[11px] text-slate-400">
+                {editingRole.name === 'ADMIN' 
+                  ? (isAmharic ? 'የስርዓት አስተዳዳሪ ሙሉ ፈቃድ አለው (የተጠበቀ)' : 'Admin role retains full system privileges') 
+                  : (isAmharic ? 'ለውጦች ወዲያውኑ በተገናኙ ተጠቃሚዎች ላይ ተግባራዊ ይሆናሉ' : 'Changes apply immediately across all active users in this role')}
+              </p>
+              <div className="flex space-x-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRoleModalOpen(false);
+                    setEditingRole(null);
+                  }}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 rounded-xl border border-slate-200 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  {isAmharic ? 'ሰርዝ' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  id="btn-save-role-perms"
+                  onClick={handleSaveRolePermissions}
+                  disabled={isSavingRolePerms || editingRole.name === 'ADMIN'}
+                  className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-xl shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
+                >
+                  {isSavingRolePerms ? (
+                    <span>{isAmharic ? 'በማስቀመጥ ላይ...' : 'Saving...'}</span>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{isAmharic ? 'ፈቃዶችን አስቀምጥ' : 'Save Permissions'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

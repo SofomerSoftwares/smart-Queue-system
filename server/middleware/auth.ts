@@ -53,8 +53,7 @@ export function authenticate(req: AuthenticatedRequest, res: Response, next: Nex
         });
       }
 
-      const roleInfo = ROLES[user.role];
-      const permissions = roleInfo ? roleInfo.permissions : [];
+      const permissions = db.getUserPermissions(user);
 
       req.user = {
         id: user.id,

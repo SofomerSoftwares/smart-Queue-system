@@ -22,8 +22,20 @@ export interface Permission {
 export interface Role {
   id: string;
   name: RoleName;
+  displayName?: string;
+  displayNameAmharic?: string;
   description: string;
+  descriptionAmharic?: string;
   permissions: string[];
+  isSystem?: boolean;
+  memberCount?: number;
+}
+
+export interface PriorityPolicy {
+  requireReasonForUrgent: boolean;
+  allowOfficerTriage: boolean;
+  allowReceptionTriage: boolean;
+  autoAuditPriorityChanges: boolean;
 }
 
 export interface User {
@@ -35,6 +47,8 @@ export interface User {
   role: RoleName;
   status: 'ACTIVE' | 'INACTIVE';
   assignedCounterId?: string;
+  canManagePriority?: boolean;
+  customPermissions?: string[];
   lastLoginAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -187,6 +201,7 @@ export interface AuditLog {
 
 export interface DatabaseSchema {
   users: User[];
+  roles: Role[];
   services: Service[];
   counters: Counter[];
   tickets: QueueTicket[];
@@ -195,6 +210,7 @@ export interface DatabaseSchema {
   audioSetting: AudioSetting;
   auditLogs: AuditLog[];
   customerReviews: CustomerReview[];
+  priorityPolicy: PriorityPolicy;
 }
 
 export interface AnnouncementPayload {

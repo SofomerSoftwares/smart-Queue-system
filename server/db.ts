@@ -13,6 +13,7 @@ import {
   CustomerReview,
   RoleName,
   PriorityLevel,
+  PriorityPolicy,
   DatabaseSchema
 } from './types.js';
 import { mongoService } from './mongodb.js';
@@ -27,7 +28,9 @@ export const PERMISSIONS: Permission[] = [
   { id: 'ticket.start', name: 'Start Service', description: 'Start serving the customer' },
   { id: 'ticket.complete', name: 'Complete Ticket', description: 'Mark ticket as finished' },
   { id: 'ticket.transfer', name: 'Transfer Ticket', description: 'Transfer ticket to another service or counter' },
-  { id: 'ticket.priority', name: 'Manage Ticket Priority', description: 'Flag urgent tickets for prioritized service in the officer dashboard' },
+  { id: 'ticket.priority', name: 'Manage Ticket Priority', description: 'Flag urgent tickets for prioritized service in the officer dashboard and queue' },
+  { id: 'ticket.priority_create', name: 'Issue Priority Tickets', description: 'Issue tickets with pre-assigned Priority or Urgent classification at reception/kiosk' },
+  { id: 'ticket.priority_reset', name: 'Reset Priority to Normal', description: 'De-escalate tickets from Urgent or Priority back to Normal' },
   { id: 'ticket.cancel', name: 'Cancel Ticket', description: 'Cancel an active ticket' },
   { id: 'ticket.no_show', name: 'Mark No-Show', description: 'Mark customer as absent' },
   { id: 'services.view', name: 'View Services', description: 'View service configurations' },
@@ -48,31 +51,43 @@ export const PERMISSIONS: Permission[] = [
   { id: 'audio.manage', name: 'Manage Audio', description: 'Configure Addis AI voice announcement settings' }
 ];
 
-export const ROLES: Record<RoleName, Role> = {
-  ADMIN: {
+export const DEFAULT_ROLES: Role[] = [
+  {
     id: 'role-admin',
     name: 'ADMIN',
-    description: 'Full administrative access',
-    permissions: PERMISSIONS.map(p => p.id)
+    displayName: 'System Administrator',
+    displayNameAmharic: 'የስርዓት አስተዳዳሪ',
+    description: 'Full administrative access to all queues, services, counters, and priority settings',
+    descriptionAmharic: 'ሙሉ የስርዓት ቁጥጥር እና የቅድሚያ አስተዳደር ፈቃድ ያለው',
+    permissions: PERMISSIONS.map(p => p.id),
+    isSystem: true
   },
-  RECEPTIONIST: {
+  {
     id: 'role-receptionist',
     name: 'RECEPTIONIST',
-    description: 'Front desk ticket creation and queue triage',
+    displayName: 'Reception & Front Desk',
+    displayNameAmharic: 'መስተንግዶ እና ቅበላ ሰራተኛ',
+    description: 'Front desk ticket creation, customer triage, and urgency escalation',
+    descriptionAmharic: 'የደንበኞች ምዝገባ፣ የቲኬት አሰጣጥ እና የቅድሚያ አገልግሎት ማስተናገጃ',
     permissions: [
       'dashboard.view',
       'queue.view',
       'ticket.create',
       'ticket.priority',
+      'ticket.priority_create',
+      'ticket.priority_reset',
       'ticket.cancel',
       'ticket.transfer',
       'services.view'
     ]
   },
-  SERVICE_OFFICER: {
+  {
     id: 'role-service-officer',
     name: 'SERVICE_OFFICER',
-    description: 'Counter service officer handling customer tickets',
+    displayName: 'Counter Service Officer',
+    displayNameAmharic: 'የመስኮት አገልግሎት ሰራተኛ',
+    description: 'Counter service officer calling, serving, and triaging customer tickets',
+    descriptionAmharic: 'በመስኮት ደንበኞችን የሚጠራ፣ የሚያስተናግድ እና አስቸኳይ ሁኔታዎችን ቅድሚያ የሚሰጥ',
     permissions: [
       'dashboard.view',
       'queue.view',
@@ -82,9 +97,23 @@ export const ROLES: Record<RoleName, Role> = {
       'ticket.complete',
       'ticket.no_show',
       'ticket.priority',
+      'ticket.priority_reset',
       'ticket.transfer'
     ]
   }
+];
+
+export const DEFAULT_PRIORITY_POLICY: PriorityPolicy = {
+  requireReasonForUrgent: true,
+  allowOfficerTriage: true,
+  allowReceptionTriage: true,
+  autoAuditPriorityChanges: true
+};
+
+export const ROLES: Record<RoleName, Role> = {
+  ADMIN: DEFAULT_ROLES[0],
+  RECEPTIONIST: DEFAULT_ROLES[1],
+  SERVICE_OFFICER: DEFAULT_ROLES[2]
 };
 
 function getTodayKey(): string {
@@ -403,6 +432,7 @@ function seedDatabase(): DatabaseSchema {
 
   return {
     users,
+    roles: JSON.parse(JSON.stringify(DEFAULT_ROLES)),
     services,
     counters,
     tickets: sampleTickets,
@@ -410,7 +440,8 @@ function seedDatabase(): DatabaseSchema {
     officeSetting,
     audioSetting,
     auditLogs: [],
-    customerReviews: []
+    customerReviews: [],
+    priorityPolicy: { ...DEFAULT_PRIORITY_POLICY }
   };
 }
 
@@ -434,6 +465,12 @@ class Database {
         if (mongoData && mongoData.users && mongoData.users.length > 0) {
           // MongoDB Atlas has existing data; hydrate our state directly from MongoDB
           this.data = mongoData;
+          if (!this.data.roles || this.data.roles.length === 0) {
+            this.data.roles = JSON.parse(JSON.stringify(DEFAULT_ROLES));
+          }
+          if (!this.data.priorityPolicy) {
+            this.data.priorityPolicy = { ...DEFAULT_PRIORITY_POLICY };
+          }
           console.log(`🚀 [MongoDB Atlas] Successfully loaded ${mongoData.tickets?.length || 0} tickets, ${mongoData.services?.length || 0} services from Atlas collections`);
         } else {
           // MongoDB Atlas is freshly connected and empty; push initial seed to Atlas collections
@@ -579,6 +616,137 @@ class Database {
       return true;
     }
     return false;
+  }
+
+  // --- ROLES & PERMISSIONS ---
+  public getRoles(): Role[] {
+    if (!this.data.roles || this.data.roles.length === 0) {
+      this.data.roles = JSON.parse(JSON.stringify(DEFAULT_ROLES));
+    }
+    return this.data.roles.map(r => ({
+      ...r,
+      memberCount: this.data.users.filter(u => u.role === r.name).length
+    }));
+  }
+
+  public getRole(name: RoleName): Role | undefined {
+    return this.getRoles().find(r => r.name === name);
+  }
+
+  public updateRolePermissions(name: RoleName, permissions: string[]): Role {
+    if (!this.data.roles || this.data.roles.length === 0) {
+      this.data.roles = JSON.parse(JSON.stringify(DEFAULT_ROLES));
+    }
+    const role = this.data.roles.find(r => r.name === name);
+    if (!role) {
+      throw new Error(`Role ${name} not found`);
+    }
+
+    if (name === 'ADMIN') {
+      const required = ['dashboard.view', 'settings.view', 'settings.update', 'ticket.priority'];
+      for (const req of required) {
+        if (!permissions.includes(req)) permissions.push(req);
+      }
+    }
+
+    role.permissions = Array.from(new Set(permissions));
+    this.save();
+    return {
+      ...role,
+      memberCount: this.data.users.filter(u => u.role === role.name).length
+    };
+  }
+
+  public toggleRolePriority(name: RoleName, enabled: boolean): Role {
+    if (!this.data.roles || this.data.roles.length === 0) {
+      this.data.roles = JSON.parse(JSON.stringify(DEFAULT_ROLES));
+    }
+    const role = this.data.roles.find(r => r.name === name);
+    if (!role) {
+      throw new Error(`Role ${name} not found`);
+    }
+    if (name === 'ADMIN') {
+      return { ...role, memberCount: this.data.users.filter(u => u.role === role.name).length };
+    }
+
+    const priorityPerms = ['ticket.priority', 'ticket.priority_create', 'ticket.priority_reset'];
+    if (enabled) {
+      role.permissions = Array.from(new Set([...role.permissions, ...priorityPerms]));
+    } else {
+      role.permissions = role.permissions.filter(p => !priorityPerms.includes(p));
+    }
+    this.save();
+    return {
+      ...role,
+      memberCount: this.data.users.filter(u => u.role === role.name).length
+    };
+  }
+
+  public getPriorityPolicy(): PriorityPolicy {
+    if (!this.data.priorityPolicy) {
+      this.data.priorityPolicy = { ...DEFAULT_PRIORITY_POLICY };
+    }
+    return this.data.priorityPolicy;
+  }
+
+  public updatePriorityPolicy(updates: Partial<PriorityPolicy>): PriorityPolicy {
+    if (!this.data.priorityPolicy) {
+      this.data.priorityPolicy = { ...DEFAULT_PRIORITY_POLICY };
+    }
+    this.data.priorityPolicy = { ...this.data.priorityPolicy, ...updates };
+
+    if (updates.allowOfficerTriage !== undefined) {
+      this.toggleRolePriority('SERVICE_OFFICER', updates.allowOfficerTriage);
+    }
+    if (updates.allowReceptionTriage !== undefined) {
+      this.toggleRolePriority('RECEPTIONIST', updates.allowReceptionTriage);
+    }
+
+    this.save();
+    return this.data.priorityPolicy;
+  }
+
+  public getUserPermissions(userOrId: User | string): string[] {
+    const user = typeof userOrId === 'string' ? this.getUserById(userOrId) : userOrId;
+    if (!user) return [];
+
+    if (user.role === 'ADMIN') {
+      return PERMISSIONS.map(p => p.id);
+    }
+
+    const role = this.getRole(user.role);
+    let perms = role ? [...role.permissions] : [];
+
+    if (user.canManagePriority === true) {
+      if (!perms.includes('ticket.priority')) perms.push('ticket.priority');
+      if (!perms.includes('ticket.priority_create')) perms.push('ticket.priority_create');
+      if (!perms.includes('ticket.priority_reset')) perms.push('ticket.priority_reset');
+    } else if (user.canManagePriority === false) {
+      perms = perms.filter(p => !['ticket.priority', 'ticket.priority_create', 'ticket.priority_reset'].includes(p));
+    }
+
+    const policy = this.getPriorityPolicy();
+    if (user.role === 'SERVICE_OFFICER' && !policy.allowOfficerTriage && user.canManagePriority !== true) {
+      perms = perms.filter(p => p !== 'ticket.priority');
+    }
+    if (user.role === 'RECEPTIONIST' && !policy.allowReceptionTriage && user.canManagePriority !== true) {
+      perms = perms.filter(p => !['ticket.priority', 'ticket.priority_create'].includes(p));
+    }
+
+    if (user.customPermissions && Array.isArray(user.customPermissions)) {
+      perms = [...perms, ...user.customPermissions];
+    }
+
+    return Array.from(new Set(perms));
+  }
+
+  public setUserPriorityAccess(userId: string, canManagePriority: boolean | null): User | undefined {
+    const user = this.getUserById(userId);
+    if (!user) return undefined;
+    user.canManagePriority = canManagePriority === null ? undefined : canManagePriority;
+    user.updatedAt = new Date().toISOString();
+    this.save();
+    return user;
   }
 
   // --- SERVICES ---
@@ -786,6 +954,21 @@ class Database {
         notes
       }
     });
+
+    if (this.getPriorityPolicy().autoAuditPriorityChanges) {
+      this.addAuditLog({
+        userName: flaggedBy || 'Staff',
+        action: `PRIORITY_UPDATE_${priority}`,
+        entity: 'Ticket',
+        entityId: ticket.id,
+        metadata: {
+          ticketNumber: ticket.ticketNumber,
+          previousPriority,
+          newPriority: priority,
+          urgencyReason: ticket.urgencyReason
+        }
+      });
+    }
 
     this.save();
     return ticket;

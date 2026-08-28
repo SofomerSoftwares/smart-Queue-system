@@ -756,6 +756,14 @@ router.patch('/ticket/:id/priority', authenticate, authorize('ticket.priority'),
       return res.status(404).json({ success: false, message: 'Ticket not found.' });
     }
 
+    const policy = db.getPriorityPolicy();
+    if (priority === 'URGENT' && policy.requireReasonForUrgent && (!urgencyReason || !urgencyReason.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'A specific urgency reason is required by office priority policy for Urgent classification.'
+      });
+    }
+
     const flaggedBy = req.user?.name || req.user?.username || 'Staff';
     const updated = db.setTicketPriority(
       id, 
@@ -819,6 +827,14 @@ router.post('/ticket/:id/priority', authenticate, authorize('ticket.priority'), 
     const ticket = db.getTicketById(id);
     if (!ticket) {
       return res.status(404).json({ success: false, message: 'Ticket not found.' });
+    }
+
+    const policy = db.getPriorityPolicy();
+    if (priority === 'URGENT' && policy.requireReasonForUrgent && (!urgencyReason || !urgencyReason.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'A specific urgency reason is required by office priority policy for Urgent classification.'
+      });
     }
 
     const flaggedBy = req.user?.name || req.user?.username || 'Staff';

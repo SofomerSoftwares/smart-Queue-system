@@ -7,6 +7,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
 }
 
@@ -15,6 +16,20 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const refreshUser = async () => {
+    try {
+      const token = localStorage.getItem('queue_access_token');
+      if (token) {
+        const res = await api.getMe();
+        if (res.success && res.user) {
+          setUser(res.user);
+        }
+      }
+    } catch (err) {
+      console.warn('Refresh user error:', err);
+    }
+  };
 
   useEffect(() => {
     async function loadUser() {
@@ -68,7 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, hasPermission }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, refreshUser, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

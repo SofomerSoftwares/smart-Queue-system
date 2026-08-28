@@ -13,6 +13,31 @@ export type PriorityLevel = 'NORMAL' | 'PRIORITY' | 'URGENT';
 
 export type AnnouncementLanguage = 'AMHARIC' | 'ENGLISH' | 'BOTH';
 
+export interface Permission {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface Role {
+  id: string;
+  name: RoleName;
+  displayName?: string;
+  displayNameAmharic?: string;
+  description: string;
+  descriptionAmharic?: string;
+  permissions: string[];
+  isSystem?: boolean;
+  memberCount?: number;
+}
+
+export interface PriorityPolicy {
+  requireReasonForUrgent: boolean;
+  allowOfficerTriage: boolean;
+  allowReceptionTriage: boolean;
+  autoAuditPriorityChanges: boolean;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -20,6 +45,11 @@ export interface User {
   role: RoleName;
   assignedCounterId?: string;
   permissions: string[];
+  canManagePriority?: boolean;
+  password?: string;
+  status?: 'ACTIVE' | 'INACTIVE';
+  lastLoginAt?: string;
+  createdAt?: string;
 }
 
 export interface Service {
@@ -225,3 +255,10 @@ export interface PrintTicketData {
   urgencyReason?: string;
   isUrgent?: boolean;
 }
+
+export interface PermissionDefinition {
+  id: string;
+  name: string;
+  description: string;
+}
+

@@ -123,8 +123,6 @@ router.post('/login', async (req: Request, res: Response) => {
       maxAge: 8 * 60 * 60 * 1000
     });
 
-    const roleInfo = ROLES[user.role];
-
     // Log audit
     db.addAuditLog({
       userId: user.id,
@@ -145,7 +143,8 @@ router.post('/login', async (req: Request, res: Response) => {
         username: user.username,
         role: user.role,
         assignedCounterId: user.assignedCounterId,
-        permissions: roleInfo ? roleInfo.permissions : []
+        permissions: db.getUserPermissions(user),
+        canManagePriority: user.canManagePriority
       }
     });
   } catch (err: any) {
@@ -181,8 +180,6 @@ router.get('/me', authenticate, (req: AuthenticatedRequest, res: Response) => {
     return res.status(404).json({ success: false, message: 'User not found.' });
   }
 
-  const roleInfo = ROLES[user.role];
-
   return res.json({
     success: true,
     user: {
@@ -191,7 +188,8 @@ router.get('/me', authenticate, (req: AuthenticatedRequest, res: Response) => {
       username: user.username,
       role: user.role,
       assignedCounterId: user.assignedCounterId,
-      permissions: roleInfo ? roleInfo.permissions : []
+      permissions: db.getUserPermissions(user),
+      canManagePriority: user.canManagePriority
     }
   });
 });
