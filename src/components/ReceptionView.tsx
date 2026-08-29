@@ -500,75 +500,87 @@ export const ReceptionView: React.FC = () => {
             {isAmharic ? 'አገልግሎት ይምረጡ' : 'Select Service to Issue Ticket'}
           </h2>
           <span className="text-xs text-slate-500 font-medium">
-            {services.filter(s => s.active).length} {isAmharic ? 'ንቁ አገልግሎቶች' : 'Active Services'}
+            {services.filter(s => s.isActive !== false).length} {isAmharic ? 'ንቁ አገልግሎቶች' : 'Active Services'}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {services.filter(s => s.active).map((service) => {
-            const waitingCount = waitingTickets.filter(t => t.serviceId === service.id).length;
-            const urgentWaiting = waitingTickets.filter(t => t.serviceId === service.id && t.priority === 'URGENT').length;
-            const isUrgentSelected = priority === 'URGENT';
-            const isPrioritySelected = priority === 'PRIORITY';
+        {services.filter(s => s.isActive !== false).length === 0 ? (
+          <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center space-y-2">
+            <Ticket className="w-8 h-8 text-slate-400 mx-auto" />
+            <h3 className="text-sm font-bold text-slate-800">
+              {isAmharic ? 'ምንም ንቁ አገልግሎት አልተገኘም' : 'No active services available'}
+            </h3>
+            <p className="text-xs text-slate-500">
+              {isAmharic ? 'እባክዎ በአስተዳዳሪ ክፍል ውስጥ አገልግሎቶችን ያክሉ ወይም ያንቁ' : 'Please configure or activate services in the Admin panel'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {services.filter(s => s.isActive !== false).map((service) => {
+              const waitingCount = waitingTickets.filter(t => t.serviceId === service.id).length;
+              const urgentWaiting = waitingTickets.filter(t => t.serviceId === service.id && t.priority === 'URGENT').length;
+              const isUrgentSelected = priority === 'URGENT';
+              const isPrioritySelected = priority === 'PRIORITY';
 
-            return (
-              <button
-                key={service.id}
-                id={`btn-service-${service.prefix}`}
-                disabled={isGenerating}
-                onClick={() => handleGenerateTicket(service)}
-                className={`p-5 rounded-2xl border text-left flex flex-col justify-between h-44 transition group relative overflow-hidden active:scale-[0.99] cursor-pointer ${
-                  isUrgentSelected
-                    ? 'bg-rose-50/90 border-rose-300 hover:border-rose-500 hover:shadow-md'
-                    : isPrioritySelected
-                    ? 'bg-amber-50/90 border-amber-300 hover:border-amber-500 hover:shadow-md'
-                    : 'bg-white border-slate-200 hover:border-indigo-400 hover:shadow-md'
-                }`}
-              >
-                {/* Active Priority Tag on Service card */}
-                {isUrgentSelected && (
-                  <div className="absolute top-0 right-0 bg-rose-600 text-white text-[9px] font-black uppercase px-2.5 py-0.5 rounded-bl-lg flex items-center gap-1 shadow-xs animate-pulse">
-                    <Flame className="w-2.5 h-2.5" /> URGENT
-                  </div>
-                )}
-                {isPrioritySelected && (
-                  <div className="absolute top-0 right-0 bg-amber-500 text-slate-950 text-[9px] font-extrabold uppercase px-2.5 py-0.5 rounded-bl-lg flex items-center gap-1 shadow-xs">
-                    <Zap className="w-2.5 h-2.5" /> PRIORITY
-                  </div>
-                )}
+              return (
+                <button
+                  key={service.id}
+                  id={`btn-service-${service.prefix}`}
+                  disabled={isGenerating}
+                  onClick={() => handleGenerateTicket(service)}
+                  className={`p-5 rounded-2xl border text-left flex flex-col justify-between h-44 transition group relative overflow-hidden active:scale-[0.99] cursor-pointer ${
+                    isUrgentSelected
+                      ? 'bg-rose-50/90 border-rose-300 hover:border-rose-500 hover:shadow-md'
+                      : isPrioritySelected
+                      ? 'bg-amber-50/90 border-amber-300 hover:border-amber-500 hover:shadow-md'
+                      : 'bg-white border-slate-200 hover:border-indigo-400 hover:shadow-md'
+                  }`}
+                >
+                  {/* Active Priority Tag on Service card */}
+                  {isUrgentSelected && (
+                    <div className="absolute top-0 right-0 bg-rose-600 text-white text-[9px] font-black uppercase px-2.5 py-0.5 rounded-bl-lg flex items-center gap-1 shadow-xs animate-pulse">
+                      <Flame className="w-2.5 h-2.5" /> URGENT
+                    </div>
+                  )}
+                  {isPrioritySelected && (
+                    <div className="absolute top-0 right-0 bg-amber-500 text-slate-950 text-[9px] font-extrabold uppercase px-2.5 py-0.5 rounded-bl-lg flex items-center gap-1 shadow-xs">
+                      <Zap className="w-2.5 h-2.5" /> PRIORITY
+                    </div>
+                  )}
 
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-indigo-600 group-hover:text-white text-slate-900 font-mono font-bold text-base flex items-center justify-center transition">
-                      {service.prefix}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-indigo-600 group-hover:text-white text-slate-900 font-mono font-bold text-base flex items-center justify-center transition">
+                        {service.prefix}
+                      </span>
+                      <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-slate-400" />
+                        {waitingCount} {isAmharic ? 'በመጠባበቅ ላይ' : 'waiting'}
+                        {urgentWaiting > 0 && (
+                          <span className="text-rose-600 font-bold ml-0.5">({urgentWaiting}⚡)</span>
+                        )}
+                      </span>
+                    </div>
+
+                    <h3 className="font-bold text-slate-900 text-base leading-snug group-hover:text-indigo-600 transition line-clamp-1">
+                      {isAmharic ? (service.nameAmharic || service.name) : service.name}
+                    </h3>
+                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                      {isAmharic ? service.name : (service.nameAmharic || '')}
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 group-hover:text-indigo-600">
+                    <span className="font-medium text-[11px]">
+                      {isUrgentSelected ? (isAmharic ? 'አስቸኳይ ቲኬት አውጣ' : 'Issue Urgent Ticket') : isPrioritySelected ? (isAmharic ? 'የቅድሚያ ቲኬት አውጣ' : 'Issue Priority Ticket') : (isAmharic ? 'ቲኬት አውጣ' : 'Print Ticket')}
                     </span>
-                    <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-slate-400" />
-                      {waitingCount} {isAmharic ? 'በመጠባበቅ ላይ' : 'waiting'}
-                      {urgentWaiting > 0 && (
-                        <span className="text-rose-600 font-bold ml-0.5">({urgentWaiting}⚡)</span>
-                      )}
-                    </span>
+                    <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition" />
                   </div>
-
-                  <h3 className="font-bold text-slate-900 text-base leading-snug group-hover:text-indigo-600 transition line-clamp-1">
-                    {isAmharic ? (service.nameAmharic || service.name) : service.name}
-                  </h3>
-                  <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                    {isAmharic ? service.name : (service.nameAmharic || '')}
-                  </p>
-                </div>
-
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 group-hover:text-indigo-600">
-                  <span className="font-medium text-[11px]">
-                    {isUrgentSelected ? (isAmharic ? 'አስቸኳይ ቲኬት አውጣ' : 'Issue Urgent Ticket') : isPrioritySelected ? (isAmharic ? 'የቅድሚያ ቲኬት አውጣ' : 'Issue Priority Ticket') : (isAmharic ? 'ቲኬት አውጣ' : 'Print Ticket')}
-                  </span>
-                  <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition" />
-                </div>
-              </button>
-            );
-          })}
-        </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Active Waiting Queue & Priority Triage Panel */}
