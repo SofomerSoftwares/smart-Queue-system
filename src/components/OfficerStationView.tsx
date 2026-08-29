@@ -1121,14 +1121,13 @@ export const OfficerStationView: React.FC = () => {
                         </button>
 
                         <button
-                          onClick={() => handleCallNext(ticket.id)}
-                          className={`px-3 py-1 rounded-lg text-xs font-bold transition shadow-xs ${
-                            ticket.priority === 'URGENT'
-                              ? 'bg-rose-600 hover:bg-rose-700 text-white'
-                              : 'bg-white hover:bg-indigo-600 hover:text-white text-indigo-600 border border-indigo-200'
-                          }`}
+                          type="button"
+                          disabled={true}
+                          title={isAmharic ? 'በወረፋ ዝርዝር ላይ በቀጥታ መጥራት ተሰናክሏል፤ የጣቢያውን "ቀጣይ ጥራ" ይጠቀሙ' : 'Direct calling from upcoming queue is disabled. Use the main station "Call Next" button.'}
+                          className="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60 flex items-center space-x-1"
                         >
-                          {isAmharic ? 'ጥራ' : 'Call'}
+                          <Lock className="w-2.5 h-2.5 text-slate-400" />
+                          <span>{isAmharic ? 'ጥራ' : 'Call'}</span>
                         </button>
                       </div>
                     </div>

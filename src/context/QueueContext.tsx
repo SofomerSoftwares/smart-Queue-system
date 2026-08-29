@@ -13,6 +13,7 @@ import {
 import { api } from '../lib/api';
 import { audioManager } from '../lib/audioManager';
 import { notificationManager, NotificationPermissionState } from '../lib/notificationManager';
+import { useAuth } from './AuthContext';
 
 interface QueueContextType {
   waitingTickets: QueueTicket[];
@@ -62,6 +63,7 @@ interface QueueContextType {
 const QueueContext = createContext<QueueContextType | undefined>(undefined);
 
 export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
   const [waitingTickets, setWaitingTickets] = useState<QueueTicket[]>([]);
   const [servingTickets, setServingTickets] = useState<QueueTicket[]>([]);
   const [completedTickets, setCompletedTickets] = useState<QueueTicket[]>([]);
@@ -83,6 +85,9 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const notificationsEnabledRef = useRef<boolean>(isNotificationsEnabled);
   notificationsEnabledRef.current = isNotificationsEnabled;
+
+  const userRef = useRef(user);
+  userRef.current = user;
 
   const requestNotificationPermission = useCallback(async (): Promise<boolean> => {
     const granted = await notificationManager.requestPermission();
@@ -206,8 +211,9 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               console.warn('Playback error:', err);
             });
 
-            // Trigger Browser Push Notification if enabled
-            if (notificationsEnabledRef.current) {
+            // Trigger Browser Push Notification if enabled (for public waiting displays or customer viewers, not for logged in staff)
+            const isStaff = !!userRef.current;
+            if (notificationsEnabledRef.current && !isStaff) {
               notificationManager.notifyTicketCalled({
                 ticketNumber: announcement.ticketNumber,
                 counterNumber: announcement.counterNumber,
@@ -238,30 +244,12 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const callNextTicket = async (counterId: string, specificTicketId?: string) => {
     const res = await api.callNextTicket({ counterId, specificTicketId });
     await refreshQueue();
-    if (res?.success && res.ticket && notificationsEnabledRef.current) {
-      notificationManager.notifyTicketCalled({
-        ticketNumber: res.ticket.ticketNumber,
-        counterNumber: res.counter?.number || res.ticket.counterNumber || 1,
-        serviceName: res.ticket.serviceName,
-        serviceNameAmharic: res.ticket.serviceNameAmharic,
-        language: uiLanguage === 'AMHARIC' ? 'AMHARIC' : 'BOTH'
-      });
-    }
     return res;
   };
 
   const recallTicket = async (ticketId: string) => {
     const res = await api.recallTicket(ticketId);
     await refreshQueue();
-    if (res?.success && res.ticket && notificationsEnabledRef.current) {
-      notificationManager.notifyTicketCalled({
-        ticketNumber: res.ticket.ticketNumber,
-        counterNumber: res.ticket.counterNumber || 1,
-        serviceName: res.ticket.serviceName,
-        serviceNameAmharic: res.ticket.serviceNameAmharic,
-        language: uiLanguage === 'AMHARIC' ? 'AMHARIC' : 'BOTH'
-      });
-    }
     return res;
   };
 
