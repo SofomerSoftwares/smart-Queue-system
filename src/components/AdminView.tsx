@@ -714,8 +714,27 @@ export const AdminView: React.FC = () => {
         setDbActionMsg(
           res.connected
             ? (isAmharic ? 'በተሳካ ሁኔታ ከ MongoDB Atlas ጋር ተገናኝቷል!' : 'Successfully connected to MongoDB Atlas!')
-            : (isAmharic ? 'ከዳታቤዙ ጋር መገናኘት አልተቻለም፡ ' + res.error : 'Failed to connect: ' + res.error)
+            : (isAmharic ? 'ከዳታቤዙ ጋር መገናኘት አልተቻለም፡ ' + (res.error || 'Check credentials') : 'Failed to connect: ' + (res.error || 'Check credentials'))
         );
+        setTimeout(() => setDbActionMsg(''), 5000);
+      }
+    } catch (err: any) {
+      setDbActionMsg(`Error: ${err.message}`);
+    } finally {
+      setIsConnectingDb(false);
+    }
+  };
+
+  // Disconnect MongoDB Atlas and revert to local mode
+  const handleDisconnectDb = async () => {
+    try {
+      setIsConnectingDb(true);
+      setDbActionMsg(isAmharic ? 'ወደ አካባቢያዊ ዳታቤዝ (Local Mode) በመመለስ ላይ...' : 'Switching to local storage mode...');
+      const res = await api.connectDatabase('disconnect');
+      if (res.success) {
+        setDbStatus(res);
+        setMongoUriInput('');
+        setDbActionMsg(isAmharic ? 'ስርዓቱ በአካባቢያዊ ዳታቤዝ (Local Resilient Mode) እየሰራ ነው።' : 'Switched to local resilient storage mode.');
         setTimeout(() => setDbActionMsg(''), 4000);
       }
     } catch (err: any) {
@@ -2101,7 +2120,7 @@ export const AdminView: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isConnectingDb}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs"
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs cursor-pointer"
                 >
                   <Server className="w-3.5 h-3.5" />
                   <span>{isConnectingDb ? (isAmharic ? 'በመገናኘት ላይ...' : 'Connecting...') : (isAmharic ? 'ከ Atlas ጋር አገናኝ' : 'Connect / Re-test Atlas')}</span>
@@ -2109,9 +2128,19 @@ export const AdminView: React.FC = () => {
 
                 <button
                   type="button"
+                  onClick={handleDisconnectDb}
+                  disabled={isConnectingDb}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border border-slate-300 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5 text-slate-500" />
+                  <span>{isAmharic ? 'ወደ አካባቢያዊ ዳታቤዝ ቀይር (Local Mode)' : 'Use Local Resilient Mode'}</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={handleSyncDb}
-                  disabled={isSyncingDb}
-                  className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs"
+                  disabled={isSyncingDb || !dbStatus?.connected}
+                  className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs cursor-pointer"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isSyncingDb ? 'animate-spin' : ''}`} />
                   <span>{isSyncingDb ? (isAmharic ? 'በማመሳሰል ላይ...' : 'Syncing...') : (isAmharic ? 'ሁሉንም መረጃዎች ወደ Atlas ላክ (Sync Now)' : 'Sync All Collections Now')}</span>
@@ -2128,6 +2157,28 @@ export const AdminView: React.FC = () => {
                 ? 'በዚህ ስርዓት ውስጥ የሚከናወኑ ማናቸውም ቲኬቶች፣ የአገልግሎት ለውጦች እና የመስኮት ጥሪዎች በቀጥታ ወደ MongoDB Atlas ዳታቤዝ ይገባሉ።'
                 : 'All queue tickets, service definitions, counters, staff accounts, audit logs, and audio settings are automatically synced to MongoDB Atlas.'}
             </p>
+          </div>
+
+          {/* Atlas Configuration Helper Guide */}
+          <div className="p-4 bg-amber-50/80 rounded-2xl border border-amber-200/80 text-amber-950 space-y-2">
+            <div className="flex items-center space-x-2 text-xs font-bold text-amber-900">
+              <Database className="w-4 h-4 text-amber-700" />
+              <span>{isAmharic ? 'የ MongoDB Atlas አገናኝ መመሪያ (Atlas Setup Guide)' : 'MongoDB Atlas Setup Guide'}</span>
+            </div>
+            <ul className="text-[11px] text-amber-900/90 space-y-1.5 list-disc list-inside">
+              <li>
+                <strong>Database User:</strong> In MongoDB Atlas, go to <strong>Security &gt; Database Access</strong> and ensure your user has Read/Write permissions to any database.
+              </li>
+              <li>
+                <strong>Network Access:</strong> In MongoDB Atlas, go to <strong>Security &gt; Network Access</strong> and add <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">0.0.0.0/0</code> (Allow Access from Anywhere).
+              </li>
+              <li>
+                <strong>URI Format:</strong> <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">mongodb+srv://&lt;db_user&gt;:&lt;db_password&gt;@&lt;cluster-name&gt;.mongodb.net/office_queue_db?retryWrites=true&w=majority</code>
+              </li>
+              <li>
+                <strong>Local Mode:</strong> You can always click <span className="font-bold">"Use Local Resilient Mode"</span> anytime to run with zero cloud dependencies.
+              </li>
+            </ul>
           </div>
         </div>
       )}

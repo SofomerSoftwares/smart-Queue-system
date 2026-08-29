@@ -100,14 +100,35 @@ class MongoDBService {
     }
   }
 
+  public async disconnect(): Promise<void> {
+    if (this.client) {
+      try {
+        await this.client.close();
+      } catch {
+        // ignore cleanup errors
+      }
+      this.client = null;
+    }
+    this.db = null;
+    this.isConnected = false;
+    this.activeUri = null;
+    this.lastError = null;
+    console.log('ℹ️ [MongoDB Atlas] Switched to local resilient storage mode.');
+  }
+
   public async connect(uri?: string): Promise<boolean> {
+    if (uri === '' || uri === 'local' || uri === 'disconnect') {
+      await this.disconnect();
+      return false;
+    }
+
     const rawUri = uri || this.activeUri || process.env.MONGODB_URI;
     
     if (!isValidMongoUri(rawUri)) {
       this.isConnected = false;
       this.lastError = rawUri && rawUri.trim()
         ? 'Provided MongoDB connection URI is incomplete or contains placeholder values (<username>, <password>).'
-        : 'No MongoDB URI configured. Operating in local resilient storage mode.';
+        : null;
       return false;
     }
 

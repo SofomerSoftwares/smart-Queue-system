@@ -148,7 +148,18 @@ export const OfficerStationView: React.FC = () => {
   const nextEligibleTicket = eligibleTickets[0];
   const hasUrgentWaiting = eligibleTickets.some(t => t.priority === 'URGENT');
 
+  const hasPriorityPermission = user?.role === 'ADMIN';
+
   const handleOpenOfficerTriage = (ticket: QueueTicket) => {
+    if (!hasPriorityPermission) {
+      setStationNotice(
+        isAmharic 
+          ? 'የቅድሚያ ደረጃ ለመቀየር የአስተዳዳሪ (Admin) ፈቃድ ያስፈልጋል።' 
+          : 'Access denied: Ticket priority must be issued or modified by an Administrator.'
+      );
+      setTimeout(() => setStationNotice(''), 4000);
+      return;
+    }
     setOfficerTriageTicket(ticket);
     setOfficerTriagePriority(ticket.priority || 'URGENT');
     setOfficerTriageReason(ticket.urgencyReason || '');

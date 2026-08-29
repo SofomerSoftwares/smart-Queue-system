@@ -340,8 +340,16 @@ router.post('/ticket', optionalAuthenticate, (req: AuthenticatedRequest, res: Re
     }
 
     let validatedPriority: PriorityLevel = 'NORMAL';
-    if (priority === 'URGENT') validatedPriority = 'URGENT';
-    else if (priority === 'PRIORITY') validatedPriority = 'PRIORITY';
+    if (priority === 'URGENT' || priority === 'PRIORITY') {
+      if (req.user?.role === 'ADMIN') {
+        validatedPriority = priority as PriorityLevel;
+      } else {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied: Priority and Urgent tickets must be issued by an Administrator (የቅድሚያ እና አስቸኳይ ቲኬት በአስተዳዳሪ (Admin) ብቻ ነው የሚሰጠው).'
+        });
+      }
+    }
 
     const ticket = db.generateTicket(
       serviceId, 
@@ -738,9 +746,16 @@ router.post('/reset-daily', authenticate, authorize('queue.manage'), (req: Authe
   }
 });
 
-// 12. PATCH /api/queue/ticket/:id/priority - Flag urgent/priority ticket
-router.patch('/ticket/:id/priority', authenticate, authorize('ticket.priority'), (req: AuthenticatedRequest, res: Response) => {
+// 12. PATCH /api/queue/ticket/:id/priority - Flag urgent/priority ticket (Must be issued/managed by Admin)
+router.patch('/ticket/:id/priority', authenticate, (req: AuthenticatedRequest, res: Response) => {
   try {
+    if (req.user?.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Ticket priority must be issued and managed by an Administrator (የቅድሚያ ደረጃ መቀየር በአስተዳዳሪ ብቻ የተፈቀደ ነው).'
+      });
+    }
+
     const { id } = req.params;
     const { priority, urgencyReason, notes } = req.body;
 

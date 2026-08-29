@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Printer, X, CheckCircle2, Clock, Users, Download, Copy, Check, Sparkles, Calendar, QrCode } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Printer, X, CheckCircle2, Clock, Users, Download, Copy, Check, Sparkles, Calendar, QrCode, ToggleLeft, ToggleRight } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { PrintTicketData } from '../types';
 import { AmharicLib } from '../lib/amharic';
@@ -9,23 +9,13 @@ interface TicketPrintModalProps {
   isOpen: boolean;
   onClose: () => void;
   uiLanguage: 'AMHARIC' | 'ENGLISH';
+  autoPrint?: boolean;
+  onToggleAutoPrint?: (enabled: boolean) => void;
 }
 
-export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
-  printData,
-  isOpen,
-  onClose,
-  uiLanguage
-}) => {
-  const [isPrinting, setIsPrinting] = useState<boolean>(false);
-  const [printSuccess, setPrintSuccess] = useState<boolean>(false);
-  const [copied, setCopied] = useState<boolean>(false);
-
-  if (!isOpen || !printData) return null;
-
+const generateTicketHtmlDocument = (printData: PrintTicketData, uiLanguage: 'AMHARIC' | 'ENGLISH', qrSvgMarkup: string) => {
   const isAmharic = uiLanguage === 'AMHARIC';
   const issuedDate = new Date(printData.issuedAt);
-
   const formattedDate = issuedDate.toLocaleString(
     isAmharic ? 'am-ET' : 'en-US',
     {
@@ -33,20 +23,10 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
       timeStyle: 'short'
     }
   );
-
   const ethiopianDateStr = AmharicLib.calendar.formatDateString(issuedDate, { useGeez: true });
   const geezAhead = AmharicLib.numbers.toGeez(printData.peopleAhead);
 
-  const checkInUrl = typeof window !== 'undefined' 
-    ? `${window.location.origin}${window.location.pathname}?view=customer&ticket=${encodeURIComponent(printData.ticketNumber)}&checkin=true`
-    : `https://addisqueue.app?ticket=${printData.ticketNumber}&checkin=true`;
-
-  const generateTicketHtml = () => {
-    // Get serialized SVG of the QR Code from the DOM if rendered, or render inline
-    const qrSvgElement = document.getElementById('modal-print-qr-svg');
-    const qrSvgMarkup = qrSvgElement ? new XMLSerializer().serializeToString(qrSvgElement) : '';
-
-    return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -185,16 +165,28 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
     እባክዎ ቁጥርዎ በስክሪን እና በድምፅ እስኪጠራ ድረስ ይጠብቁ።<br/>
     Please wait until your number is announced.
   </div>
-</body>
-</html>`;
-  };
+ </body>
+ </html>`;
+};
 
-  const handlePrint = () => {
+export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
+  printData,
+  isOpen,
+  onClose,
+  uiLanguage,
+  autoPrint = false,
+  onToggleAutoPrint
+}) => {
+  const [isPrinting, setIsPrinting] = useState<boolean>(false);
+  const [printSuccess, setPrintSuccess] = useState<boolean>(false);
+  const [copied, setCopied] = useState<boolean>(false);
+  const hasAutoPrintedRef = useRef<string | null>(null);
+
+  const executePrint = (data: PrintTicketData) => {
     setIsPrinting(true);
     setPrintSuccess(false);
 
     try {
-      // Approach 1: Try printing through isolated iframe
       let iframe = document.getElementById('ticket-print-iframe') as HTMLIFrameElement;
       if (!iframe) {
         iframe = document.createElement('iframe');
@@ -208,10 +200,14 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
         document.body.appendChild(iframe);
       }
 
+      const qrSvgElement = document.getElementById('modal-print-qr-svg');
+      const qrSvgMarkup = qrSvgElement ? new XMLSerializer().serializeToString(qrSvgElement) : '';
+      const html = generateTicketHtmlDocument(data, uiLanguage, qrSvgMarkup);
+
       const doc = iframe.contentWindow?.document || iframe.contentDocument;
       if (doc) {
         doc.open();
-        doc.write(generateTicketHtml());
+        doc.write(html);
         doc.close();
 
         setTimeout(() => {
@@ -222,7 +218,6 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
             setPrintSuccess(true);
             setTimeout(() => setPrintSuccess(false), 4000);
           } catch {
-            // Fallback to top window print if iframe print blocked
             window.print();
             setIsPrinting(false);
             setPrintSuccess(true);
@@ -239,6 +234,41 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
       setIsPrinting(false);
       setPrintSuccess(true);
     }
+  };
+
+  // Automatically trigger printing if autoPrint prop is true
+  useEffect(() => {
+    if (isOpen && autoPrint && printData && hasAutoPrintedRef.current !== printData.ticketNumber) {
+      hasAutoPrintedRef.current = printData.ticketNumber;
+      const timer = setTimeout(() => {
+        executePrint(printData);
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, autoPrint, printData?.ticketNumber, uiLanguage]);
+
+  if (!isOpen || !printData) return null;
+
+  const isAmharic = uiLanguage === 'AMHARIC';
+  const issuedDate = new Date(printData.issuedAt);
+
+  const formattedDate = issuedDate.toLocaleString(
+    isAmharic ? 'am-ET' : 'en-US',
+    {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }
+  );
+
+  const ethiopianDateStr = AmharicLib.calendar.formatDateString(issuedDate, { useGeez: true });
+  const geezAhead = AmharicLib.numbers.toGeez(printData.peopleAhead);
+
+  const checkInUrl = typeof window !== 'undefined' 
+    ? `${window.location.origin}${window.location.pathname}?view=customer&ticket=${encodeURIComponent(printData.ticketNumber)}&checkin=true`
+    : `https://addisqueue.app?ticket=${printData.ticketNumber}&checkin=true`;
+
+  const handlePrint = () => {
+    executePrint(printData);
   };
 
   const handleDownloadSlip = () => {
@@ -389,6 +419,29 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
 
         {/* Action Buttons */}
         <div className="p-4 bg-slate-50 border-t border-slate-100 space-y-2.5">
+          {onToggleAutoPrint && (
+            <div className="flex items-center justify-between px-1 py-1 text-xs bg-white rounded-lg border border-slate-200/80 px-2.5">
+              <span className="text-slate-600 font-medium flex items-center space-x-1.5 text-[11px]">
+                <Printer className="w-3.5 h-3.5 text-indigo-600" />
+                <span>{isAmharic ? 'ቀጣይ ቲኬቶች ወዲያውኑ ይታተሙ (Auto-print)' : 'Auto-trigger browser print for new tickets'}</span>
+              </span>
+              <button
+                type="button"
+                id="btn-toggle-autoprint-modal"
+                onClick={() => onToggleAutoPrint(!autoPrint)}
+                className={`relative inline-flex h-4.5 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  autoPrint ? 'bg-indigo-600' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    autoPrint ? 'translate-x-3.5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
