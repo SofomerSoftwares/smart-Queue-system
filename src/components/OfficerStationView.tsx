@@ -26,7 +26,8 @@ import {
   Edit3,
   X,
   Check,
-  FileText
+  FileText,
+  Keyboard
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
 import { useAuth } from '../context/AuthContext';
@@ -361,6 +362,53 @@ export const OfficerStationView: React.FC = () => {
     }
   };
 
+  // Global keyboard shortcuts for staff: Alt+N (Call Next) and Alt+C (Complete Ticket)
+  useEffect(() => {
+    if (!user || !isAuthorized) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Must have Alt key pressed without Ctrl/Meta
+      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+
+      const key = e.key.toLowerCase();
+      const code = e.code;
+
+      // Check if user is actively interacting with form inputs/modals
+      const activeEl = document.activeElement;
+      const isTyping = activeEl && (
+        activeEl.tagName === 'INPUT' ||
+        activeEl.tagName === 'TEXTAREA' ||
+        activeEl.tagName === 'SELECT'
+      );
+
+      if (officerTriageTicket || showTransferModal) {
+        if (isTyping) return;
+      }
+
+      // Alt + N -> Call Next Ticket
+      if (key === 'n' || code === 'KeyN') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isCalling) {
+          handleCallNext();
+        }
+      } 
+      // Alt + C -> Complete Active Ticket
+      else if (key === 'c' || code === 'KeyC') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (currentTicket) {
+          handleComplete();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [user, isAuthorized, isCalling, selectedCounterId, currentTicket, nextEligibleTicket, isAmharic, officerTriageTicket, showTransferModal]);
+
   // 1. Unauthenticated Gate: User must sign in first
   if (!user) {
     return (
@@ -629,24 +677,43 @@ export const OfficerStationView: React.FC = () => {
     <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
       
       {/* Top Header Bar with Counter Selector or Locked Counter Badge */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl shadow-xs border border-slate-200">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
-            <UserCheck className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">
-              {isAmharic ? 'የአገልግሎት ሰጪ ጣቢያ' : 'Service Officer Station'}
-            </h1>
-            <div className="flex items-center space-x-2 mt-0.5">
-              <span className="text-xs text-slate-600 font-bold">
-                {user ? user.name : (isAmharic ? 'አገልግሎት ሰጪ' : 'Counter Officer')}
-              </span>
-              <span className="text-slate-300">•</span>
-              <span className="text-[11px] px-2 py-0.5 rounded-md font-bold bg-slate-100 text-slate-700 uppercase">
-                {user?.role || 'OFFICER'}
-              </span>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl shadow-xs border border-slate-200">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
+              <UserCheck className="w-5 h-5" />
             </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-900">
+                {isAmharic ? 'የአገልግሎት ሰጪ ጣቢያ' : 'Service Officer Station'}
+              </h1>
+              <div className="flex items-center space-x-2 mt-0.5">
+                <span className="text-xs text-slate-600 font-bold">
+                  {user ? user.name : (isAmharic ? 'አገልግሎት ሰጪ' : 'Counter Officer')}
+                </span>
+                <span className="text-slate-300">•</span>
+                <span className="text-[11px] px-2 py-0.5 rounded-md font-bold bg-slate-100 text-slate-700 uppercase">
+                  {user?.role || 'OFFICER'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Keyboard Shortcuts Reference Pill */}
+          <div className="inline-flex items-center gap-2 bg-slate-50 border border-slate-200/90 px-3 py-1.5 rounded-xl text-[11px] text-slate-600">
+            <span className="font-bold text-slate-700 flex items-center gap-1.5">
+              <Keyboard className="w-3.5 h-3.5 text-indigo-600" />
+              <span>{isAmharic ? 'አቋራጭ ቁልፎች:' : 'Shortcuts:'}</span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono font-bold text-slate-800 shadow-2xs">Alt+N</kbd>
+              <span className="text-slate-600">{isAmharic ? 'ቀጣይ ጥራ' : 'Call Next'}</span>
+            </span>
+            <span className="text-slate-300">·</span>
+            <span className="inline-flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono font-bold text-slate-800 shadow-2xs">Alt+C</kbd>
+              <span className="text-slate-600">{isAmharic ? 'ጨርስ' : 'Complete'}</span>
+            </span>
           </div>
         </div>
 
@@ -843,7 +910,7 @@ export const OfficerStationView: React.FC = () => {
                 id="btn-call-next"
                 disabled={isCalling}
                 onClick={() => handleCallNext()}
-                className={`text-white font-bold py-5 rounded-xl shadow-lg active:scale-[0.99] flex flex-col items-center justify-center gap-1 transition ${
+                className={`text-white font-bold py-5 px-3 rounded-xl shadow-lg active:scale-[0.99] flex flex-col items-center justify-center gap-1 transition relative group ${
                   nextEligibleTicket?.priority === 'URGENT'
                     ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200 ring-2 ring-rose-400 ring-offset-2'
                     : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'
@@ -857,9 +924,14 @@ export const OfficerStationView: React.FC = () => {
                       : (isAmharic ? 'ቀጣይ ጥራ' : 'Call Next')}
                   </span>
                 </div>
-                <span className="text-xs opacity-80 font-normal italic">
-                  {isAmharic ? 'Call Next Customer' : 'ቀጣዩን ጥራ'}
-                </span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-xs opacity-80 font-normal italic">
+                    {isAmharic ? 'Call Next Customer' : 'ቀጣዩን ጥራ'}
+                  </span>
+                  <span className="text-[10px] font-mono font-bold bg-white/20 px-1.5 py-0.5 rounded text-white/90 shadow-2xs">
+                    Alt+N
+                  </span>
+                </div>
               </button>
 
               {/* Recall Button */}
@@ -867,7 +939,7 @@ export const OfficerStationView: React.FC = () => {
                 id="btn-recall-ticket"
                 disabled={!currentTicket}
                 onClick={handleRecall}
-                className="bg-white border-2 border-slate-200 hover:border-slate-300 active:scale-[0.99] text-slate-700 font-bold py-5 rounded-xl flex flex-col items-center justify-center gap-1 transition disabled:opacity-50"
+                className="bg-white border-2 border-slate-200 hover:border-slate-300 active:scale-[0.99] text-slate-700 font-bold py-5 px-3 rounded-xl flex flex-col items-center justify-center gap-1 transition disabled:opacity-50"
               >
                 <span className="text-lg uppercase tracking-wider">
                   {isAmharic ? 'ድገም ጥራ' : 'Recall'}
@@ -882,14 +954,19 @@ export const OfficerStationView: React.FC = () => {
                 id="btn-complete-ticket"
                 disabled={!currentTicket}
                 onClick={handleComplete}
-                className="bg-emerald-500 hover:bg-emerald-600 active:scale-[0.99] text-white font-bold py-5 rounded-xl shadow-lg shadow-emerald-100 flex flex-col items-center justify-center gap-1 transition disabled:opacity-50"
+                className="bg-emerald-500 hover:bg-emerald-600 active:scale-[0.99] text-white font-bold py-5 px-3 rounded-xl shadow-lg shadow-emerald-100 flex flex-col items-center justify-center gap-1 transition disabled:opacity-50 relative group"
               >
                 <span className="text-lg uppercase tracking-wider">
                   {isAmharic ? 'ጨርስ' : 'Complete'}
                 </span>
-                <span className="text-xs opacity-80 font-normal italic">
-                  {isAmharic ? 'Finish Service' : 'ጨርስ'}
-                </span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-xs opacity-80 font-normal italic">
+                    {isAmharic ? 'Finish Service' : 'ጨርስ'}
+                  </span>
+                  <span className="text-[10px] font-mono font-bold bg-white/20 px-1.5 py-0.5 rounded text-white/90 shadow-2xs">
+                    Alt+C
+                  </span>
+                </div>
               </button>
 
               {/* No Show Button */}
