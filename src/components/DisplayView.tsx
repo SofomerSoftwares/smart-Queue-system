@@ -23,7 +23,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { DisplayVideoPlayer, PRESET_VIDEOS } from './DisplayVideoPlayer';
 import { videoStorage } from '../lib/videoStorage';
 
-export const DisplayView: React.FC = () => {
+interface DisplayViewProps {
+  onSwitchToCounterDisplay?: (counterId?: string, counterNumber?: number) => void;
+}
+
+export const DisplayView: React.FC<DisplayViewProps> = ({
+  onSwitchToCounterDisplay
+}) => {
   const { 
     waitingTickets, 
     servingTickets, 
@@ -204,8 +210,20 @@ export const DisplayView: React.FC = () => {
           </div>
         </div>
 
-        {/* Video Mode, Audio Unlock & Fullscreen Controls */}
+        {/* Video Mode, Audio Unlock, Counter Screen & Fullscreen Controls */}
         <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
+          {/* Quick Switch to Dedicated Counter Terminal */}
+          {onSwitchToCounterDisplay && (
+            <button
+              onClick={() => onSwitchToCounterDisplay()}
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 text-xs font-bold transition shadow-sm cursor-pointer"
+              title="Open Dedicated Single Counter Display"
+            >
+              <Tv className="w-4 h-4 text-indigo-400" />
+              <span className="hidden sm:inline">{isAmharic ? 'የመስኮት ስክሪን' : 'Counter Display'}</span>
+            </button>
+          )}
+
           {/* One-click Audio Unlock Button if not yet clicked */}
           {!isAudioUnlocked && (
             <button
@@ -435,21 +453,23 @@ export const DisplayView: React.FC = () => {
                 {counters.slice(0, 4).map((cnt) => {
                   const isBusy = cnt.status === 'SERVING' && cnt.currentTicketNumber;
                   return (
-                    <div
+                    <button
                       key={cnt.id}
-                      className={`p-2 rounded-xl border transition-all text-center ${
+                      onClick={() => onSwitchToCounterDisplay && onSwitchToCounterDisplay(cnt.id, cnt.number)}
+                      className={`p-2 rounded-xl border transition-all text-center group cursor-pointer hover:border-indigo-400 ${
                         isBusy
                           ? 'bg-indigo-950/60 border-indigo-500/40 text-indigo-200'
-                          : 'bg-slate-950/60 border-slate-800 text-slate-500'
+                          : 'bg-slate-950/60 border-slate-800 text-slate-500 hover:text-slate-300'
                       }`}
+                      title={`Open dedicated display for Counter ${cnt.number}`}
                     >
-                      <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400 truncate">
+                      <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400 truncate group-hover:text-indigo-300">
                         {isAmharic ? `መስኮት 0${cnt.number}` : `CNT 0${cnt.number}`}
                       </div>
                       <div className="text-base sm:text-lg font-black text-white mt-0.5 font-mono truncate">
                         {cnt.currentTicketNumber || (cnt.status === 'CLOSED' ? 'CLOSED' : 'READY')}
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -675,21 +695,23 @@ export const DisplayView: React.FC = () => {
               {counters.map((cnt) => {
                 const isBusy = cnt.status === 'SERVING' && cnt.currentTicketNumber;
                 return (
-                  <div
+                  <button
                     key={cnt.id}
-                    className={`p-3.5 rounded-xl border transition-all ${
+                    onClick={() => onSwitchToCounterDisplay && onSwitchToCounterDisplay(cnt.id, cnt.number)}
+                    className={`p-3.5 rounded-xl border transition-all text-left group cursor-pointer hover:border-indigo-400 ${
                       isBusy
                         ? 'bg-indigo-950/60 border-indigo-500/40 text-indigo-200'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-500'
+                        : 'bg-slate-950/60 border-slate-800 text-slate-500 hover:text-slate-300'
                     }`}
+                    title={`Open dedicated display for Counter ${cnt.number}`}
                   >
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-indigo-300">
                       {isAmharic ? `መስኮት 0${cnt.number}` : `COUNTER 0${cnt.number}`}
                     </div>
                     <div className="text-xl font-black text-white mt-0.5 font-mono">
                       {cnt.currentTicketNumber || (cnt.status === 'CLOSED' ? 'CLOSED' : 'READY')}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>

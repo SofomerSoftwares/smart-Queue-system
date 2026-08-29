@@ -372,7 +372,7 @@ router.get('/counters', (req: Request, res: Response) => {
 // POST /api/counters (Admin only)
 router.post('/counters', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { number, name, nameAmharic } = req.body;
+    const { number, name, nameAmharic, serviceIds, location, locationAmharic, displayTheme, currentOfficerId, status } = req.body;
     const countNum = Number(number);
 
     if (!countNum || !name) {
@@ -383,16 +383,34 @@ router.post('/counters', authenticate, requireAdmin, (req: AuthenticatedRequest,
       return res.status(400).json({ success: false, message: `Counter number ${countNum} already exists.` });
     }
 
+    let assignedOfficerName: string | undefined = undefined;
+    if (currentOfficerId) {
+      const officerUser = db.getUserById(currentOfficerId);
+      if (officerUser) {
+        assignedOfficerName = officerUser.name;
+      }
+    }
+
     const newCounter: Counter = {
       id: `cnt-${countNum}`,
       number: countNum,
       name,
       nameAmharic: nameAmharic || `መስኮት ${countNum}`,
-      status: 'AVAILABLE',
+      status: status || 'AVAILABLE',
+      currentOfficerId: currentOfficerId || undefined,
+      currentOfficerName: assignedOfficerName,
+      serviceIds: Array.isArray(serviceIds) ? serviceIds : undefined,
+      location: location || undefined,
+      locationAmharic: locationAmharic || undefined,
+      displayTheme: displayTheme || 'modern',
       updatedAt: new Date().toISOString()
     };
 
     db.createCounter(newCounter);
+
+    if (currentOfficerId) {
+      db.updateUser(currentOfficerId, { assignedCounterId: newCounter.id });
+    }
 
     db.addAuditLog({
       userId: req.user?.id,

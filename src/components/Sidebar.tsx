@@ -20,7 +20,9 @@ import {
   Radio,
   Clock,
   Layers,
-  ChevronDown
+  ChevronDown,
+  Monitor,
+  LayoutGrid
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useQueue } from '../context/QueueContext';
@@ -53,7 +55,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     unlockAudio, 
     isMusicPlaying, 
     toggleBackgroundMusic,
-    stats
+    stats,
+    counters
   } = useQueue();
 
   const [currentTime, setCurrentTime] = useState<string>('');
@@ -80,6 +83,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200'
     },
     { 
+      id: 'counter-display', 
+      label: isAmharic ? 'የመስኮት ስክሪን' : 'Counter Display', 
+      icon: Monitor,
+      badge: isAmharic ? 'ቀጥታ' : 'Live',
+      badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200'
+    },
+    { 
       id: 'reception', 
       label: isAmharic ? 'መስተንግዶ ዴስክ' : 'Reception Desk', 
       icon: Ticket, 
@@ -88,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     { 
       id: 'officer', 
-      label: isAmharic ? 'መስኮት' : 'Counter Station', 
+      label: isAmharic ? 'መስኮት ጣቢያ' : 'Counter Station', 
       icon: UserCheck 
     },
     { 
@@ -99,6 +109,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const managementNav = [
+    { 
+      id: 'counters', 
+      label: isAmharic ? 'የመስኮቶች አስተዳደር' : 'Counter Hub', 
+      icon: Layers,
+      badge: counters?.length ? `${counters.length}` : undefined,
+      badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200'
+    },
     { 
       id: 'admin', 
       label: isAmharic ? 'አስተዳደር ማዕከል' : 'Admin Control', 

@@ -64,6 +64,18 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
           subtitle: isAmharic ? 'የቀጥታ ወረፋ እና ጥሪ ስክሪን' : 'Live queue status & audio broadcasting',
           icon: Tv
         };
+      case 'counter-display':
+        return {
+          title: isAmharic ? 'የመስኮት ስክሪን ማሳያ' : 'Dedicated Counter Display',
+          subtitle: isAmharic ? 'ለመስኮት የተገጠመ የቀጥታ ጥሪ ማሳያ' : 'Live window terminal display for individual service counters',
+          icon: Tv
+        };
+      case 'counters':
+        return {
+          title: isAmharic ? 'የመስኮቶች አስተዳደር ማዕከል' : 'Counter Management Hub',
+          subtitle: isAmharic ? 'የመስኮቶች ሁኔታ፣ ሰራተኞች እና የስክሪን ግንኙነቶች' : 'Manage counters, staff assignments, and display pairings',
+          icon: ShieldCheck
+        };
       case 'reception':
         return {
           title: t('reception_desk', 'Reception & Ticket Kiosk'),
