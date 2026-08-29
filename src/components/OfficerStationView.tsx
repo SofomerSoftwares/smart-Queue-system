@@ -362,30 +362,30 @@ export const OfficerStationView: React.FC = () => {
     }
   };
 
-  // Global keyboard shortcuts for staff: Alt+N (Call Next) and Alt+C (Complete Ticket)
+  // Global keyboard shortcuts for staff: N (Next), C (Complete), R (Re-announce / Recall), A (Mark Absent / No Show)
   useEffect(() => {
     if (!user || !isAuthorized) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Must have Alt key pressed without Ctrl/Meta
-      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+      // Never intercept browser system combinations like Ctrl+C (Copy), Ctrl+A (Select All), Ctrl+R (Reload), Ctrl+N (New window) or Meta/Cmd
+      if (e.ctrlKey || e.metaKey) return;
 
-      const key = e.key.toLowerCase();
-      const code = e.code;
-
-      // Check if user is actively interacting with form inputs/modals
+      // Check if user is actively interacting with form inputs/modals or editable content
       const activeEl = document.activeElement;
       const isTyping = activeEl && (
         activeEl.tagName === 'INPUT' ||
         activeEl.tagName === 'TEXTAREA' ||
-        activeEl.tagName === 'SELECT'
+        activeEl.tagName === 'SELECT' ||
+        (activeEl as HTMLElement).isContentEditable
       );
 
-      if (officerTriageTicket || showTransferModal) {
-        if (isTyping) return;
-      }
+      if (isTyping) return;
+      if (officerTriageTicket || showTransferModal) return;
 
-      // Alt + N -> Call Next Ticket
+      const key = e.key.toLowerCase();
+      const code = e.code;
+
+      // N or Alt+N -> Call Next Ticket
       if (key === 'n' || code === 'KeyN') {
         e.preventDefault();
         e.stopPropagation();
@@ -393,12 +393,28 @@ export const OfficerStationView: React.FC = () => {
           handleCallNext();
         }
       } 
-      // Alt + C -> Complete Active Ticket
+      // C or Alt+C -> Complete Active Ticket
       else if (key === 'c' || code === 'KeyC') {
         e.preventDefault();
         e.stopPropagation();
         if (currentTicket) {
           handleComplete();
+        }
+      }
+      // R or Alt+R -> Re-announce / Recall Ticket
+      else if (key === 'r' || code === 'KeyR') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (currentTicket) {
+          handleRecall();
+        }
+      }
+      // A or Alt+A -> Mark Absent / No Show
+      else if (key === 'a' || code === 'KeyA') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (currentTicket) {
+          handleNoShow();
         }
       }
     };
@@ -700,19 +716,29 @@ export const OfficerStationView: React.FC = () => {
           </div>
 
           {/* Quick Keyboard Shortcuts Reference Pill */}
-          <div className="inline-flex items-center gap-2 bg-slate-50 border border-slate-200/90 px-3 py-1.5 rounded-xl text-[11px] text-slate-600">
+          <div className="inline-flex flex-wrap items-center gap-2 bg-slate-50 border border-slate-200/90 px-3 py-1.5 rounded-xl text-[11px] text-slate-600">
             <span className="font-bold text-slate-700 flex items-center gap-1.5">
               <Keyboard className="w-3.5 h-3.5 text-indigo-600" />
-              <span>{isAmharic ? 'አቋራጭ ቁልፎች:' : 'Shortcuts:'}</span>
+              <span>{isAmharic ? 'አቋራጮች:' : 'Shortcuts:'}</span>
             </span>
             <span className="inline-flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono font-bold text-slate-800 shadow-2xs">Alt+N</kbd>
-              <span className="text-slate-600">{isAmharic ? 'ቀጣይ ጥራ' : 'Call Next'}</span>
+              <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono font-bold text-slate-800 shadow-2xs">N</kbd>
+              <span className="text-slate-600">{isAmharic ? 'ቀጣይ' : 'Next'}</span>
             </span>
             <span className="text-slate-300">·</span>
             <span className="inline-flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono font-bold text-slate-800 shadow-2xs">Alt+C</kbd>
+              <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono font-bold text-slate-800 shadow-2xs">C</kbd>
               <span className="text-slate-600">{isAmharic ? 'ጨርስ' : 'Complete'}</span>
+            </span>
+            <span className="text-slate-300">·</span>
+            <span className="inline-flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono font-bold text-slate-800 shadow-2xs">R</kbd>
+              <span className="text-slate-600">{isAmharic ? 'ድገም' : 'Re-announce'}</span>
+            </span>
+            <span className="text-slate-300">·</span>
+            <span className="inline-flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px] font-mono font-bold text-slate-800 shadow-2xs">A</kbd>
+              <span className="text-slate-600">{isAmharic ? 'አልቀረበም' : 'Absent'}</span>
             </span>
           </div>
         </div>
@@ -928,8 +954,8 @@ export const OfficerStationView: React.FC = () => {
                   <span className="text-xs opacity-80 font-normal italic">
                     {isAmharic ? 'Call Next Customer' : 'ቀጣዩን ጥራ'}
                   </span>
-                  <span className="text-[10px] font-mono font-bold bg-white/20 px-1.5 py-0.5 rounded text-white/90 shadow-2xs">
-                    Alt+N
+                  <span className="text-[11px] font-mono font-black bg-white/20 px-2 py-0.5 rounded text-white shadow-2xs border border-white/20">
+                    N
                   </span>
                 </div>
               </button>
@@ -939,14 +965,19 @@ export const OfficerStationView: React.FC = () => {
                 id="btn-recall-ticket"
                 disabled={!currentTicket}
                 onClick={handleRecall}
-                className="bg-white border-2 border-slate-200 hover:border-slate-300 active:scale-[0.99] text-slate-700 font-bold py-5 px-3 rounded-xl flex flex-col items-center justify-center gap-1 transition disabled:opacity-50"
+                className="bg-white border-2 border-slate-200 hover:border-slate-300 active:scale-[0.99] text-slate-700 font-bold py-5 px-3 rounded-xl flex flex-col items-center justify-center gap-1 transition disabled:opacity-50 relative group shadow-xs"
               >
                 <span className="text-lg uppercase tracking-wider">
                   {isAmharic ? 'ድገም ጥራ' : 'Recall'}
                 </span>
-                <span className="text-xs text-slate-400 font-normal italic">
-                  {isAmharic ? 'Re-announce' : 'እንደገና ጥራ'}
-                </span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-xs text-slate-400 font-normal italic">
+                    {isAmharic ? 'Re-announce' : 'እንደገና ጥራ'}
+                  </span>
+                  <span className="text-[11px] font-mono font-black bg-slate-100 px-2 py-0.5 rounded text-slate-700 shadow-2xs border border-slate-300">
+                    R
+                  </span>
+                </div>
               </button>
 
               {/* Complete Button */}
@@ -963,8 +994,8 @@ export const OfficerStationView: React.FC = () => {
                   <span className="text-xs opacity-80 font-normal italic">
                     {isAmharic ? 'Finish Service' : 'ጨርስ'}
                   </span>
-                  <span className="text-[10px] font-mono font-bold bg-white/20 px-1.5 py-0.5 rounded text-white/90 shadow-2xs">
-                    Alt+C
+                  <span className="text-[11px] font-mono font-black bg-white/20 px-2 py-0.5 rounded text-white shadow-2xs border border-white/20">
+                    C
                   </span>
                 </div>
               </button>
@@ -974,14 +1005,19 @@ export const OfficerStationView: React.FC = () => {
                 id="btn-no-show-ticket"
                 disabled={!currentTicket}
                 onClick={handleNoShow}
-                className="bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100 active:scale-[0.99] font-bold py-5 rounded-xl flex flex-col items-center justify-center gap-1 transition disabled:opacity-50"
+                className="bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100 active:scale-[0.99] font-bold py-5 rounded-xl flex flex-col items-center justify-center gap-1 transition disabled:opacity-50 relative group shadow-xs"
               >
                 <span className="text-lg uppercase tracking-wider">
                   {isAmharic ? 'አልቀረበም' : 'No Show'}
                 </span>
-                <span className="text-xs text-rose-400 font-normal italic">
-                  {isAmharic ? 'Mark Absent' : 'አልተገኘም'}
-                </span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-xs text-rose-400 font-normal italic">
+                    {isAmharic ? 'Mark Absent' : 'አልተገኘም'}
+                  </span>
+                  <span className="text-[11px] font-mono font-black bg-rose-200/70 text-rose-800 px-2 py-0.5 rounded shadow-2xs border border-rose-300">
+                    A
+                  </span>
+                </div>
               </button>
             </div>
 

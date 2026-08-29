@@ -373,59 +373,102 @@ export const DisplayView: React.FC = () => {
                 <AnimatePresence mode="wait">
                   {primaryCalledTicket ? (
                     <motion.div
-                      key={primaryCalledTicket.id + (primaryCalledTicket.calledAt || '')}
-                      initial={{ scale: 0.88, opacity: 0, y: 15 }}
+                      key={primaryCalledTicket.id + (primaryCalledTicket.calledAt || '') + (primaryCalledTicket.status || '')}
+                      initial={{ scale: 0.86, opacity: 0, y: 20 }}
                       animate={{ scale: 1, opacity: 1, y: 0 }}
-                      exit={{ scale: 0.92, opacity: 0 }}
-                      transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+                      exit={{ scale: 0.9, opacity: 0, y: -20 }}
+                      transition={{ type: 'spring', stiffness: 320, damping: 24 }}
                       className="space-y-3 sm:space-y-4"
                     >
                       <div className="inline-block">
                         {/* Priority Badge on TV display if urgent or priority */}
                         {primaryCalledTicket.priority === 'URGENT' && (
-                          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-rose-600 text-white rounded-full text-xs font-black uppercase tracking-wider shadow-lg shadow-rose-950/60 animate-pulse border border-rose-400 mb-2">
+                          <motion.div 
+                            initial={{ scale: 0.8, opacity: 0, y: -8 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.8, opacity: 0 }}
+                            transition={{ type: 'spring', stiffness: 380, damping: 20 }}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-rose-600 text-white rounded-full text-xs font-black uppercase tracking-wider shadow-lg shadow-rose-950/60 animate-pulse border border-rose-400 mb-2"
+                          >
                             <Flame className="w-3.5 h-3.5" />
                             <span>{isAmharic ? '⚡ አስቸኳይ ተገልጋይ' : '⚡ URGENT PRIORITY'}</span>
-                          </div>
+                          </motion.div>
                         )}
                         {primaryCalledTicket.priority === 'PRIORITY' && (
-                          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-amber-500 text-slate-950 rounded-full text-xs font-extrabold uppercase tracking-wider shadow-md mb-2">
+                          <motion.div 
+                            initial={{ scale: 0.8, opacity: 0, y: -8 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.8, opacity: 0 }}
+                            transition={{ type: 'spring', stiffness: 380, damping: 20 }}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-amber-500 text-slate-950 rounded-full text-xs font-extrabold uppercase tracking-wider shadow-md mb-2"
+                          >
                             <Zap className="w-3.5 h-3.5" />
                             <span>{isAmharic ? '★ ቅድሚያ (VIP)' : '★ VIP PRIORITY'}</span>
-                          </div>
+                          </motion.div>
                         )}
 
-                        <div className="text-6xl sm:text-7xl lg:text-8xl font-black tracking-tight text-white font-mono leading-none">
+                        <motion.div
+                          key={`split-ticket-num-${primaryCalledTicket.ticketNumber}`}
+                          initial={{ opacity: 0, scale: 0.82, y: 18 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 1.08, y: -18 }}
+                          transition={{ type: 'spring', stiffness: 360, damping: 25 }}
+                          className="text-6xl sm:text-7xl lg:text-8xl font-black tracking-tight text-white font-mono leading-none"
+                        >
                           {primaryCalledTicket.ticketNumber}
-                        </div>
+                        </motion.div>
 
                         {/* Amharic Letter Display */}
                         {primaryCalledTicket.ticketNumberAmharic && primaryCalledTicket.ticketNumberAmharic !== primaryCalledTicket.ticketNumber && (
-                          <div className="text-xl sm:text-2xl font-light text-slate-400 italic mt-1 font-sans">
+                          <motion.div 
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ delay: 0.06 }}
+                            className="text-xl sm:text-2xl font-light text-slate-400 italic mt-1 font-sans"
+                          >
                             {primaryCalledTicket.ticketNumberAmharic}
-                          </div>
+                          </motion.div>
                         )}
                       </div>
 
                       {/* Service Title */}
-                      <div className="text-sm sm:text-base font-semibold text-slate-300 truncate max-w-full px-2">
+                      <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ delay: 0.08 }}
+                        className="text-sm sm:text-base font-semibold text-slate-300 truncate max-w-full px-2"
+                      >
                         {isAmharic ? (primaryCalledTicket.serviceNameAmharic || primaryCalledTicket.serviceName) : primaryCalledTicket.serviceName}
-                      </div>
+                      </motion.div>
 
                       {/* Counter Assignment Banner */}
-                      <div className="inline-flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xl sm:text-3xl px-6 sm:px-8 py-3 sm:py-3.5 rounded-2xl shadow-xl shadow-indigo-950/60 border border-indigo-500/30 font-black tracking-wide">
+                      <motion.div 
+                        initial={{ opacity: 0, y: 14, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -14, scale: 0.95 }}
+                        transition={{ delay: 0.1, type: 'spring', stiffness: 320, damping: 24 }}
+                        className="inline-flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xl sm:text-3xl px-6 sm:px-8 py-3 sm:py-3.5 rounded-2xl shadow-xl shadow-indigo-950/60 border border-indigo-500/30 font-black tracking-wide"
+                      >
                         <span>
                           {isAmharic ? `ወደ መስኮት ${primaryCalledTicket.counterNumber || 1}` : `COUNTER ${primaryCalledTicket.counterNumber || 1}`}
                         </span>
-                      </div>
+                      </motion.div>
                     </motion.div>
                   ) : (
-                    <div className="py-8 text-slate-500 space-y-2">
+                    <motion.div 
+                      key="empty-split-call"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className="py-8 text-slate-500 space-y-2"
+                    >
                       <div className="text-4xl sm:text-6xl font-mono font-bold text-slate-700">--</div>
                       <p className="text-xs sm:text-sm text-slate-400 font-medium">
                         {isAmharic ? 'በአሁኑ ሰዓት የተጠራ ደንበኛ የለም።' : 'No active ticket called yet.'}
                       </p>
-                    </div>
+                    </motion.div>
                   )}
                 </AnimatePresence>
               </div>
@@ -434,6 +477,7 @@ export const DisplayView: React.FC = () => {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-slate-800 z-10">
                 {counters.slice(0, 4).map((cnt) => {
                   const isBusy = cnt.status === 'SERVING' && cnt.currentTicketNumber;
+                  const displayVal = cnt.currentTicketNumber || (cnt.status === 'CLOSED' ? 'CLOSED' : 'READY');
                   return (
                     <div
                       key={cnt.id}
@@ -446,8 +490,19 @@ export const DisplayView: React.FC = () => {
                       <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400 truncate">
                         {isAmharic ? `መስኮት ${cnt.number}` : `CNT ${cnt.number}`}
                       </div>
-                      <div className="text-base sm:text-lg font-black text-white mt-0.5 font-mono truncate">
-                        {cnt.currentTicketNumber || (cnt.status === 'CLOSED' ? 'CLOSED' : 'READY')}
+                      <div className="text-base sm:text-lg font-black text-white mt-0.5 font-mono truncate overflow-hidden h-6 sm:h-7 flex items-center justify-center">
+                        <AnimatePresence mode="wait" initial={false}>
+                          <motion.span
+                            key={displayVal}
+                            initial={{ opacity: 0, y: 8, scale: 0.92 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -8, scale: 0.92 }}
+                            transition={{ duration: 0.2, ease: 'easeOut' }}
+                            className="inline-block"
+                          >
+                            {displayVal}
+                          </motion.span>
+                        </AnimatePresence>
                       </div>
                     </div>
                   );
@@ -471,43 +526,56 @@ export const DisplayView: React.FC = () => {
 
               {/* Waiting Ticket Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-32 overflow-y-auto pr-1">
-                {sortedWaitingTickets.length > 0 ? (
-                  sortedWaitingTickets.slice(0, 6).map((ticket, idx) => (
-                    <div
-                      key={ticket.id}
-                      className={`p-2 rounded-xl border flex items-center justify-between ${
-                        ticket.priority === 'URGENT'
-                          ? 'bg-rose-950/40 border-rose-600/60'
-                          : ticket.priority === 'PRIORITY'
-                          ? 'bg-amber-950/30 border-amber-500/50'
-                          : 'bg-slate-950 border-slate-800'
-                      }`}
+                <AnimatePresence initial={false}>
+                  {sortedWaitingTickets.length > 0 ? (
+                    sortedWaitingTickets.slice(0, 6).map((ticket, idx) => (
+                      <motion.div
+                        key={ticket.id}
+                        layout
+                        initial={{ opacity: 0, scale: 0.88, y: 10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.8, x: -12, transition: { duration: 0.18 } }}
+                        transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+                        className={`p-2 rounded-xl border flex items-center justify-between ${
+                          ticket.priority === 'URGENT'
+                            ? 'bg-rose-950/40 border-rose-600/60'
+                            : ticket.priority === 'PRIORITY'
+                            ? 'bg-amber-950/30 border-amber-500/50'
+                            : 'bg-slate-950 border-slate-800'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-1.5 min-w-0">
+                          <span className="w-4 h-4 rounded bg-slate-800 text-slate-300 font-bold text-[9px] flex items-center justify-center font-mono shrink-0">
+                            {idx + 1}
+                          </span>
+                          <span className="text-xs sm:text-sm font-black text-white font-mono truncate">
+                            {ticket.ticketNumber}
+                          </span>
+                        </div>
+                        {ticket.priority === 'URGENT' && (
+                          <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-rose-600 text-white shrink-0 flex items-center gap-0.5 animate-pulse">
+                            <Flame className="w-2.5 h-2.5" /> URGENT
+                          </span>
+                        )}
+                        {ticket.priority === 'PRIORITY' && (
+                          <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-amber-500/20 text-amber-300 shrink-0">
+                            VIP
+                          </span>
+                        )}
+                      </motion.div>
+                    ))
+                  ) : (
+                    <motion.div 
+                      key="empty-waiting-grid"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="col-span-full text-center py-3 text-slate-600 text-xs font-medium"
                     >
-                      <div className="flex items-center space-x-1.5 min-w-0">
-                        <span className="w-4 h-4 rounded bg-slate-800 text-slate-300 font-bold text-[9px] flex items-center justify-center font-mono shrink-0">
-                          {idx + 1}
-                        </span>
-                        <span className="text-xs sm:text-sm font-black text-white font-mono truncate">
-                          {ticket.ticketNumber}
-                        </span>
-                      </div>
-                      {ticket.priority === 'URGENT' && (
-                        <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-rose-600 text-white shrink-0 flex items-center gap-0.5 animate-pulse">
-                          <Flame className="w-2.5 h-2.5" /> URGENT
-                        </span>
-                      )}
-                      {ticket.priority === 'PRIORITY' && (
-                        <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-amber-500/20 text-amber-300 shrink-0">
-                          VIP
-                        </span>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  <div className="col-span-full text-center py-3 text-slate-600 text-xs font-medium">
-                    {isAmharic ? 'ሁሉም ደንበኞች ተስተናግደዋል' : 'All waiting customers served!'}
-                  </div>
-                )}
+                      {isAmharic ? 'ሁሉም ደንበኞች ተስተናግደዋል' : 'All waiting customers served!'}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
 
@@ -541,38 +609,73 @@ export const DisplayView: React.FC = () => {
               <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-500/30 uppercase tracking-wider">
                 {isAmharic ? 'አሁን የሚስተናገድ' : 'NOW SERVING'}
               </span>
-              {primaryCalledTicket ? (
-                <div className="flex items-center space-x-4">
-                  <span className="text-4xl sm:text-6xl font-black font-mono text-white">
-                    {primaryCalledTicket.ticketNumber}
-                  </span>
-                  <div className="bg-indigo-600 text-white px-5 py-2 rounded-xl text-xl sm:text-2xl font-black">
-                    {isAmharic ? `ወደ መስኮት ${primaryCalledTicket.counterNumber || 1}` : `COUNTER ${primaryCalledTicket.counterNumber || 1}`}
-                  </div>
-                  <span className="text-slate-300 font-semibold hidden lg:inline text-sm">
-                    {isAmharic ? primaryCalledTicket.serviceNameAmharic : primaryCalledTicket.serviceName}
-                  </span>
-                </div>
-              ) : (
-                <span className="text-slate-500 font-medium text-sm">
-                  {isAmharic ? 'በአሁኑ ሰዓት የተጠራ ደንበኛ የለም' : 'No active ticket called yet'}
-                </span>
-              )}
+              <AnimatePresence mode="wait">
+                {primaryCalledTicket ? (
+                  <motion.div 
+                    key={primaryCalledTicket.id + (primaryCalledTicket.calledAt || '') + (primaryCalledTicket.status || '')}
+                    initial={{ opacity: 0, x: -20, scale: 0.92 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: 20, scale: 0.92 }}
+                    transition={{ type: 'spring', stiffness: 320, damping: 24 }}
+                    className="flex items-center space-x-4"
+                  >
+                    <motion.span
+                      key={`full-ticket-num-${primaryCalledTicket.ticketNumber}`}
+                      initial={{ opacity: 0, scale: 0.85 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 1.1 }}
+                      transition={{ type: 'spring', stiffness: 360, damping: 24 }}
+                      className="text-4xl sm:text-6xl font-black font-mono text-white"
+                    >
+                      {primaryCalledTicket.ticketNumber}
+                    </motion.span>
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      transition={{ delay: 0.08 }}
+                      className="bg-indigo-600 text-white px-5 py-2 rounded-xl text-xl sm:text-2xl font-black shadow-lg"
+                    >
+                      {isAmharic ? `ወደ መስኮት ${primaryCalledTicket.counterNumber || 1}` : `COUNTER ${primaryCalledTicket.counterNumber || 1}`}
+                    </motion.div>
+                    <span className="text-slate-300 font-semibold hidden lg:inline text-sm">
+                      {isAmharic ? primaryCalledTicket.serviceNameAmharic : primaryCalledTicket.serviceName}
+                    </span>
+                  </motion.div>
+                ) : (
+                  <motion.span 
+                    key="empty-full-call"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="text-slate-500 font-medium text-sm"
+                  >
+                    {isAmharic ? 'በአሁኑ ሰዓት የተጠራ ደንበኛ የለም' : 'No active ticket called yet'}
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Waiting Queue Mini Badges */}
-            <div className="flex items-center space-x-2 overflow-x-auto max-w-full">
+            <div className="flex items-center space-x-2 overflow-x-auto max-w-full py-1">
               <span className="text-xs text-slate-400 font-bold uppercase whitespace-nowrap mr-1">
                 {isAmharic ? 'ቀጣይ:' : 'Next:'}
               </span>
-              {waitingTickets.slice(0, 4).map((ticket, idx) => (
-                <span 
-                  key={ticket.id}
-                  className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono font-bold text-white whitespace-nowrap"
-                >
-                  #{idx + 1} {ticket.ticketNumber}
-                </span>
-              ))}
+              <AnimatePresence initial={false}>
+                {waitingTickets.slice(0, 4).map((ticket, idx) => (
+                  <motion.span 
+                    key={ticket.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.82, y: 8 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.8, x: -10, transition: { duration: 0.15 } }}
+                    transition={{ type: 'spring', stiffness: 360, damping: 26 }}
+                    className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono font-bold text-white whitespace-nowrap inline-block"
+                  >
+                    #{idx + 1} {ticket.ticketNumber}
+                  </motion.span>
+                ))}
+              </AnimatePresence>
             </div>
           </div>
         </div>
@@ -616,56 +719,99 @@ export const DisplayView: React.FC = () => {
               <AnimatePresence mode="wait">
                 {primaryCalledTicket ? (
                   <motion.div
-                    key={primaryCalledTicket.id + (primaryCalledTicket.calledAt || '')}
-                    initial={{ scale: 0.88, opacity: 0, y: 15 }}
+                    key={primaryCalledTicket.id + (primaryCalledTicket.calledAt || '') + (primaryCalledTicket.status || '')}
+                    initial={{ scale: 0.86, opacity: 0, y: 24 }}
                     animate={{ scale: 1, opacity: 1, y: 0 }}
-                    exit={{ scale: 0.92, opacity: 0 }}
-                    transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+                    exit={{ scale: 0.9, opacity: 0, y: -24 }}
+                    transition={{ type: 'spring', stiffness: 320, damping: 24 }}
                     className="space-y-4"
                   >
                     <div className="inline-block">
                       {/* Priority Badge on Fullscreen display */}
                       {primaryCalledTicket.priority === 'URGENT' && (
-                        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-rose-600 text-white rounded-full text-sm font-black uppercase tracking-wider shadow-xl shadow-rose-950/60 animate-pulse border border-rose-400 mb-3">
+                        <motion.div 
+                          initial={{ scale: 0.8, opacity: 0, y: -10 }}
+                          animate={{ scale: 1, opacity: 1, y: 0 }}
+                          exit={{ scale: 0.8, opacity: 0 }}
+                          transition={{ type: 'spring', stiffness: 380, damping: 20 }}
+                          className="inline-flex items-center gap-2 px-4 py-1.5 bg-rose-600 text-white rounded-full text-sm font-black uppercase tracking-wider shadow-xl shadow-rose-950/60 animate-pulse border border-rose-400 mb-3"
+                        >
                           <Flame className="w-4 h-4" />
                           <span>{isAmharic ? '⚡ አስቸኳይ ተገልጋይ' : '⚡ URGENT PRIORITY'}</span>
-                        </div>
+                        </motion.div>
                       )}
                       {primaryCalledTicket.priority === 'PRIORITY' && (
-                        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-500 text-slate-950 rounded-full text-sm font-extrabold uppercase tracking-wider shadow-lg mb-3">
+                        <motion.div 
+                          initial={{ scale: 0.8, opacity: 0, y: -10 }}
+                          animate={{ scale: 1, opacity: 1, y: 0 }}
+                          exit={{ scale: 0.8, opacity: 0 }}
+                          transition={{ type: 'spring', stiffness: 380, damping: 20 }}
+                          className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-500 text-slate-950 rounded-full text-sm font-extrabold uppercase tracking-wider shadow-lg mb-3"
+                        >
                           <Zap className="w-4 h-4" />
                           <span>{isAmharic ? '★ ቅድሚያ (VIP)' : '★ VIP PRIORITY'}</span>
-                        </div>
+                        </motion.div>
                       )}
 
-                      <div className="text-7xl sm:text-9xl lg:text-[11rem] font-black tracking-tight text-white font-mono leading-none">
+                      <motion.div 
+                        key={`main-ticket-num-${primaryCalledTicket.ticketNumber}`}
+                        initial={{ opacity: 0, scale: 0.8, y: 24 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 1.1, y: -24 }}
+                        transition={{ type: 'spring', stiffness: 360, damping: 25 }}
+                        className="text-7xl sm:text-9xl lg:text-[11rem] font-black tracking-tight text-white font-mono leading-none"
+                      >
                         {primaryCalledTicket.ticketNumber}
-                      </div>
+                      </motion.div>
 
                       {primaryCalledTicket.ticketNumberAmharic && primaryCalledTicket.ticketNumberAmharic !== primaryCalledTicket.ticketNumber && (
-                        <div className="text-3xl sm:text-4xl font-light text-slate-400 italic mt-2 font-sans">
+                        <motion.div 
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ delay: 0.06 }}
+                          className="text-3xl sm:text-4xl font-light text-slate-400 italic mt-2 font-sans"
+                        >
                           {primaryCalledTicket.ticketNumberAmharic}
-                        </div>
+                        </motion.div>
                       )}
                     </div>
 
-                    <div className="text-xl sm:text-2xl font-semibold text-slate-300">
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ delay: 0.08 }}
+                      className="text-xl sm:text-2xl font-semibold text-slate-300"
+                    >
                       {isAmharic ? (primaryCalledTicket.serviceNameAmharic || primaryCalledTicket.serviceName) : primaryCalledTicket.serviceName}
-                    </div>
+                    </motion.div>
 
-                    <div className="inline-flex items-center justify-center space-x-3 bg-indigo-600 hover:bg-indigo-700 text-white text-3xl sm:text-5xl px-10 sm:px-16 py-4 rounded-2xl shadow-xl shadow-indigo-950/60 border border-indigo-500/30 font-black tracking-wide">
+                    <motion.div 
+                      initial={{ opacity: 0, y: 16, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -16, scale: 0.95 }}
+                      transition={{ delay: 0.1, type: 'spring', stiffness: 320, damping: 24 }}
+                      className="inline-flex items-center justify-center space-x-3 bg-indigo-600 hover:bg-indigo-700 text-white text-3xl sm:text-5xl px-10 sm:px-16 py-4 rounded-2xl shadow-xl shadow-indigo-950/60 border border-indigo-500/30 font-black tracking-wide"
+                    >
                       <span>
                         {isAmharic ? `ወደ መስኮት ${primaryCalledTicket.counterNumber || 1}` : `COUNTER ${primaryCalledTicket.counterNumber || 1}`}
                       </span>
-                    </div>
+                    </motion.div>
                   </motion.div>
                 ) : (
-                  <div className="py-16 text-slate-500 space-y-3">
+                  <motion.div 
+                    key="empty-main-call"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="py-16 text-slate-500 space-y-3"
+                  >
                     <div className="text-5xl sm:text-7xl font-mono font-bold text-slate-700">--</div>
                     <p className="text-base text-slate-400 font-medium">
                       {isAmharic ? 'በአሁኑ ሰዓት የተጠራ ደንበኛ የለም።' : 'No active ticket called yet.'}
                     </p>
-                  </div>
+                  </motion.div>
                 )}
               </AnimatePresence>
             </div>
@@ -674,6 +820,7 @@ export const DisplayView: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-5 border-t border-slate-800 z-10">
               {counters.map((cnt) => {
                 const isBusy = cnt.status === 'SERVING' && cnt.currentTicketNumber;
+                const displayVal = cnt.currentTicketNumber || (cnt.status === 'CLOSED' ? 'CLOSED' : 'READY');
                 return (
                   <div
                     key={cnt.id}
@@ -686,8 +833,19 @@ export const DisplayView: React.FC = () => {
                     <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       {isAmharic ? `መስኮት ${cnt.number}` : `COUNTER ${cnt.number}`}
                     </div>
-                    <div className="text-xl font-black text-white mt-0.5 font-mono">
-                      {cnt.currentTicketNumber || (cnt.status === 'CLOSED' ? 'CLOSED' : 'READY')}
+                    <div className="text-xl font-black text-white mt-0.5 font-mono overflow-hidden h-7 flex items-center">
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.span
+                          key={displayVal}
+                          initial={{ opacity: 0, y: 8, scale: 0.92 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -8, scale: 0.92 }}
+                          transition={{ duration: 0.2, ease: 'easeOut' }}
+                          className="inline-block truncate"
+                        >
+                          {displayVal}
+                        </motion.span>
+                      </AnimatePresence>
                     </div>
                   </div>
                 );
@@ -731,65 +889,78 @@ export const DisplayView: React.FC = () => {
                 </div>
 
                 <div className="space-y-2 max-h-[300px] lg:max-h-[360px] overflow-y-auto pr-1">
-                  {sortedWaitingTickets.length > 0 ? (
-                    sortedWaitingTickets.slice(0, 8).map((ticket, idx) => (
-                      <div
-                        key={ticket.id}
-                        className={`flex items-center justify-between p-3 rounded-xl border transition ${
-                          ticket.priority === 'URGENT'
-                            ? 'bg-rose-950/40 border-rose-600/60'
-                            : ticket.priority === 'PRIORITY'
-                            ? 'bg-amber-950/30 border-amber-500/50'
-                            : 'bg-slate-950/80 border-slate-800/80 hover:border-indigo-500/30'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="w-6 h-6 rounded-lg bg-slate-800 text-slate-300 font-bold text-xs flex items-center justify-center font-mono">
-                            {idx + 1}
-                          </div>
-                          <div>
-                            <div className="flex items-center space-x-2">
-                              <span className="text-lg font-black text-white font-mono tracking-wide">
-                                {ticket.ticketNumber}
-                              </span>
-                              {ticket.priority === 'URGENT' && (
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-600 text-white flex items-center gap-0.5 animate-pulse">
-                                  <Flame className="w-2.5 h-2.5" /> URGENT
-                                </span>
-                              )}
-                              {ticket.priority === 'PRIORITY' && (
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300">
-                                  VIP
-                                </span>
-                              )}
+                  <AnimatePresence initial={false}>
+                    {sortedWaitingTickets.length > 0 ? (
+                      sortedWaitingTickets.slice(0, 8).map((ticket, idx) => (
+                        <motion.div
+                          key={ticket.id}
+                          layout
+                          initial={{ opacity: 0, scale: 0.88, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.8, x: -12, transition: { duration: 0.18 } }}
+                          transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+                          className={`flex items-center justify-between p-3 rounded-xl border transition ${
+                            ticket.priority === 'URGENT'
+                              ? 'bg-rose-950/40 border-rose-600/60'
+                              : ticket.priority === 'PRIORITY'
+                              ? 'bg-amber-950/30 border-amber-500/50'
+                              : 'bg-slate-950/80 border-slate-800/80 hover:border-indigo-500/30'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className="w-6 h-6 rounded-lg bg-slate-800 text-slate-300 font-bold text-xs flex items-center justify-center font-mono">
+                              {idx + 1}
                             </div>
-                            <div className="text-xs text-slate-400 truncate max-w-[140px]">
-                              {isAmharic ? (ticket.serviceNameAmharic || ticket.serviceName) : ticket.serviceName}
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-lg font-black text-white font-mono tracking-wide">
+                                  {ticket.ticketNumber}
+                                </span>
+                                {ticket.priority === 'URGENT' && (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-600 text-white flex items-center gap-0.5 animate-pulse">
+                                    <Flame className="w-2.5 h-2.5" /> URGENT
+                                  </span>
+                                )}
+                                {ticket.priority === 'PRIORITY' && (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300">
+                                    VIP
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-slate-400 truncate max-w-[140px]">
+                                {isAmharic ? (ticket.serviceNameAmharic || ticket.serviceName) : ticket.serviceName}
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="text-right">
-                          {ticket.priority === 'PRIORITY' ? (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                              {isAmharic ? 'ቅድሚያ' : 'VIP'}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-slate-500 font-mono">
-                              ~{idx * 5 + 5}m
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-12 text-slate-600">
-                      <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-slate-700" />
-                      <p className="text-xs font-medium">
-                        {isAmharic ? 'ሁሉም ደንበኞች ተስተናግደዋል' : 'All waiting customers served!'}
-                      </p>
-                    </div>
-                  )}
+                          <div className="text-right">
+                            {ticket.priority === 'PRIORITY' ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                {isAmharic ? 'ቅድሚያ' : 'VIP'}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-500 font-mono">
+                                ~{idx * 5 + 5}m
+                              </span>
+                            )}
+                          </div>
+                        </motion.div>
+                      ))
+                    ) : (
+                      <motion.div 
+                        key="empty-waiting-list"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="text-center py-12 text-slate-600"
+                      >
+                        <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-slate-700" />
+                        <p className="text-xs font-medium">
+                          {isAmharic ? 'ሁሉም ደንበኞች ተስተናግደዋል' : 'All waiting customers served!'}
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
 
