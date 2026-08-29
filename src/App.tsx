@@ -9,8 +9,6 @@ import { OfficerStationView } from './components/OfficerStationView';
 import { CustomerTicketView } from './components/CustomerTicketView';
 import { AdminView } from './components/AdminView';
 import { ReportsView } from './components/ReportsView';
-import { CounterManagementView } from './components/CounterManagementView';
-import { CounterDisplayView } from './components/CounterDisplayView';
 import { LoginView } from './components/LoginView';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
 
@@ -22,13 +20,11 @@ const AppContent: React.FC = () => {
       const viewParam = params.get('view');
       if (viewParam) return viewParam;
       if (params.get('ticket') || params.get('t') || params.get('checkin')) return 'customer';
-      if (params.get('counter') || params.get('cnt')) return 'counter-display';
     } catch {}
     return 'display';
   };
 
   const [currentView, setCurrentView] = useState<string>(getInitialView);
-  const [selectedCounterForDisplay, setSelectedCounterForDisplay] = useState<{ id: string; number: number } | null>(null);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
@@ -36,32 +32,7 @@ const AppContent: React.FC = () => {
   const renderView = () => {
     switch (currentView) {
       case 'display':
-        return (
-          <DisplayView 
-            onSwitchToCounterDisplay={(counterId, counterNum) => {
-              if (counterId) setSelectedCounterForDisplay({ id: counterId, number: counterNum || 1 });
-              setCurrentView('counter-display');
-            }} 
-          />
-        );
-      case 'counter-display':
-        return (
-          <CounterDisplayView 
-            initialCounterId={selectedCounterForDisplay?.id}
-            initialCounterNumber={selectedCounterForDisplay?.number}
-            onBackToMainDisplay={() => setCurrentView('display')}
-            onNavigateToManagement={() => setCurrentView('counters')}
-          />
-        );
-      case 'counters':
-        return (
-          <CounterManagementView 
-            onOpenCounterDisplay={(counterId, counterNum) => {
-              setSelectedCounterForDisplay({ id: counterId, number: counterNum });
-              setCurrentView('counter-display');
-            }}
-          />
-        );
+        return <DisplayView />;
       case 'reception':
         return <ReceptionView />;
       case 'officer':

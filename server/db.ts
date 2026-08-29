@@ -804,34 +804,6 @@ class Database {
   public updateCounter(id: string, update: Partial<Counter>): Counter | undefined {
     const idx = this.data.counters.findIndex(c => c.id === id);
     if (idx === -1) return undefined;
-
-    const oldCounter = this.data.counters[idx];
-    
-    // If currentOfficerId changed, sync user assignedCounterId
-    if ('currentOfficerId' in update) {
-      const newOfficerId = update.currentOfficerId;
-      const oldOfficerId = oldCounter.currentOfficerId;
-
-      if (oldOfficerId && oldOfficerId !== newOfficerId) {
-        const oldUser = this.data.users.find(u => u.id === oldOfficerId);
-        if (oldUser && oldUser.assignedCounterId === id) {
-          oldUser.assignedCounterId = undefined;
-          oldUser.updatedAt = new Date().toISOString();
-        }
-      }
-
-      if (newOfficerId) {
-        const newUser = this.data.users.find(u => u.id === newOfficerId);
-        if (newUser) {
-          newUser.assignedCounterId = id;
-          newUser.updatedAt = new Date().toISOString();
-          update.currentOfficerName = newUser.name;
-        }
-      } else {
-        update.currentOfficerName = undefined;
-      }
-    }
-
     this.data.counters[idx] = { ...this.data.counters[idx], ...update, updatedAt: new Date().toISOString() };
     this.save();
     return this.data.counters[idx];

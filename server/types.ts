@@ -76,10 +76,7 @@ export interface Counter {
   currentOfficerName?: string;
   currentTicketId?: string;
   currentTicketNumber?: string;
-  serviceIds?: string[]; // Allowed services or empty for all
-  location?: string; // e.g. "Room 101", "Window 1"
-  locationAmharic?: string;
-  displayTheme?: 'modern' | 'led' | 'minimal';
+  serviceIds?: string[]; // Allowed services or all
   updatedAt: string;
 }
 

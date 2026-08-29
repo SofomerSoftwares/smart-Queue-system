@@ -504,17 +504,7 @@ export const ReceptionView: React.FC = () => {
           </span>
         </div>
 
-        {services.filter(s => s.isActive !== false).length === 0 ? (
-          <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center space-y-2">
-            <Ticket className="w-8 h-8 text-slate-400 mx-auto" />
-            <h3 className="text-sm font-bold text-slate-800">
-              {isAmharic ? 'ምንም ንቁ አገልግሎት አልተገኘም' : 'No active services available'}
-            </h3>
-            <p className="text-xs text-slate-500">
-              {isAmharic ? 'እባክዎ በአስተዳዳሪ ክፍል ውስጥ አገልግሎቶችን ያክሉ ወይም ያንቁ' : 'Please configure or activate services in the Admin panel'}
-            </p>
-          </div>
-        ) : (
+        {services.filter(s => s.isActive !== false).length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {services.filter(s => s.isActive !== false).map((service) => {
               const waitingCount = waitingTickets.filter(t => t.serviceId === service.id).length;
@@ -579,6 +569,16 @@ export const ReceptionView: React.FC = () => {
                 </button>
               );
             })}
+          </div>
+        ) : (
+          <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center py-10">
+            <Ticket className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm font-bold text-slate-700">
+              {isAmharic ? 'ምንም የሚገኙ ንቁ አገልግሎቶች የሉም' : 'No Active Services Found'}
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              {isAmharic ? 'እባክዎ በአስተዳዳሪ ገጽ አገልግሎቶችን ያረጋግጡ ወይም ያክሉ' : 'Please configure or activate services in the Admin panel.'}
+            </p>
           </div>
         )}
       </div>
