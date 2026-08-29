@@ -362,7 +362,7 @@ export const ReportsView: React.FC = () => {
               {statsData.counterBreakdown.map((cnt) => (
                 <div key={cnt.counterId} className="p-5 bg-slate-50 rounded-2xl border border-slate-200">
                   <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                    {isAmharic ? `መስኮት 0${cnt.counterNumber}` : `Counter 0${cnt.counterNumber}`}
+                    {isAmharic ? `መስኮት ${cnt.counterNumber}` : `Counter ${cnt.counterNumber}`}
                   </div>
                   <div className="text-2xl font-black text-slate-900 font-mono mt-1">
                     {cnt.totalServed} {isAmharic ? 'ደንበኞች' : 'served'}

@@ -149,7 +149,7 @@ class NotificationManager {
     }
     this.lastNotifiedMap.set(ticketNumber, now);
 
-    const counterStr = counterNumber.toString().padStart(2, '0');
+    const counterStr = counterNumber.toString();
     const isAmharic = language === 'AMHARIC';
     const isBilingual = language === 'BOTH';
 

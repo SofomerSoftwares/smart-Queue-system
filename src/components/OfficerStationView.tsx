@@ -732,7 +732,7 @@ export const OfficerStationView: React.FC = () => {
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
               </div>
               <p className="text-sm font-black text-slate-900 font-mono">
-                {isAmharic ? `መስኮት 0${activeCounter?.number || 1}` : `COUNTER 0${activeCounter?.number || 1}`}
+                {isAmharic ? `መስኮት ${activeCounter?.number || 1}` : `COUNTER ${activeCounter?.number || 1}`}
                 <span className="font-sans font-medium text-slate-500 text-xs ml-1.5">
                   ({activeCounter?.name || `Counter ${activeCounter?.number}`})
                 </span>
@@ -759,7 +759,7 @@ export const OfficerStationView: React.FC = () => {
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                     }`}
                   >
-                    {isAmharic ? `መስኮት 0${c.number}` : `COUNTER 0${c.number}`}
+                    {isAmharic ? `መስኮት ${c.number}` : `COUNTER ${c.number}`}
                   </button>
                 );
               })}
@@ -825,8 +825,8 @@ export const OfficerStationView: React.FC = () => {
                 {isOfficer && <Lock className="w-3.5 h-3.5 text-indigo-500" />}
                 <span>
                   {isAmharic 
-                    ? `መስኮት 0${activeCounter?.number || 1}` 
-                    : `COUNTER 0${activeCounter?.number || 1}`}
+                    ? `መስኮት ${activeCounter?.number || 1}` 
+                    : `COUNTER ${activeCounter?.number || 1}`}
                 </span>
               </span>
             </div>
@@ -1055,8 +1055,8 @@ export const OfficerStationView: React.FC = () => {
               </div>
               <div className="text-lg text-slate-400 mb-6 font-medium">
                 {isAmharic 
-                  ? `ወደ መስኮት 0${activeCounter?.number || 1} ይሂዱ` 
-                  : `Proceed to Counter 0${activeCounter?.number || 1}`}
+                  ? `ወደ መስኮት ${activeCounter?.number || 1} ይሂዱ` 
+                  : `Proceed to Counter ${activeCounter?.number || 1}`}
               </div>
               
               <div className="w-full grid grid-cols-2 gap-3 mt-4">

@@ -415,7 +415,7 @@ export const DisplayView: React.FC = () => {
                       {/* Counter Assignment Banner */}
                       <div className="inline-flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xl sm:text-3xl px-6 sm:px-8 py-3 sm:py-3.5 rounded-2xl shadow-xl shadow-indigo-950/60 border border-indigo-500/30 font-black tracking-wide">
                         <span>
-                          {isAmharic ? `ወደ መስኮት  0${primaryCalledTicket.counterNumber || 1}` : `COUNTER 0${primaryCalledTicket.counterNumber || 1}`}
+                          {isAmharic ? `ወደ መስኮት ${primaryCalledTicket.counterNumber || 1}` : `COUNTER ${primaryCalledTicket.counterNumber || 1}`}
                         </span>
                       </div>
                     </motion.div>
@@ -444,7 +444,7 @@ export const DisplayView: React.FC = () => {
                       }`}
                     >
                       <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400 truncate">
-                        {isAmharic ? `መስኮት 0${cnt.number}` : `CNT 0${cnt.number}`}
+                        {isAmharic ? `መስኮት ${cnt.number}` : `CNT ${cnt.number}`}
                       </div>
                       <div className="text-base sm:text-lg font-black text-white mt-0.5 font-mono truncate">
                         {cnt.currentTicketNumber || (cnt.status === 'CLOSED' ? 'CLOSED' : 'READY')}
@@ -547,7 +547,7 @@ export const DisplayView: React.FC = () => {
                     {primaryCalledTicket.ticketNumber}
                   </span>
                   <div className="bg-indigo-600 text-white px-5 py-2 rounded-xl text-xl sm:text-2xl font-black">
-                    {isAmharic ? `ወደ መስኮት 0${primaryCalledTicket.counterNumber || 1}` : `COUNTER 0${primaryCalledTicket.counterNumber || 1}`}
+                    {isAmharic ? `ወደ መስኮት ${primaryCalledTicket.counterNumber || 1}` : `COUNTER ${primaryCalledTicket.counterNumber || 1}`}
                   </div>
                   <span className="text-slate-300 font-semibold hidden lg:inline text-sm">
                     {isAmharic ? primaryCalledTicket.serviceNameAmharic : primaryCalledTicket.serviceName}
@@ -655,7 +655,7 @@ export const DisplayView: React.FC = () => {
 
                     <div className="inline-flex items-center justify-center space-x-3 bg-indigo-600 hover:bg-indigo-700 text-white text-3xl sm:text-5xl px-10 sm:px-16 py-4 rounded-2xl shadow-xl shadow-indigo-950/60 border border-indigo-500/30 font-black tracking-wide">
                       <span>
-                        {isAmharic ? `ወደ መስኮት 0${primaryCalledTicket.counterNumber || 1}` : `COUNTER 0${primaryCalledTicket.counterNumber || 1}`}
+                        {isAmharic ? `ወደ መስኮት ${primaryCalledTicket.counterNumber || 1}` : `COUNTER ${primaryCalledTicket.counterNumber || 1}`}
                       </span>
                     </div>
                   </motion.div>
@@ -684,7 +684,7 @@ export const DisplayView: React.FC = () => {
                     }`}
                   >
                     <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      {isAmharic ? `መስኮት 0${cnt.number}` : `COUNTER 0${cnt.number}`}
+                      {isAmharic ? `መስኮት ${cnt.number}` : `COUNTER ${cnt.number}`}
                     </div>
                     <div className="text-xl font-black text-white mt-0.5 font-mono">
                       {cnt.currentTicketNumber || (cnt.status === 'CLOSED' ? 'CLOSED' : 'READY')}

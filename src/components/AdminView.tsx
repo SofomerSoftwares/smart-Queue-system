@@ -1271,7 +1271,7 @@ export const AdminView: React.FC = () => {
                         {assignedCnt ? (
                           <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                             <Lock className="w-3 h-3 text-indigo-500" />
-                            <span>{isAmharic ? `መስኮት 0${assignedCnt.number}` : `Counter 0${assignedCnt.number}`}</span>
+                            <span>{isAmharic ? `መስኮት ${assignedCnt.number}` : `Counter ${assignedCnt.number}`}</span>
                           </span>
                         ) : (
                           <span className="text-slate-400 text-xs italic">{isAmharic ? 'አልተመደበም' : 'Unassigned'}</span>
@@ -3092,7 +3092,7 @@ export const AdminView: React.FC = () => {
                   <option value="">{isAmharic ? '-- የተመደበ መስኮት የለም (Unassigned) --' : '-- No Counter Assigned --'}</option>
                   {counters.map(c => (
                     <option key={c.id} value={c.id}>
-                      {isAmharic ? `መስኮት 0${c.number} (${c.nameAmharic || c.name})` : `Counter 0${c.number} (${c.name})`}
+                      {isAmharic ? `መስኮት ${c.number} (${c.nameAmharic || c.name})` : `Counter ${c.number} (${c.name})`}
                     </option>
                   ))}
                 </select>

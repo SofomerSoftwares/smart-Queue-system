@@ -427,7 +427,7 @@ export const CustomerTicketView: React.FC = () => {
                 <span>{isAmharic ? 'ተራዎ ደርሷል!' : 'YOUR NUMBER IS CALLED!'}</span>
               </div>
               <div className="text-sm font-bold text-indigo-100">
-                {isAmharic ? `እባክዎ ወደ መስኮት 0${ticketData.counterNumber || 1} ይሂዱ` : `Please proceed to Counter 0${ticketData.counterNumber || 1}`}
+                {isAmharic ? `እባክዎ ወደ መስኮት ${ticketData.counterNumber || 1} ይሂዱ` : `Please proceed to Counter ${ticketData.counterNumber || 1}`}
               </div>
             </div>
           )}
