@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Tv, 
+  Monitor,
   Ticket, 
   UserCheck, 
   ShieldCheck, 
@@ -78,6 +79,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Tv, 
       badge: stats?.serving !== undefined ? `${stats.serving} Active` : undefined,
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200'
+    },
+    { 
+      id: 'counter-display', 
+      label: isAmharic ? 'የመስኮት ስክሪን' : 'Counter Display', 
+      icon: Monitor, 
+      badge: stats?.activeCounters !== undefined ? `${stats.activeCounters} Open` : undefined,
+      badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200'
     },
     { 
       id: 'reception', 

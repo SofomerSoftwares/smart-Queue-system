@@ -9,6 +9,7 @@ import { OfficerStationView } from './components/OfficerStationView';
 import { CustomerTicketView } from './components/CustomerTicketView';
 import { AdminView } from './components/AdminView';
 import { ReportsView } from './components/ReportsView';
+import { CounterDisplayView } from './components/CounterDisplayView';
 import { LoginView } from './components/LoginView';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
 
@@ -20,6 +21,7 @@ const AppContent: React.FC = () => {
       const viewParam = params.get('view');
       if (viewParam) return viewParam;
       if (params.get('ticket') || params.get('t') || params.get('checkin')) return 'customer';
+      if (params.get('counter')) return 'counter-display';
     } catch {}
     return 'display';
   };
@@ -33,6 +35,10 @@ const AppContent: React.FC = () => {
     switch (currentView) {
       case 'display':
         return <DisplayView />;
+      case 'counter-display':
+      case 'counter_display':
+      case 'counters':
+        return <CounterDisplayView />;
       case 'reception':
         return <ReceptionView />;
       case 'officer':

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Menu, 
   Tv, 
+  Monitor,
   Ticket, 
   UserCheck, 
   ShieldCheck, 
@@ -63,6 +64,14 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
           title: t('display_screen', 'Public Display Screen'),
           subtitle: isAmharic ? 'የቀጥታ ወረፋ እና ጥሪ ስክሪን' : 'Live queue status & audio broadcasting',
           icon: Tv
+        };
+      case 'counter-display':
+      case 'counter_display':
+      case 'counters':
+        return {
+          title: isAmharic ? 'የመስኮት መከታተያ ስክሪን' : 'Counter Station Directory & Overhead Display',
+          subtitle: isAmharic ? 'የመስኮት ሁኔታዎች፣ የአገልግሎት ዝርዝር እና የዴስክ ታብሌት ስክሪን' : 'Live counter status, service directory & dedicated desk signage',
+          icon: Monitor
         };
       case 'reception':
         return {

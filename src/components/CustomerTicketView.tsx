@@ -27,7 +27,8 @@ import {
   Edit3,
   MessageCircleHeart,
   BellRing,
-  Flame
+  Flame,
+  Monitor
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../lib/api';
@@ -421,13 +422,22 @@ export const CustomerTicketView: React.FC = () => {
           
           {/* Urgent "Called" Alarm Banner */}
           {isCalled && (
-            <div className="mb-6 p-4.5 bg-indigo-600 text-white rounded-2xl text-center space-y-1.5 shadow-lg shadow-indigo-200 animate-pulse">
+            <div className="mb-6 p-4.5 bg-indigo-600 text-white rounded-2xl text-center space-y-2.5 shadow-lg shadow-indigo-200 animate-pulse">
               <div className="flex items-center justify-center space-x-2 font-black text-base">
                 <Bell className="w-5 h-5" />
                 <span>{isAmharic ? 'ተራዎ ደርሷል!' : 'YOUR NUMBER IS CALLED!'}</span>
               </div>
               <div className="text-sm font-bold text-indigo-100">
                 {isAmharic ? `እባክዎ ወደ መስኮት ${ticketData.counterNumber || 1} ይሂዱ` : `Please proceed to Counter ${ticketData.counterNumber || 1}`}
+              </div>
+              <div>
+                <a
+                  href={`?view=counter-display&counter=${ticketData.counterNumber || 1}`}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-indigo-900 rounded-xl text-xs font-black shadow-md hover:bg-slate-100 transition active:scale-95"
+                >
+                  <Monitor className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{isAmharic ? `የመስኮት ${ticketData.counterNumber || 1} ስክሪን ተመልከት` : `View Counter ${ticketData.counterNumber || 1} Station`}</span>
+                </a>
               </div>
             </div>
           )}
