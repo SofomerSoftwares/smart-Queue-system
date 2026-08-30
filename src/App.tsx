@@ -40,7 +40,7 @@ const AppContent: React.FC = () => {
       case 'counters':
         return <CounterDisplayView />;
       case 'reception':
-        return <ReceptionView />;
+        return <ReceptionView onNavigate={setCurrentView} />;
       case 'officer':
         return <OfficerStationView />;
       case 'customer':

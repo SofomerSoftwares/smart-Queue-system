@@ -330,6 +330,14 @@ router.get('/reviews', optionalAuthenticate, (req: AuthenticatedRequest, res: Re
 // 3. POST /api/queue/ticket - Receptionist / Kiosk ticket creation (Anonymous self-service or staff logged)
 router.post('/ticket', optionalAuthenticate, (req: AuthenticatedRequest, res: Response) => {
   try {
+    // Explicitly forbid Service Officers from operating Reception and creating tickets
+    if (req.user?.role === 'SERVICE_OFFICER') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access forbidden: Service Officers are not permitted to issue tickets at the Reception & Ticket Kiosk (የመስኮት ሰራተኞች በመስተንግዶ ክፍል ቲኬት ማውጣት አይችሉም).'
+      });
+    }
+
     const { serviceId, priority, urgencyReason, notes } = req.body;
 
     if (!serviceId) {

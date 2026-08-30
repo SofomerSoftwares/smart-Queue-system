@@ -26,7 +26,11 @@ import {
   Crown,
   ShieldCheck,
   KeyRound,
-  LogIn
+  LogIn,
+  UserCheck,
+  LogOut,
+  Building2,
+  Tv
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
 import { useAuth } from '../context/AuthContext';
@@ -41,7 +45,11 @@ const URGENCY_PRESETS = [
   { id: 'official', labelEn: 'Official Escalation', labelAm: 'አስቸኳይ የስራ ጉዳይ', icon: ShieldAlert }
 ];
 
-export const ReceptionView: React.FC = () => {
+export interface ReceptionViewProps {
+  onNavigate?: (view: string) => void;
+}
+
+export const ReceptionView: React.FC<ReceptionViewProps> = ({ onNavigate }) => {
   const { 
     services, 
     waitingTickets, 
@@ -50,8 +58,9 @@ export const ReceptionView: React.FC = () => {
     uiLanguage 
   } = useQueue();
 
-  const { user, login } = useAuth();
+  const { user, login, logout } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
+  const isServiceOfficer = user?.role === 'SERVICE_OFFICER';
 
   const [priority, setPriority] = useState<PriorityLevel>('NORMAL');
   const [urgencyReason, setUrgencyReason] = useState<string>('');
@@ -248,6 +257,83 @@ export const ReceptionView: React.FC = () => {
 
     return matchesSearch && matchesPriority;
   });
+
+  // RESTRICTION: Forbid Service Officers from accessing Reception & Ticket Kiosk
+  if (isServiceOfficer && user) {
+    return (
+      <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 my-6">
+        <div className="bg-white rounded-3xl border-2 border-rose-200 shadow-xl p-6 sm:p-10 text-center space-y-6 relative overflow-hidden">
+          <div className="w-20 h-20 rounded-2xl bg-rose-50 border-2 border-rose-200 text-rose-600 flex items-center justify-center mx-auto shadow-xs">
+            <ShieldAlert className="w-10 h-10" />
+          </div>
+
+          <div className="space-y-2.5">
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-100 text-rose-800 text-xs font-black uppercase tracking-wider border border-rose-200">
+              <Lock className="w-3.5 h-3.5" />
+              <span>{isAmharic ? 'የመግቢያ ፈቃድ ተከልክሏል' : 'Access Restricted'}</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              {isAmharic 
+                ? 'ለመስኮት ሰራተኞች የመስተንግዶ እና ኪዮስክ መግቢያ ተከልክሏል' 
+                : 'Service Officers are Forbidden from Accessing Reception & Kiosk'}
+            </h1>
+            <p className="text-sm sm:text-base text-slate-600 max-w-xl mx-auto font-medium leading-relaxed">
+              {isAmharic 
+                ? 'የመስኮት ሰራተኞች (Service Officers) ወደ መስተንግዶ እና ቲኬት መስጫ ኪዮስክ መግባት አልተፈቀደላቸውም። ቲኬቶችን መስጠት የሚችሉት የፊት-ዴስክ አስተናጋጆች (Receptionists)፣ የኪዮስክ ደንበኞች ወይም የስርዓት አስተዳዳሪዎች (Admins) ብቻ ናቸው።' 
+                : 'Service Officers are not permitted to operate or issue tickets at the Reception Desk and Self-Service Kiosk. This workstation is strictly reserved for Receptionists and Administrators.'}
+            </p>
+          </div>
+
+          {/* User Profile Badge */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 max-w-md mx-auto flex items-center justify-between text-left">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
+                <UserCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs text-slate-500 font-medium">{isAmharic ? 'የገቡበት አካውንት' : 'Logged in as'}</div>
+                <div className="text-sm font-bold text-slate-900">{user.name} (@{user.username})</div>
+              </div>
+            </div>
+            <span className="px-2.5 py-1 bg-rose-100 text-rose-800 text-[11px] font-black rounded-lg border border-rose-200 uppercase">
+              {isAmharic ? 'የመስኮት ሰራተኛ' : 'SERVICE_OFFICER'}
+            </span>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <button
+              id="btn-goto-counter-station"
+              onClick={() => onNavigate ? onNavigate('officer') : (window.location.search = '?view=officer')}
+              className="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-sm shadow-lg shadow-indigo-200 transition flex items-center justify-center gap-2"
+            >
+              <UserCheck className="w-4 h-4" />
+              <span>{isAmharic ? 'ወደ መስኮት አገልግሎት ጣቢያ ይሂዱ' : 'Go to Counter Station'}</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
+            <button
+              id="btn-goto-public-display"
+              onClick={() => onNavigate ? onNavigate('display') : (window.location.search = '?view=display')}
+              className="w-full sm:w-auto px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-sm border border-slate-200 transition flex items-center justify-center gap-2"
+            >
+              <Tv className="w-4 h-4" />
+              <span>{isAmharic ? 'የህዝብ ስክሪን ይመልከቱ' : 'Public Display'}</span>
+            </button>
+
+            <button
+              id="btn-forbidden-logout"
+              onClick={logout}
+              className="w-full sm:w-auto px-5 py-3 bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 rounded-xl font-bold text-sm border border-rose-200 transition flex items-center justify-center gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>{isAmharic ? 'ይውጡ / ይቀይሩ' : 'Sign Out'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">

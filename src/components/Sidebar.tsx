@@ -87,13 +87,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: stats?.activeCounters !== undefined ? `${stats.activeCounters} Open` : undefined,
       badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200'
     },
-    { 
+    // Reception is strictly for Receptionists, Admins, and self-service; hidden for Service Officers
+    ...(user?.role === 'SERVICE_OFFICER' ? [] : [{ 
       id: 'reception', 
       label: isAmharic ? 'መስተንግዶ ዴስክ' : 'Reception Desk', 
       icon: Ticket, 
       badge: stats?.waiting !== undefined ? `${stats.waiting} Wait` : undefined,
       badgeColor: 'bg-amber-100 text-amber-800 border-amber-200'
-    },
+    }]),
     { 
       id: 'officer', 
       label: isAmharic ? 'መስኮት' : 'Counter Station', 

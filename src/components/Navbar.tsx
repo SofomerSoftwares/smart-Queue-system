@@ -64,12 +64,13 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenC
       icon: Tv, 
       badge: stats?.serving ? `${stats.serving} Active` : undefined 
     },
-    { 
+    // Reception is hidden for Service Officers
+    ...(user?.role === 'SERVICE_OFFICER' ? [] : [{ 
       id: 'reception', 
       label: isAmharic ? 'መስተንግዶ' : 'Reception Desk', 
       icon: Ticket, 
       badge: stats?.waiting ? `${stats.waiting} Wait` : undefined 
-    },
+    }]),
     { 
       id: 'officer', 
       label: isAmharic ? 'መስኮት' : 'Counter Station', 
@@ -80,16 +81,18 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenC
       label: isAmharic ? 'የሞባይል መከታተያ' : 'Customer Tracker', 
       icon: Smartphone 
     },
-    { 
-      id: 'admin', 
-      label: isAmharic ? 'አስተዳደር' : 'Admin Control', 
-      icon: ShieldCheck 
-    },
-    { 
-      id: 'reports', 
-      label: isAmharic ? 'ትንታኔ እና ሪፖርት' : 'Analytics & Reports', 
-      icon: BarChart3 
-    }
+    ...(user?.role === 'ADMIN' ? [
+      { 
+        id: 'admin', 
+        label: isAmharic ? 'አስተዳደር' : 'Admin Control', 
+        icon: ShieldCheck 
+      },
+      { 
+        id: 'reports', 
+        label: isAmharic ? 'ትንታኔ እና ሪፖርት' : 'Analytics & Reports', 
+        icon: BarChart3 
+      }
+    ] : [])
   ];
 
   const handleNavClick = (id: string) => {
