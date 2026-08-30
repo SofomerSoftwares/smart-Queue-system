@@ -15,10 +15,14 @@ const router = Router();
 
 // Helper to trigger asynchronous voice generation & broadcast
 async function triggerVoiceAnnouncement(
-  ticketNumber: string, 
-  counterNumber: number, 
+  ticketNumber: string,
+  counterNumber: number,
   serviceName: string,
-  serviceNameAmharic: string
+  serviceNameAmharic: string = '',
+  customAudioBase64?: string,
+  customAudioMimeType?: string,
+  officerName?: string,
+  customText?: string
 ) {
   try {
     const audioSettings = db.getAudioSetting();
@@ -26,9 +30,9 @@ async function triggerVoiceAnnouncement(
       return;
     }
 
-    const textAmharic = buildAmharicAnnouncementText(ticketNumber, counterNumber, serviceNameAmharic);
-    const textEnglish = buildEnglishAnnouncementText(ticketNumber, counterNumber, serviceName);
-    const phoneticText = buildPhoneticAnnouncementText(ticketNumber, counterNumber, serviceNameAmharic || serviceName);
+    const textAmharic = customText || buildAmharicAnnouncementText(ticketNumber, counterNumber, serviceNameAmharic);
+    const textEnglish = customText || buildEnglishAnnouncementText(ticketNumber, counterNumber, serviceName);
+    const phoneticText = customText || buildPhoneticAnnouncementText(ticketNumber, counterNumber, serviceNameAmharic || serviceName);
     const ticketAmharic = getAmharicTicketNumber(ticketNumber);
 
     // Initial announcement payload
@@ -46,10 +50,31 @@ async function triggerVoiceAnnouncement(
         : audioSettings.language === 'BOTH' 
           ? `${phoneticText} ${textEnglish}` 
           : phoneticText,
+      officerName,
+      customText,
       timestamp: new Date().toISOString()
     };
 
-    // Voice generation text resolution
+    // Case 1: Direct personal live voice recording from officer
+    if (customAudioBase64 && customAudioBase64.trim().length > 0) {
+      payload.audioBase64 = customAudioBase64;
+      payload.audioMimeType = customAudioMimeType || 'audio/webm';
+      payload.source = 'OFFICER_LIVE_RECORDING';
+      payload.isLiveVoiceRecord = true;
+      broadcaster.broadcast('announcement:play', payload);
+      return;
+    }
+
+    // Case 2: Custom recorded audio configured in system audio settings
+    if ((audioSettings.ttsProvider === 'CUSTOM_RECORDED' || audioSettings.voiceMode === 'CUSTOM_RECORDED') && audioSettings.customRecordingBase64) {
+      payload.audioBase64 = audioSettings.customRecordingBase64;
+      payload.audioMimeType = audioSettings.customRecordingMimeType || 'audio/webm';
+      payload.source = 'CUSTOM_RECORDED';
+      broadcaster.broadcast('announcement:play', payload);
+      return;
+    }
+
+    // Case 3: Addis AI Cloud Voice generation / Phonetic fallback
     let speechText = textAmharic;
     if (audioSettings.language === 'ENGLISH') {
       speechText = textEnglish;
@@ -488,11 +513,16 @@ router.post('/ticket/call-next', authenticate, authorize('ticket.call'), async (
     broadcaster.broadcast('queue:updated', { action: 'TICKET_CALLED' });
 
     // Asynchronously trigger AI voice announcement (DO NOT block the response)
+    const { customAudioBase64, customAudioMimeType, customText } = req.body;
     triggerVoiceAnnouncement(
       calledTicket.ticketNumber,
       counter ? counter.number : 1,
       calledTicket.serviceName,
-      calledTicket.serviceNameAmharic
+      calledTicket.serviceNameAmharic,
+      customAudioBase64,
+      customAudioMimeType,
+      req.user?.name || req.user?.username,
+      customText
     );
 
     return res.json({
@@ -509,6 +539,7 @@ router.post('/ticket/call-next', authenticate, authorize('ticket.call'), async (
 router.post('/ticket/:id/recall', authenticate, authorize('ticket.recall'), (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const { customAudioBase64, customAudioMimeType, customText } = req.body;
     const ticket = db.getTicketById(id);
 
     if (!ticket) {
@@ -536,20 +567,59 @@ router.post('/ticket/:id/recall', authenticate, authorize('ticket.recall'), (req
       action: 'RECALL_TICKET',
       entity: 'QueueTicket',
       entityId: ticket.id,
-      metadata: { ticketNumber: ticket.ticketNumber, counterNumber }
+      metadata: { ticketNumber: ticket.ticketNumber, counterNumber, hasCustomVoice: !!customAudioBase64 }
     });
 
     broadcaster.broadcast('ticket:called', { ticket, counter });
 
-    // Trigger voice announcement
+    // Trigger voice announcement with optional custom live audio
     triggerVoiceAnnouncement(
       ticket.ticketNumber,
       counterNumber,
       ticket.serviceName,
-      ticket.serviceNameAmharic
+      ticket.serviceNameAmharic,
+      customAudioBase64,
+      customAudioMimeType,
+      req.user?.name || req.user?.username,
+      customText
     );
 
     return res.json({ success: true, ticket });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 5b. POST /api/queue/ticket/:id/call-with-voice - Explicit personal voice announcement call
+router.post('/ticket/:id/call-with-voice', authenticate, authorize('ticket.call'), (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { audioBase64, mimeType = 'audio/webm', customText } = req.body;
+    const ticket = db.getTicketById(id);
+
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: 'Ticket not found.' });
+    }
+
+    const counter = ticket.counterId ? db.getCounterById(ticket.counterId) : undefined;
+    const counterNumber = counter ? counter.number : (ticket.counterNumber || 1);
+
+    triggerVoiceAnnouncement(
+      ticket.ticketNumber,
+      counterNumber,
+      ticket.serviceName,
+      ticket.serviceNameAmharic,
+      audioBase64,
+      mimeType,
+      req.user?.name || req.user?.username,
+      customText
+    );
+
+    return res.json({
+      success: true,
+      message: `Personal voice call for Ticket ${ticket.ticketNumber} broadcasted successfully.`,
+      ticket
+    });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: err.message });
   }

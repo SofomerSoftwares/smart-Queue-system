@@ -27,12 +27,15 @@ import {
   X,
   Check,
   FileText,
-  Keyboard
+  Keyboard,
+  Mic,
+  Radio
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { Service, QueueTicket, PriorityLevel } from '../types';
+import { OfficerVoiceRecorderModal } from './OfficerVoiceRecorderModal';
 
 export const OfficerStationView: React.FC = () => {
   const { user, login, logout, hasPermission, isLoading: isAuthLoading } = useAuth();
@@ -88,6 +91,10 @@ export const OfficerStationView: React.FC = () => {
   const [officerTriageReason, setOfficerTriageReason] = useState<string>('');
   const [officerTriageNotes, setOfficerTriageNotes] = useState<string>('');
   const [isOfficerUpdatingPriority, setIsOfficerUpdatingPriority] = useState<boolean>(false);
+
+  // Personal voice recording modal state
+  const [showVoiceRecorderModal, setShowVoiceRecorderModal] = useState<boolean>(false);
+  const [targetVoiceTicket, setTargetVoiceTicket] = useState<QueueTicket | null>(null);
 
   // Keep officer locked to assigned counter whenever user or counters change
   useEffect(() => {
@@ -417,13 +424,23 @@ export const OfficerStationView: React.FC = () => {
           handleNoShow();
         }
       }
+      // V or Alt+V -> Open Personal Voice Recorder
+      else if (key === 'v' || code === 'KeyV') {
+        e.preventDefault();
+        e.stopPropagation();
+        const tkt = currentTicket || nextEligibleTicket;
+        if (tkt) {
+          setTargetVoiceTicket(tkt);
+          setShowVoiceRecorderModal(true);
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [user, isAuthorized, isCalling, selectedCounterId, currentTicket, nextEligibleTicket, isAmharic, officerTriageTicket, showTransferModal]);
+  }, [user, isAuthorized, isCalling, selectedCounterId, currentTicket, nextEligibleTicket, isAmharic, officerTriageTicket, showTransferModal, showVoiceRecorderModal]);
 
   // 1. Unauthenticated Gate: User must sign in first
   if (!user) {
@@ -1021,27 +1038,47 @@ export const OfficerStationView: React.FC = () => {
               </button>
             </div>
 
-            {/* Transfer Ticket Link */}
-            {currentTicket && (
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+            {/* Personal Voice Call Bar & Transfer Link */}
+            <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+              <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => setShowTransferModal(true)}
-                  className="text-xs font-semibold text-slate-500 hover:text-indigo-600 flex items-center space-x-1.5 transition"
+                  type="button"
+                  id="btn-open-voice-studio"
+                  onClick={() => {
+                    const tkt = currentTicket || nextEligibleTicket;
+                    setTargetVoiceTicket(tkt || null);
+                    setShowVoiceRecorderModal(true);
+                  }}
+                  className="px-3.5 py-2 bg-gradient-to-r from-rose-500 to-indigo-600 hover:from-rose-600 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center space-x-2 cursor-pointer active:scale-95"
                 >
-                  <ArrowRightLeft className="w-3.5 h-3.5" />
-                  <span>{isAmharic ? 'ወደ ሌላ አገልግሎት አስተላልፍ (Transfer)' : 'Transfer ticket to another service'}</span>
+                  <Mic className="w-3.5 h-3.5 animate-pulse" />
+                  <span>{isAmharic ? '🎙️ የግል ድምፅ ቅረጽ እና ጥራ' : '🎙️ Record Voice Call'}</span>
+                  <span className="text-[10px] font-mono font-black bg-white/20 px-1.5 py-0.5 rounded text-white ml-1">
+                    V
+                  </span>
                 </button>
 
-                {currentTicket.status === 'CALLED' && (
+                {currentTicket && (
                   <button
-                    onClick={handleStart}
-                    className="text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-100"
+                    onClick={() => setShowTransferModal(true)}
+                    className="text-xs font-semibold text-slate-500 hover:text-indigo-600 flex items-center space-x-1.5 transition px-2 py-1 rounded-lg hover:bg-slate-50"
                   >
-                    ▶ {isAmharic ? 'አገልግሎት ጀምር' : 'Start Service'}
+                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                    <span>{isAmharic ? 'አስተላልፍ (Transfer)' : 'Transfer'}</span>
                   </button>
                 )}
               </div>
-            )}
+
+              {currentTicket && currentTicket.status === 'CALLED' && (
+                <button
+                  onClick={handleStart}
+                  className="text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3.5 py-2 rounded-xl border border-indigo-100 flex items-center justify-center space-x-1.5 transition"
+                >
+                  <Play className="w-3.5 h-3.5 fill-indigo-600" />
+                  <span>{isAmharic ? 'አገልግሎት ጀምር' : 'Start Service'}</span>
+                </button>
+              )}
+            </div>
           </section>
 
           {/* Metric KPIs Strip */}
@@ -1456,6 +1493,28 @@ export const OfficerStationView: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Personal Audio Voice Recorder Studio Modal */}
+      {showVoiceRecorderModal && (
+        <OfficerVoiceRecorderModal
+          isOpen={showVoiceRecorderModal}
+          onClose={() => {
+            setShowVoiceRecorderModal(false);
+            setTargetVoiceTicket(null);
+          }}
+          ticket={targetVoiceTicket || currentTicket || nextEligibleTicket || null}
+          counter={activeCounter || null}
+          isAmharic={isAmharic}
+          onSuccess={(calledTkt) => {
+            setStationNotice(
+              isAmharic 
+                ? `የቲኬት ${calledTkt.ticketNumber} የግል ድምፅ ጥሪ ተላልፏል!`
+                : `Voice call for Ticket ${calledTkt.ticketNumber} broadcasted live!`
+            );
+            setTimeout(() => setStationNotice(''), 4000);
+          }}
+        />
       )}
     </div>
   );

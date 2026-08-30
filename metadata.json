@@ -1,6 +1,6 @@
 {
   "name": "Small Office Queue Management System",
   "description": "Production-ready queue management system with anonymous customer tickets, dynamic QR code arrival check-in pass, interactive customer reviews & service ratings, real-time window assignment, TV public screen video player with multi-layout broadcast, Addis AI Amharic voice announcements, dynamic role-based access control with ticket priority management, MongoDB Atlas cloud storage, and administrative triage policies.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

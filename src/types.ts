@@ -148,7 +148,7 @@ export interface OfficeSetting {
   displayFontSize?: 'COMPACT' | 'NORMAL' | 'LARGE' | 'XLARGE' | 'MASSIVE';
 }
 
-export type TTSProviderType = 'ADDIS_AI';
+export type TTSProviderType = 'ADDIS_AI' | 'CUSTOM_RECORDED' | 'BROWSER_SPEECH';
 
 export interface AddisVoiceOption {
   id: string;
@@ -164,6 +164,7 @@ export interface AudioSetting {
   voiceEnabled: boolean;
   language: AnnouncementLanguage;
   ttsProvider?: TTSProviderType;
+  voiceMode?: 'ADDIS_AI' | 'CUSTOM_RECORDED' | 'BROWSER_SPEECH';
   addisVoice?: string;
   addisAiSpeed?: number;
   addisAiEndpoint?: string;
@@ -171,6 +172,14 @@ export interface AudioSetting {
   volume: number;
   repeatCount: number;
   announcementDelaySeconds: number;
+  // Personal custom audio recordings
+  customRecordingBase64?: string;
+  customRecordingMimeType?: string;
+  customRecordingDuration?: number;
+  customRecordingName?: string;
+  customRecordingCreatedAt?: string;
+  customRecordingRecordedBy?: string;
+  allowOfficerPersonalRecord?: boolean;
 }
 
 export interface AnnouncementPayload {
@@ -185,7 +194,10 @@ export interface AnnouncementPayload {
   phoneticText?: string;
   audioBase64?: string;
   audioMimeType?: string;
-  source?: 'ADDIS_AI';
+  source?: 'ADDIS_AI' | 'CACHE' | 'SYNTHESIS_FALLBACK' | 'CUSTOM_RECORDED' | 'OFFICER_LIVE_RECORDING';
+  isLiveVoiceRecord?: boolean;
+  officerName?: string;
+  customText?: string;
   timestamp: string;
 }
 

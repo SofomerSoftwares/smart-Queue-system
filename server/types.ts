@@ -171,13 +171,14 @@ export interface OfficeSetting {
   displayFontSize?: 'COMPACT' | 'NORMAL' | 'LARGE' | 'XLARGE' | 'MASSIVE';
 }
 
-export type TTSProviderType = 'ADDIS_AI';
+export type TTSProviderType = 'ADDIS_AI' | 'CUSTOM_RECORDED' | 'BROWSER_SPEECH';
 
 export interface AudioSetting {
   id: string;
   voiceEnabled: boolean;
   language: AnnouncementLanguage;
   ttsProvider?: TTSProviderType;
+  voiceMode?: 'ADDIS_AI' | 'CUSTOM_RECORDED' | 'BROWSER_SPEECH';
   addisVoice?: string; // 'aster', 'abebe', 'selam', 'dawit'
   addisAiSpeed?: number;
   addisAiEndpoint?: string;
@@ -185,6 +186,14 @@ export interface AudioSetting {
   volume: number; // 0 to 100
   repeatCount: number; // 1 or 2
   announcementDelaySeconds: number;
+  // Personal custom audio recordings
+  customRecordingBase64?: string;
+  customRecordingMimeType?: string;
+  customRecordingDuration?: number;
+  customRecordingName?: string;
+  customRecordingCreatedAt?: string;
+  customRecordingRecordedBy?: string;
+  allowOfficerPersonalRecord?: boolean;
 }
 
 export interface AuditLog {
@@ -225,6 +234,9 @@ export interface AnnouncementPayload {
   phoneticText?: string;
   audioBase64?: string;
   audioMimeType?: string;
-  source?: 'ADDIS_AI' | 'CACHE' | 'SYNTHESIS_FALLBACK';
+  source?: 'ADDIS_AI' | 'CACHE' | 'SYNTHESIS_FALLBACK' | 'CUSTOM_RECORDED' | 'OFFICER_LIVE_RECORDING';
+  isLiveVoiceRecord?: boolean;
+  officerName?: string;
+  customText?: string;
   timestamp: string;
 }

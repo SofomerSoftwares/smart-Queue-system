@@ -14,7 +14,8 @@ import {
   Role,
   RoleName,
   PriorityPolicy,
-  PermissionDefinition
+  PermissionDefinition,
+  AnnouncementPayload
 } from '../types';
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -171,7 +172,7 @@ export const api = {
       body: JSON.stringify(data)
     }),
 
-  callNextTicket: (data: { counterId: string; specificTicketId?: string }) =>
+  callNextTicket: (data: { counterId: string; specificTicketId?: string; customAudioBase64?: string; customAudioMimeType?: string; customText?: string }) =>
     request<{
       success: boolean;
       ticket: QueueTicket | null;
@@ -182,9 +183,16 @@ export const api = {
       body: JSON.stringify(data)
     }),
 
-  recallTicket: (ticketId: string) =>
+  recallTicket: (ticketId: string, data?: { customAudioBase64?: string; customAudioMimeType?: string; customText?: string }) =>
     request<{ success: boolean; ticket: QueueTicket }>(`/api/queue/ticket/${ticketId}/recall`, {
-      method: 'POST'
+      method: 'POST',
+      body: JSON.stringify(data || {})
+    }),
+
+  callTicketWithVoice: (ticketId: string, data: { audioBase64: string; mimeType?: string; customText?: string }) =>
+    request<{ success: boolean; message: string; ticket: QueueTicket }>(`/api/queue/ticket/${ticketId}/call-with-voice`, {
+      method: 'POST',
+      body: JSON.stringify(data)
     }),
 
   startTicketService: (ticketId: string) =>
@@ -218,7 +226,7 @@ export const api = {
       method: 'POST'
     }),
 
-  // --- AUDIO ---
+  // --- AUDIO & VOICE ANNOUNCEMENTS ---
   getAudioSettings: () =>
     request<{ success: boolean; settings: AudioSetting }>('/api/audio/settings'),
 
@@ -231,7 +239,51 @@ export const api = {
       body: JSON.stringify(settings)
     }),
 
-  testVoice: (data: { text?: string; language?: string; voice?: string; provider?: string; speed?: number; model?: string }) =>
+  broadcastPersonalRecording: (data: {
+    audioBase64: string;
+    mimeType?: string;
+    ticketNumber: string;
+    counterNumber?: number;
+    serviceName?: string;
+    serviceNameAmharic?: string;
+    customText?: string;
+    language?: string;
+  }) =>
+    request<{
+      success: boolean;
+      message: string;
+      payload: AnnouncementPayload;
+    }>('/api/audio/broadcast-personal-recording', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+
+  saveCustomAudioRecording: (data: {
+    customRecordingBase64: string;
+    customRecordingMimeType?: string;
+    customRecordingDuration?: number;
+    customRecordingName?: string;
+    setAsActive?: boolean;
+  }) =>
+    request<{
+      success: boolean;
+      message: string;
+      settings: AudioSetting;
+    }>('/api/audio/save-custom-recording', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+
+  deleteCustomAudioRecording: () =>
+    request<{
+      success: boolean;
+      message: string;
+      settings: AudioSetting;
+    }>('/api/audio/delete-custom-recording', {
+      method: 'DELETE'
+    }),
+
+  testVoice: (data: { text?: string; language?: string; voice?: string; provider?: string; speed?: number; model?: string; mode?: string; customAudioBase64?: string; customMimeType?: string }) =>
     request<{
       success: boolean;
       text: string;
