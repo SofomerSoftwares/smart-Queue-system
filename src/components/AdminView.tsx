@@ -79,14 +79,14 @@ export const AdminView: React.FC = () => {
     refreshQueue 
   } = useQueue();
 
-  const { user, login, demoLogin } = useAuth();
+  const { user, login } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'counters' | 'staff' | 'roles' | 'audio' | 'database' | 'office' | 'audit'>('overview');
 
   const isAmharic = uiLanguage === 'AMHARIC';
 
   // Admin Gate Form State
-  const [adminUsername, setAdminUsername] = useState<string>('admin');
-  const [adminPassword, setAdminPassword] = useState<string>('Admin@123');
+  const [adminUsername, setAdminUsername] = useState<string>('');
+  const [adminPassword, setAdminPassword] = useState<string>('');
   const [adminGateError, setAdminGateError] = useState<string>('');
   const [isLoggingInAdmin, setIsLoggingInAdmin] = useState<boolean>(false);
 
@@ -872,23 +872,14 @@ export const AdminView: React.FC = () => {
                 />
               </div>
 
-              <div className="pt-2 space-y-2">
+              <div className="pt-2">
                 <button
                   type="submit"
                   disabled={isLoggingInAdmin}
-                  className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition disabled:opacity-50"
+                  className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition disabled:opacity-50 cursor-pointer"
                 >
                   <UserCheck className="w-4 h-4" />
                   <span>{isLoggingInAdmin ? (isAmharic ? 'በማረጋገጥ ላይ...' : 'Verifying...') : (isAmharic ? 'እንደ አስተዳዳሪ ግባ' : 'Sign In as Administrator')}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => demoLogin('ADMIN')}
-                  className="w-full flex items-center justify-center space-x-1.5 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold border border-slate-200 transition"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>{isAmharic ? 'ፈጣን የአስተዳዳሪ መግቢያ (Quick Admin Sign-In)' : 'Quick Demo Admin Sign-In (admin)'}</span>
                 </button>
               </div>
             </form>
@@ -927,7 +918,7 @@ export const AdminView: React.FC = () => {
               setRenameModalError('');
               setIsRenameModalOpen(true);
             }}
-            className="flex items-center space-x-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition shadow-2xs"
+            className="flex items-center space-x-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
             title="Rename Office Name"
           >
             <Building2 className="w-4 h-4" />
@@ -941,39 +932,13 @@ export const AdminView: React.FC = () => {
                 resetDailyQueue();
               }
             }}
-            className="flex items-center space-x-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition"
+            className="flex items-center space-x-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition cursor-pointer"
           >
             <RotateCcw className="w-4 h-4" />
             <span>{isAmharic ? 'የዛሬውን ወረፋ አድስ' : 'Reset Daily Queue'}</span>
           </button>
         </div>
       </div>
-
-      {/* Admin Session Notice if not signed in */}
-      {!user && (
-        <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold shrink-0">
-              <Users className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-indigo-950">
-                {isAmharic ? 'የአስተዳዳሪ ፈቃድ ያስፈልጋል' : 'Admin Authorization Required'}
-              </p>
-              <p className="text-[11px] text-indigo-700">
-                {isAmharic ? 'አገልግሎቶችን፣  ሰራተኞችን ለማስተካከል በአስተዳዳሪ መለያ ይግቡ' : 'To save services, counters, and office configurations, sign in as Administrator.'}
-              </p>
-            </div>
-          </div>
-          <button
-            id="btn-admin-quick-login"
-            onClick={() => demoLogin('ADMIN')}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs whitespace-nowrap self-start sm:self-auto"
-          >
-            {isAmharic ? 'በአስተዳዳሪ ግባ (Admin Login)' : 'Authorize as Admin'}
-          </button>
-        </div>
-      )}
 
       {saveSuccessMsg && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center space-x-2 animate-in fade-in">

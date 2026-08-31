@@ -27,15 +27,15 @@ import { QueueStats, CustomerReview } from '../types';
 
 export const ReportsView: React.FC = () => {
   const { uiLanguage } = useQueue();
-  const { user, login, demoLogin } = useAuth();
+  const { user, login } = useAuth();
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [statsData, setStatsData] = useState<QueueStats | null>(null);
   const [reviewsList, setReviewsList] = useState<CustomerReview[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Admin Gate Form State
-  const [adminUsername, setAdminUsername] = useState<string>('admin');
-  const [adminPassword, setAdminPassword] = useState<string>('Admin@123');
+  const [adminUsername, setAdminUsername] = useState<string>('');
+  const [adminPassword, setAdminPassword] = useState<string>('');
   const [adminGateError, setAdminGateError] = useState<string>('');
   const [isLoggingInAdmin, setIsLoggingInAdmin] = useState<boolean>(false);
 
@@ -173,23 +173,14 @@ export const ReportsView: React.FC = () => {
                 />
               </div>
 
-              <div className="pt-2 space-y-2">
+              <div className="pt-2">
                 <button
                   type="submit"
                   disabled={isLoggingInAdmin}
-                  className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition disabled:opacity-50"
+                  className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/20 transition disabled:opacity-50 cursor-pointer"
                 >
                   <UserCheck className="w-4 h-4" />
                   <span>{isLoggingInAdmin ? (isAmharic ? 'በማረጋገጥ ላይ...' : 'Verifying...') : (isAmharic ? 'እንደ አስተዳዳሪ ግባ' : 'Sign In as Administrator')}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => demoLogin('ADMIN')}
-                  className="w-full flex items-center justify-center space-x-1.5 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold border border-slate-200 transition"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>{isAmharic ? 'ፈጣን የአስተዳዳሪ መግቢያ (Quick Admin Sign-In)' : 'Quick Demo Admin Sign-In (admin)'}</span>
                 </button>
               </div>
             </form>

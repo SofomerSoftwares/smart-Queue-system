@@ -64,13 +64,12 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onOpenC
       icon: Tv, 
       badge: stats?.serving ? `${stats.serving} Active` : undefined 
     },
-    // Reception is hidden for Service Officers
-    ...(user?.role === 'SERVICE_OFFICER' ? [] : [{ 
+    { 
       id: 'reception', 
-      label: isAmharic ? 'መስተንግዶ' : 'Reception Desk', 
+      label: isAmharic ? 'መስተንግዶ እና ኪዮስክ' : 'Reception & Kiosk', 
       icon: Ticket, 
       badge: stats?.waiting ? `${stats.waiting} Wait` : undefined 
-    }]),
+    },
     { 
       id: 'officer', 
       label: isAmharic ? 'መስኮት' : 'Counter Station', 

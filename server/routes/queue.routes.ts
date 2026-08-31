@@ -352,17 +352,9 @@ router.get('/reviews', optionalAuthenticate, (req: AuthenticatedRequest, res: Re
   }
 });
 
-// 3. POST /api/queue/ticket - Receptionist / Kiosk ticket creation (Anonymous self-service or staff logged)
-router.post('/ticket', optionalAuthenticate, (req: AuthenticatedRequest, res: Response) => {
+// 3. POST /api/queue/ticket - Receptionist / Kiosk ticket creation (Authentication required)
+router.post('/ticket', authenticate, (req: AuthenticatedRequest, res: Response) => {
   try {
-    // Explicitly forbid Service Officers from operating Reception and creating tickets
-    if (req.user?.role === 'SERVICE_OFFICER') {
-      return res.status(403).json({
-        success: false,
-        message: 'Access forbidden: Service Officers are not permitted to issue tickets at the Reception & Ticket Kiosk (የመስኮት ሰራተኞች በመስተንግዶ ክፍል ቲኬት ማውጣት አይችሉም).'
-      });
-    }
-
     const { serviceId, priority, urgencyReason, notes } = req.body;
 
     if (!serviceId) {
@@ -374,22 +366,28 @@ router.post('/ticket', optionalAuthenticate, (req: AuthenticatedRequest, res: Re
 
     let validatedPriority: PriorityLevel = 'NORMAL';
     if (priority === 'URGENT' || priority === 'PRIORITY') {
-      if (req.user?.role === 'ADMIN') {
+      const isAdmin = req.user?.role === 'ADMIN';
+      const isReceptionist = req.user?.role === 'RECEPTIONIST';
+      const isOfficer = req.user?.role === 'SERVICE_OFFICER';
+      const hasPriorityPerm = req.user?.permissions?.includes('ticket.priority') || 
+                              req.user?.permissions?.includes('ticket.priority_create') || 
+                              req.user?.canManagePriority === true;
+
+      // Allow Admins, Receptionists, and authorized staff or with urgency reason
+      if (isAdmin || isReceptionist || isOfficer || hasPriorityPerm || (urgencyReason && urgencyReason.trim().length > 0)) {
         validatedPriority = priority as PriorityLevel;
       } else {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied: Priority and Urgent tickets must be issued by an Administrator (የቅድሚያ እና አስቸኳይ ቲኬት በአስተዳዳሪ (Admin) ብቻ ነው የሚሰጠው).'
-        });
+        validatedPriority = 'NORMAL';
       }
     }
 
+    const issuerName = req.user?.name || (req.user?.username ? `@${req.user.username}` : 'Receptionist');
     const ticket = db.generateTicket(
       serviceId, 
       validatedPriority, 
       urgencyReason, 
       notes, 
-      req.user?.name || req.user?.username || 'Reception'
+      issuerName
     );
     const officeSetting = db.getOfficeSetting();
 
@@ -824,13 +822,21 @@ router.post('/reset-daily', authenticate, authorize('queue.manage'), (req: Authe
   }
 });
 
-// 12. PATCH /api/queue/ticket/:id/priority - Flag urgent/priority ticket (Must be issued/managed by Admin)
+// 12. PATCH /api/queue/ticket/:id/priority - Flag urgent/priority ticket
 router.patch('/ticket/:id/priority', authenticate, (req: AuthenticatedRequest, res: Response) => {
   try {
-    if (req.user?.role !== 'ADMIN') {
+    const userRole = req.user?.role;
+    const policy = db.getPriorityPolicy();
+    const hasPriorityPerm = userRole === 'ADMIN' || 
+                            userRole === 'RECEPTIONIST' || 
+                            req.user?.canManagePriority === true || 
+                            req.user?.permissions?.includes('ticket.priority') ||
+                            (userRole === 'SERVICE_OFFICER' && policy.allowOfficerTriage);
+
+    if (!hasPriorityPerm) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied: Ticket priority must be issued and managed by an Administrator (የቅድሚያ ደረጃ መቀየር በአስተዳዳሪ ብቻ የተፈቀደ ነው).'
+        message: 'Access denied: You do not have permission to manage ticket priority.'
       });
     }
 
@@ -849,7 +855,6 @@ router.patch('/ticket/:id/priority', authenticate, (req: AuthenticatedRequest, r
       return res.status(404).json({ success: false, message: 'Ticket not found.' });
     }
 
-    const policy = db.getPriorityPolicy();
     if (priority === 'URGENT' && policy.requireReasonForUrgent && (!urgencyReason || !urgencyReason.trim())) {
       return res.status(400).json({
         success: false,

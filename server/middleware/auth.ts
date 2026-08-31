@@ -12,6 +12,7 @@ export interface AuthenticatedUser {
   role: RoleName;
   assignedCounterId?: string;
   permissions: string[];
+  canManagePriority?: boolean;
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -61,7 +62,8 @@ export function authenticate(req: AuthenticatedRequest, res: Response, next: Nex
         username: user.username,
         role: user.role,
         assignedCounterId: user.assignedCounterId,
-        permissions
+        permissions,
+        canManagePriority: user.canManagePriority
       };
 
       next();

@@ -91,14 +91,17 @@ export const DEFAULT_ROLES: Role[] = [
     permissions: [
       'dashboard.view',
       'queue.view',
+      'ticket.create',
       'ticket.call',
       'ticket.recall',
       'ticket.start',
       'ticket.complete',
       'ticket.no_show',
       'ticket.priority',
+      'ticket.priority_create',
       'ticket.priority_reset',
-      'ticket.transfer'
+      'ticket.transfer',
+      'services.view'
     ]
   }
 ];
