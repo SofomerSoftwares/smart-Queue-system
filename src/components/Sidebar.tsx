@@ -21,7 +21,8 @@ import {
   Radio,
   Clock,
   Layers,
-  ChevronDown
+  ChevronDown,
+  Medal
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useQueue } from '../context/QueueContext';
@@ -116,6 +117,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'reports', 
       label: isAmharic ? 'ትንታኔ እና ሪፖርት' : 'Analytics & Reports', 
       icon: BarChart3 
+    },
+    { 
+      id: 'officer-performance', 
+      label: isAmharic ? 'የሰራተኞች አፈፃፀም' : 'Officer Performance', 
+      icon: Medal 
     }
   ];
 

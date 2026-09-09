@@ -66,6 +66,7 @@ import {
 } from '../types';
 import { PRESET_VIDEOS } from './DisplayVideoPlayer';
 import { videoStorage, StoredVideo, formatBytes } from '../lib/videoStorage';
+import { LiveActivityFeed } from './LiveActivityFeed';
 
 export const AdminView: React.FC = () => {
   const { 
@@ -1001,38 +1002,46 @@ export const AdminView: React.FC = () => {
             </div>
           </div>
 
-          {/* Service Breakdown Table */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs">
-            <h3 className="font-bold text-slate-900 text-sm mb-4">
-              {isAmharic ? 'የአገልግሎቶች አፈፃፀም ዝርዝር' : 'Service Queue Distribution'}
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="py-2.5 px-3">Prefix</th>
-                    <th className="py-2.5 px-3">Service Name</th>
-                    <th className="py-2.5 px-3 text-center">Total</th>
-                    <th className="py-2.5 px-3 text-center">Waiting</th>
-                    <th className="py-2.5 px-3 text-center">Completed</th>
-                    <th className="py-2.5 px-3 text-right">Avg Duration</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium">
-                  {stats?.serviceBreakdown.map((s) => (
-                    <tr key={s.serviceId} className="hover:bg-slate-50">
-                      <td className="py-3 px-3 font-bold font-mono text-indigo-600">{s.prefix}</td>
-                      <td className="py-3 px-3 text-slate-900 font-bold">
-                        {isAmharic ? (s.serviceNameAmharic || s.serviceName) : s.serviceName}
-                      </td>
-                      <td className="py-3 px-3 text-center font-mono">{s.total}</td>
-                      <td className="py-3 px-3 text-center font-mono text-amber-600 font-bold">{s.waiting}</td>
-                      <td className="py-3 px-3 text-center font-mono text-emerald-600 font-bold">{s.completed}</td>
-                      <td className="py-3 px-3 text-right font-mono text-slate-500">~{s.avgServiceMinutes}m</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              {/* Service Breakdown Table */}
+              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs">
+                <h3 className="font-bold text-slate-900 text-sm mb-4">
+                  {isAmharic ? 'የአገልግሎቶች አፈፃፀም ዝርዝር' : 'Service Queue Distribution'}
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                      <tr>
+                        <th className="py-2.5 px-3">Prefix</th>
+                        <th className="py-2.5 px-3">Service Name</th>
+                        <th className="py-2.5 px-3 text-center">Total</th>
+                        <th className="py-2.5 px-3 text-center">Waiting</th>
+                        <th className="py-2.5 px-3 text-center">Completed</th>
+                        <th className="py-2.5 px-3 text-right">Avg Duration</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {stats?.serviceBreakdown.map((s) => (
+                        <tr key={s.serviceId} className="hover:bg-slate-50">
+                          <td className="py-3 px-3 font-bold font-mono text-indigo-600">{s.prefix}</td>
+                          <td className="py-3 px-3 text-slate-900 font-bold">
+                            {isAmharic ? (s.serviceNameAmharic || s.serviceName) : s.serviceName}
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono">{s.total}</td>
+                          <td className="py-3 px-3 text-center font-mono text-amber-600 font-bold">{s.waiting}</td>
+                          <td className="py-3 px-3 text-center font-mono text-emerald-600 font-bold">{s.completed}</td>
+                          <td className="py-3 px-3 text-right font-mono text-slate-500">~{s.avgServiceMinutes}m</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            
+            <div className="lg:col-span-1">
+              <LiveActivityFeed />
             </div>
           </div>
         </div>

@@ -9,6 +9,7 @@ import { OfficerStationView } from './components/OfficerStationView';
 import { CustomerTicketView } from './components/CustomerTicketView';
 import { AdminView } from './components/AdminView';
 import { ReportsView } from './components/ReportsView';
+import { OfficerPerformanceReportView } from './components/OfficerPerformanceReportView';
 import { CounterDisplayView } from './components/CounterDisplayView';
 import { LoginView } from './components/LoginView';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
@@ -49,6 +50,8 @@ const AppContent: React.FC = () => {
         return <AdminView />;
       case 'reports':
         return <ReportsView />;
+      case 'officer-performance':
+        return <OfficerPerformanceReportView />;
       case 'login':
         return <LoginView onSuccess={() => setCurrentView('officer')} />;
       default:
