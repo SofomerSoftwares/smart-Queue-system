@@ -471,6 +471,16 @@ router.get('/reports/summary', authenticate, requireAdmin, (req: Request, res: R
   }
 });
 
+// GET /api/reports/officer-performance (Admin only)
+router.get('/reports/officer-performance', authenticate, requireAdmin, (req: Request, res: Response) => {
+  try {
+    const report = db.getOfficerPerformanceReport();
+    res.json({ success: true, ...report });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET /api/audit-logs (Admin only)
 router.get('/audit-logs', authenticate, requireAdmin, (req: Request, res: Response) => {
   try {

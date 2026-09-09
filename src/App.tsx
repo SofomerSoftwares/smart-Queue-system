@@ -74,7 +74,7 @@ const AppContent: React.FC = () => {
 
       {/* Main Content Layout */}
       <div 
-        className={`flex-1 flex flex-col min-w-0 transition-[padding] duration-300 ease-in-out will-change-[padding] ${
+        className={`flex-1 flex flex-col min-w-0 transition-[padding] duration-300 ease-in-out will-change-[padding] print:pl-0 ${
           isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64'
         }`}
       >

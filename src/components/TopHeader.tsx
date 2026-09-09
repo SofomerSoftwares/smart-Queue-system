@@ -122,7 +122,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
   const Icon = meta.icon;
 
   return (
-    <header className="h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
+    <header className="h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-2xs print:hidden">
       
       {/* Left: Mobile Sidebar Trigger + View Title & Subtitle */}
       <div className="flex items-center gap-3">

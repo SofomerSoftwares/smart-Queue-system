@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { toPng } from 'html-to-image';
+import { jsPDF } from 'jspdf';
 import { 
   Users, 
   Clock, 
@@ -11,7 +13,8 @@ import {
   Medal,
   Lock,
   UserCheck,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
 import { useAuth } from '../context/AuthContext';
@@ -60,11 +63,75 @@ export const OfficerPerformanceReportView: React.FC = () => {
   const [adminPassword, setAdminPassword] = useState<string>('');
   const [adminGateError, setAdminGateError] = useState<string>('');
   const [isLoggingInAdmin, setIsLoggingInAdmin] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  
+  const reportRef = useRef<HTMLDivElement>(null);
 
-  const filteredOfficers = officerStats.filter(officer => 
+  const [reportData, setReportData] = useState<{ officerStats: any[], performanceTrend: any[] } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (user?.role === 'ADMIN') {
+      fetchReport();
+    }
+  }, [user]);
+
+  const fetchReport = async () => {
+    try {
+      setIsLoading(true);
+      const res = await fetch('/api/reports/officer-performance');
+      const data = await res.json();
+      if (data.success) {
+        setReportData({ officerStats: data.officerStats, performanceTrend: data.performanceTrend });
+      }
+    } catch (err) {
+      console.error('Failed to fetch officer performance report', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const currentOfficerStats = reportData?.officerStats || [];
+  const currentPerformanceTrend = reportData?.performanceTrend || [];
+
+  const filteredOfficers = currentOfficerStats.filter(officer => 
     officer.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     officer.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleExportPDF = async () => {
+    if (!reportRef.current) return;
+    setIsExporting(true);
+    
+    try {
+      const dataUrl = await toPng(reportRef.current, {
+        quality: 1.0,
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
+        filter: (node) => {
+          // exclude elements that have 'print:hidden' in their classList, or have data-html2canvas-ignore
+          if (node instanceof HTMLElement) {
+            if (node.dataset.html2canvasIgnore !== undefined) return false;
+            if (node.classList && node.classList.contains('print:hidden')) return false;
+          }
+          return true;
+        }
+      });
+      
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      // Calculate height maintaining aspect ratio based on original element dimensions
+      const props = pdf.getImageProperties(dataUrl);
+      const pdfHeight = (props.height * pdfWidth) / props.width;
+      
+      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save('officer-performance-report.pdf');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleAdminGateLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,8 +255,16 @@ export const OfficerPerformanceReportView: React.FC = () => {
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+    <div ref={reportRef} className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 bg-slate-50 min-h-screen">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <div className="flex items-center space-x-3">
@@ -206,9 +281,18 @@ export const OfficerPerformanceReportView: React.FC = () => {
           </div>
         </div>
 
-        <button className="flex items-center space-x-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold transition shadow-sm">
-          <Download className="w-4 h-4" />
-          <span>{isAmharic ? 'ሪፖርት አውርድ (PDF)' : 'Export Report'}</span>
+        <button 
+          onClick={handleExportPDF}
+          disabled={isExporting}
+          data-html2canvas-ignore
+          className="flex items-center space-x-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold transition shadow-sm print:hidden cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+        >
+          {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          <span>
+            {isExporting 
+              ? (isAmharic ? 'በማዘጋጀት ላይ...' : 'Exporting...') 
+              : (isAmharic ? 'ሪፖርት አውርድ (PDF)' : 'Export Report')}
+          </span>
         </button>
       </div>
 
@@ -224,10 +308,10 @@ export const OfficerPerformanceReportView: React.FC = () => {
             </div>
           </div>
           <div className="mt-4">
-            <h3 className="text-3xl font-black text-slate-900 font-mono">12</h3>
+            <h3 className="text-3xl font-black text-slate-900 font-mono">{currentOfficerStats.length}</h3>
             <p className="text-xs text-emerald-600 font-medium mt-1 flex items-center gap-1">
               <TrendingUp className="w-3 h-3" />
-              <span>{isAmharic ? 'በስራ ላይ ያሉ 8' : '8 currently active'}</span>
+              <span>{isAmharic ? `በስራ ላይ ያሉ ${currentOfficerStats.filter(o => o.status === 'Active').length}` : `${currentOfficerStats.filter(o => o.status === 'Active').length} currently active`}</span>
             </p>
           </div>
         </div>
@@ -242,10 +326,13 @@ export const OfficerPerformanceReportView: React.FC = () => {
             </div>
           </div>
           <div className="mt-4">
-            <h3 className="text-3xl font-black text-slate-900 font-mono">5.2m</h3>
+            <h3 className="text-3xl font-black text-slate-900 font-mono">
+              {currentOfficerStats.length > 0 
+                ? (currentOfficerStats.reduce((acc, o) => acc + o.avgServiceTime, 0) / currentOfficerStats.length).toFixed(1) 
+                : '0'}m
+            </h3>
             <p className="text-xs text-emerald-600 font-medium mt-1 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" />
-              <span>{isAmharic ? 'ከባለፈው ሳምንት 12% ቀንሷል' : '12% faster than last week'}</span>
+              <span>{isAmharic ? 'የሁሉም ሰራተኞች አማካይ' : 'Across all officers'}</span>
             </p>
           </div>
         </div>
@@ -260,10 +347,11 @@ export const OfficerPerformanceReportView: React.FC = () => {
             </div>
           </div>
           <div className="mt-4">
-            <h3 className="text-3xl font-black text-slate-900 font-mono">2,960</h3>
+            <h3 className="text-3xl font-black text-slate-900 font-mono">
+              {currentOfficerStats.reduce((acc, o) => acc + o.ticketsServed, 0)}
+            </h3>
             <p className="text-xs text-emerald-600 font-medium mt-1 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" />
-              <span>{isAmharic ? 'በዚህ ወር' : 'This month'}</span>
+              <span>{isAmharic ? 'በጠቅላላ የተስተናገዱ' : 'Total resolved'}</span>
             </p>
           </div>
         </div>
@@ -278,9 +366,12 @@ export const OfficerPerformanceReportView: React.FC = () => {
             </div>
           </div>
           <div className="mt-4">
-            <h3 className="text-3xl font-black text-slate-900 font-mono">4.7<span className="text-lg text-slate-400">/5</span></h3>
+            <h3 className="text-3xl font-black text-slate-900 font-mono">
+              {currentOfficerStats.length > 0 && currentOfficerStats.some(o => o.rating > 0)
+                ? (currentOfficerStats.reduce((acc, o) => acc + o.rating, 0) / currentOfficerStats.filter(o => o.rating > 0).length).toFixed(1)
+                : '0'}<span className="text-lg text-slate-400">/5</span></h3>
             <p className="text-xs text-slate-500 font-medium mt-1">
-              {isAmharic ? 'ከ 1,240 አስተያየቶች' : 'Based on 1,240 reviews'}
+              {isAmharic ? 'ከተሰጡ አስተያየቶች' : 'Based on reviews'}
             </p>
           </div>
         </div>
@@ -300,7 +391,7 @@ export const OfficerPerformanceReportView: React.FC = () => {
           </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={officerStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <BarChart data={currentOfficerStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
@@ -326,7 +417,7 @@ export const OfficerPerformanceReportView: React.FC = () => {
           </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={performanceTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={currentPerformanceTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorTickets" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3}/>
@@ -357,7 +448,7 @@ export const OfficerPerformanceReportView: React.FC = () => {
               {isAmharic ? 'የእያንዳንዱ ሰራተኛ ሙሉ መረጃ' : 'Full breakdown of individual performance'}
             </p>
           </div>
-          <div className="relative">
+          <div className="relative print:hidden">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
               type="text" 

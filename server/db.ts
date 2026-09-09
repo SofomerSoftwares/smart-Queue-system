@@ -1419,6 +1419,50 @@ class Database {
     });
     this.save();
   }
+
+  public getOfficerPerformanceReport() {
+    const officers = this.data.users.filter(u => ['SERVICE_OFFICER', 'ADMIN', 'RECEPTIONIST'].includes(u.role));
+    
+    const officerStats = officers.map(officer => {
+      const ticketsServed = this.data.tickets.filter(t => t.officerId === officer.id && t.status === 'COMPLETED');
+      const totalServiceTime = ticketsServed.reduce((acc, t) => acc + (t.serviceDurationSeconds || 0), 0);
+      const avgServiceTime = ticketsServed.length > 0 ? Number((totalServiceTime / ticketsServed.length / 60).toFixed(1)) : 0;
+      
+      const reviews = (this.data.customerReviews || []).filter(r => ticketsServed.some(t => t.id === r.ticketId));
+      const totalRating = reviews.reduce((acc, r) => acc + r.rating, 0);
+      const avgRating = reviews.length > 0 ? Number((totalRating / reviews.length).toFixed(1)) : 0;
+      
+      return {
+        id: officer.id,
+        name: officer.name,
+        role: officer.role.replace('_', ' '),
+        ticketsServed: ticketsServed.length,
+        avgServiceTime: avgServiceTime,
+        rating: avgRating,
+        status: officer.status === 'ACTIVE' ? 'Active' : 'Offline'
+      };
+    }).filter(stat => stat.ticketsServed > 0 || stat.status === 'Active');
+    
+    const trend = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateKey = d.toISOString().split('T')[0];
+      const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+      
+      const dayTickets = this.data.tickets.filter(t => t.dateKey === dateKey && t.status === 'COMPLETED');
+      const totalTime = dayTickets.reduce((acc, t) => acc + (t.serviceDurationSeconds || 0), 0);
+      const avgTime = dayTickets.length > 0 ? Number((totalTime / dayTickets.length / 60).toFixed(1)) : 0;
+      
+      trend.push({
+        date: dayName,
+        tickets: dayTickets.length,
+        avgTime: avgTime
+      });
+    }
+
+    return { officerStats, performanceTrend: trend };
+  }
 }
 
 export const db = new Database();

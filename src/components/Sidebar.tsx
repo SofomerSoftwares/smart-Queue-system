@@ -139,14 +139,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Backdrop Overlay */}
       {isMobileOpen && (
         <div 
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 md:hidden animate-in fade-in"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 md:hidden animate-in fade-in print:hidden"
           onClick={onCloseMobile}
         />
       )}
 
       {/* Sidebar Container */}
       <aside 
-        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-slate-900 text-slate-200 border-r border-slate-800 transition-[width,transform] duration-300 ease-in-out will-change-[width,transform] select-none ${
+        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-slate-900 text-slate-200 border-r border-slate-800 transition-[width,transform] duration-300 ease-in-out will-change-[width,transform] select-none print:hidden ${
           isMobileOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'
         } ${isCollapsed ? 'md:w-20' : 'md:w-64'}`}
       >
