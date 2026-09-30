@@ -355,6 +355,15 @@ router.get('/reviews', optionalAuthenticate, (req: AuthenticatedRequest, res: Re
 // 3. POST /api/queue/ticket - Receptionist / Kiosk ticket creation (Authentication required)
 router.post('/ticket', authenticate, (req: AuthenticatedRequest, res: Response) => {
   try {
+    // Strictly prevent Counter Service Officers from issuing tickets or accessing reception/kiosk
+    if (req.user?.role === 'SERVICE_OFFICER') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Counter service officers are not permitted to access reception or issue tickets.',
+        code: 'FORBIDDEN'
+      });
+    }
+
     const { serviceId, priority, urgencyReason, notes } = req.body;
 
     if (!serviceId) {
@@ -368,13 +377,12 @@ router.post('/ticket', authenticate, (req: AuthenticatedRequest, res: Response) 
     if (priority === 'URGENT' || priority === 'PRIORITY') {
       const isAdmin = req.user?.role === 'ADMIN';
       const isReceptionist = req.user?.role === 'RECEPTIONIST';
-      const isOfficer = req.user?.role === 'SERVICE_OFFICER';
       const hasPriorityPerm = req.user?.permissions?.includes('ticket.priority') || 
                               req.user?.permissions?.includes('ticket.priority_create') || 
                               req.user?.canManagePriority === true;
 
       // Allow Admins, Receptionists, and authorized staff or with urgency reason
-      if (isAdmin || isReceptionist || isOfficer || hasPriorityPerm || (urgencyReason && urgencyReason.trim().length > 0)) {
+      if (isAdmin || isReceptionist || hasPriorityPerm || (urgencyReason && urgencyReason.trim().length > 0)) {
         validatedPriority = priority as PriorityLevel;
       } else {
         validatedPriority = 'NORMAL';

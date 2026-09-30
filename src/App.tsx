@@ -32,6 +32,13 @@ const AppContent: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
+  // Guard: Automatically redirect Counter Service Officers away from reception & kiosk to counter station
+  React.useEffect(() => {
+    if (user?.role === 'SERVICE_OFFICER' && currentView === 'reception') {
+      setCurrentView('officer');
+    }
+  }, [user, currentView]);
+
   const renderView = () => {
     switch (currentView) {
       case 'display':

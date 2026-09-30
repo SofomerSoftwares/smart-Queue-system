@@ -146,9 +146,9 @@ The initial database seeds standard staff accounts out of the box. **It is stron
 | :--- | :--- | :--- | :--- | :--- |
 | **System Administrator** | `admin` | `Admin@123` | All Counters | Full administrative control, settings, user management, audit logs, and reports |
 | **Receptionist** | `reception` | `Reception@123` | Front Desk | Ticket generation, priority triage, urgency classification, and customer check-in |
-| **Officer 1** | `officer1` | `Officer@123` | Counter 1 | Call tickets, recall, serve, complete, transfer, and flag priority |
-| **Officer 2** | `officer2` | `Officer@123` | Counter 2 | Call tickets, recall, serve, complete, transfer, and flag priority |
-| **Officer 3** | `officer3` | `Officer@123` | Counter 3 | Call tickets, recall, serve, complete, transfer, and flag priority |
+| **Officer 1** | `officer1` | `Officer@123` | Counter 1 | Call tickets, recall, serve, complete, transfer, and flag priority (strictly restricted from reception and kiosk pages) |
+| **Officer 2** | `officer2` | `Officer@123` | Counter 2 | Call tickets, recall, serve, complete, transfer, and flag priority (strictly restricted from reception and kiosk pages) |
+| **Officer 3** | `officer3` | `Officer@123` | Counter 3 | Call tickets, recall, serve, complete, transfer, and flag priority (strictly restricted from reception and kiosk pages) |
 
 ---
 
@@ -197,6 +197,8 @@ Before opening service to the public, an administrator should log in (`admin` / 
 ### 6.1 Reception & Kiosk Station
 **URL:** `/?view=reception`
 
+> **Security & Access Policy:** Access to this workstation is strictly reserved for users with the **RECEPTIONIST** or **ADMIN** role. **Counter Service Officers are prohibited** from accessing reception and kiosk pages to ensure segregation of duties.
+
 - **Purpose:** Where arriving customers are greeted or self-serve their ticket.
 - **Workflow:**
   1. The customer chooses their required service (e.g., *New Application*).
@@ -243,6 +245,8 @@ Before opening service to the public, an administrator should log in (`admin` / 
 
 ### 6.4 Service Officer Counter Workstation
 **URL:** `/?view=officer`
+
+> **Access & Role Isolation:** Counter Service Officers are restricted solely to counter operations (`/?view=officer`). They **cannot access the Reception & Kiosk workstation (`/?view=reception`)**, cannot issue queue tickets, and will be automatically blocked with an Access Restricted screen and redirected to their counter station if attempting to navigate there.
 
 - **Purpose:** Daily workstation interface for counter clerks.
 - **Workflow:**

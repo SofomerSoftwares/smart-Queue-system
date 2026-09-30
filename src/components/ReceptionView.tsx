@@ -81,14 +81,13 @@ export const ReceptionView: React.FC<ReceptionViewProps> = ({ onNavigate }) => {
   const isReceptionist = user?.role === 'RECEPTIONIST';
   const isServiceOfficer = user?.role === 'SERVICE_OFFICER';
   
-  // Full authorization check: Admins, Receptionists, officers, or staff with priority flags
+  // Full authorization check: Admins, Receptionists, or staff with priority flags (Officers excluded from reception issuance)
   const hasPriorityAuth = 
     isAdmin || 
     isReceptionist || 
     user?.canManagePriority === true || 
     hasPermission('ticket.priority') || 
-    hasPermission('ticket.priority_create') ||
-    isServiceOfficer;
+    hasPermission('ticket.priority_create');
 
   const [viewMode, setViewMode] = useState<ViewMode>('DESK');
   const [priority, setPriority] = useState<PriorityLevel>('NORMAL');
@@ -147,6 +146,16 @@ export const ReceptionView: React.FC<ReceptionViewProps> = ({ onNavigate }) => {
       setLoginError('');
       setForgotSuccessMessage('');
       await login(loginUsername.trim(), loginPassword);
+
+      // Verify if the signed-in user is a SERVICE_OFFICER: they are not authorized to use Reception & Kiosk
+      const meRes = await api.getMe();
+      if (meRes.success && meRes.user?.role === 'SERVICE_OFFICER') {
+        if (onNavigate) {
+          onNavigate('officer');
+        }
+        return;
+      }
+
       setActionNotice(isAmharic ? 'ወደ መስተንግዶ እና ኪዮስክ ጣቢያ በተሳካ ሁኔታ ገብተዋል!' : 'Signed in to Reception & Kiosk workstation successfully!');
       setTimeout(() => setActionNotice(''), 4000);
     } catch (err: any) {
@@ -422,7 +431,51 @@ export const ReceptionView: React.FC<ReceptionViewProps> = ({ onNavigate }) => {
 
   const activeServices = services.filter(s => s.isActive !== false);
 
-  // 1. Unauthenticated Gate: Staff / Operator authentication required to access Reception & Kiosk
+  // 1a. Restricted Role Gate: Counter Service Officers are prohibited from accessing Reception & Kiosk
+  if (user?.role === 'SERVICE_OFFICER') {
+    return (
+      <div className="max-w-2xl mx-auto p-4 sm:p-8 mt-12 animate-in fade-in">
+        <div className="bg-white rounded-3xl p-8 sm:p-10 border border-rose-200 shadow-sm text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-100 ring-4 ring-rose-50/50">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <div className="space-y-3">
+            <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-200">
+              {isAmharic ? 'የመዳረሻ ፈቃድ እገዳ' : 'Access Restricted'}
+            </span>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+              {isAmharic ? 'የመስኮት ሰራተኞች የመስተንግዶ እና ኪዮስክ ገፅን መክፈት አይፈቀድላቸውም' : 'Counter Service Officers Cannot Access Reception & Kiosk'}
+            </h2>
+            <p className="text-sm text-slate-600 leading-relaxed max-w-lg mx-auto">
+              {isAmharic 
+                ? 'የእርስዎ መለያ የመስኮት አገልግሎት ሰራተኛ (Counter Service Officer) ነው። የመስኮት ሰራተኞች ደንበኞችን በመስኮት ጣቢያቸው ብቻ እንዲያስተናግዱ የተመደቡ በመሆናቸው የመስተንግዶ እና የኪዮስክ ቲኬት መስጫ ገጽን መጠቀም አይችሉም።'
+                : 'Your account is assigned the Counter Service Officer role. Service officers are designated to serve customer tickets from their assigned counter station and cannot create tickets, triage front-desk queues, or manage the reception kiosk.'}
+            </p>
+          </div>
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => onNavigate ? onNavigate('officer') : undefined}
+              className="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition shadow-md shadow-indigo-100 cursor-pointer inline-flex items-center justify-center space-x-2"
+            >
+              <UserCheck className="w-4 h-4" />
+              <span>{isAmharic ? 'ወደ መስኮት አገልግሎት ጣቢያ ሂድ' : 'Go to Counter Station'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => logout()}
+              className="w-full sm:w-auto px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition cursor-pointer inline-flex items-center justify-center space-x-2"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>{isAmharic ? 'ውጣ' : 'Sign Out'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 1b. Unauthenticated Gate: Staff / Operator authentication required to access Reception & Kiosk
   if (!user) {
     return (
       <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
@@ -451,8 +504,8 @@ export const ReceptionView: React.FC<ReceptionViewProps> = ({ onNavigate }) => {
             </h1>
             <p className="text-sm text-slate-500 leading-relaxed font-medium">
               {authMode === 'LOGIN' && (isAmharic 
-                ? 'የመስተንግዶ ዴስክን ለመስራት፣ የወረፋ ቲኬቶችን ለማውጣት ወይም የቅድሚያ አገልግሎት ለመስጠት እባክዎ በተፈቀደ የመስተንግዶ፣ የአገልግሎት ሰጪ ወይም የአስተዳዳሪ መለያ ይግቡ።' 
-                : 'Authentication required. Only authorized front desk staff, receptionists, service officers, and administrators are permitted to access the reception desk and issue queue tickets.')}
+                ? 'የመስተንግዶ ዴስክን ለመስራት፣ የወረፋ ቲኬቶችን ለማውጣት ወይም የቅድሚያ አገልግሎት ለመስጠት እባክዎ በተፈቀደ የመስተንግዶ ወይም የአስተዳዳሪ መለያ ይግቡ (የመስኮት ሰራተኞች በመስኮት ገጻቸው ብቻ እንዲሰሩ ተገድበዋል)።' 
+                : 'Authentication required. Only authorized front desk receptionists and administrators are permitted to access the reception desk and issue queue tickets (Counter Service Officers are restricted to counter stations).')}
               {authMode === 'FORGOT_REQUEST' && (isAmharic
                 ? 'የማረጋገጫ ኮድ ለመቀበል የተጠቃሚ ስምዎን ያስገቡ።'
                 : 'Enter your staff username to receive a 6-digit verification reset code.')}

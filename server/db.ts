@@ -22,6 +22,7 @@ export const PERMISSIONS: Permission[] = [
   { id: 'dashboard.view', name: 'View Dashboard', description: 'Access dashboard screens' },
   { id: 'queue.view', name: 'View Queue', description: 'View current queue list and status' },
   { id: 'queue.manage', name: 'Manage Queue', description: 'Reset or manage entire queue' },
+  { id: 'reception.access', name: 'Access Reception & Kiosk', description: 'Access reception workstation and kiosk ticket issuing' },
   { id: 'ticket.create', name: 'Create Ticket', description: 'Issue new anonymous queue ticket' },
   { id: 'ticket.call', name: 'Call Ticket', description: 'Call next ticket to counter' },
   { id: 'ticket.recall', name: 'Recall Ticket', description: 'Recall previously called ticket' },
@@ -70,6 +71,7 @@ export const DEFAULT_ROLES: Role[] = [
     description: 'Front desk ticket creation, customer triage, and urgency escalation',
     descriptionAmharic: 'የደንበኞች ምዝገባ፣ የቲኬት አሰጣጥ እና የቅድሚያ አገልግሎት ማስተናገጃ',
     permissions: [
+      'reception.access',
       'dashboard.view',
       'queue.view',
       'ticket.create',
@@ -86,22 +88,21 @@ export const DEFAULT_ROLES: Role[] = [
     name: 'SERVICE_OFFICER',
     displayName: 'Counter Service Officer',
     displayNameAmharic: 'የመስኮት አገልግሎት ሰራተኛ',
-    description: 'Counter service officer calling, serving, and triaging customer tickets',
-    descriptionAmharic: 'በመስኮት ደንበኞችን የሚጠራ፣ የሚያስተናግድ እና አስቸኳይ ሁኔታዎችን ቅድሚያ የሚሰጥ',
+    description: 'Counter service officer calling, serving, and triaging customer tickets at assigned counter (restricted from reception & kiosk)',
+    descriptionAmharic: 'በመስኮት ደንበኞችን የሚጠራ፣ የሚያስተናግድ እና አስቸኳይ ሁኔታዎችን ቅድሚያ የሚሰጥ (የመስተንግዶ እና ኪዮስክ መዳረሻ የለውም)',
     permissions: [
       'dashboard.view',
       'queue.view',
-      'ticket.create',
       'ticket.call',
       'ticket.recall',
       'ticket.start',
       'ticket.complete',
       'ticket.no_show',
       'ticket.priority',
-      'ticket.priority_create',
       'ticket.priority_reset',
       'ticket.transfer',
-      'services.view'
+      'services.view',
+      'counters.view'
     ]
   }
 ];
@@ -455,9 +456,34 @@ class Database {
 
   constructor() {
     this.data = this.load();
+    this.sanitizeRolePermissions();
     this.initMongoSync().catch(err => {
       console.warn('Initial MongoDB Atlas sync background notice:', err);
     });
+  }
+
+  private sanitizeRolePermissions(): void {
+    if (!this.data.roles) {
+      this.data.roles = JSON.parse(JSON.stringify(DEFAULT_ROLES));
+      return;
+    }
+    // Strictly ensure SERVICE_OFFICER cannot access reception, kiosk, or create tickets
+    const officerRole = this.data.roles.find(r => r.name === 'SERVICE_OFFICER');
+    if (officerRole) {
+      officerRole.permissions = officerRole.permissions.filter(
+        p => p !== 'ticket.create' && p !== 'ticket.priority_create' && p !== 'reception.access'
+      );
+      if (!officerRole.permissions.includes('counters.view')) {
+        officerRole.permissions.push('counters.view');
+      }
+      officerRole.description = 'Counter service officer calling, serving, and triaging customer tickets at assigned counter (restricted from reception & kiosk)';
+      officerRole.descriptionAmharic = 'በመስኮት ደንበኞችን የሚጠራ፣ የሚያስተናግድ እና አስቸኳይ ሁኔታዎችን ቅድሚያ የሚሰጥ (የመስተንግዶ እና ኪዮስክ መዳረሻ የለውም)';
+    }
+
+    const receptionistRole = this.data.roles.find(r => r.name === 'RECEPTIONIST');
+    if (receptionistRole && !receptionistRole.permissions.includes('reception.access')) {
+      receptionistRole.permissions.unshift('reception.access');
+    }
   }
 
   private async initMongoSync(): Promise<void> {
@@ -672,7 +698,9 @@ class Database {
       return { ...role, memberCount: this.data.users.filter(u => u.role === role.name).length };
     }
 
-    const priorityPerms = ['ticket.priority', 'ticket.priority_create', 'ticket.priority_reset'];
+    const priorityPerms = name === 'SERVICE_OFFICER'
+      ? ['ticket.priority', 'ticket.priority_reset']
+      : ['ticket.priority', 'ticket.priority_create', 'ticket.priority_reset'];
     if (enabled) {
       role.permissions = Array.from(new Set([...role.permissions, ...priorityPerms]));
     } else {

@@ -88,13 +88,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: stats?.activeCounters !== undefined ? `${stats.activeCounters} Open` : undefined,
       badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200'
     },
-    { 
+    // Reception & Kiosk is restricted from Counter Service Officers
+    ...(user?.role !== 'SERVICE_OFFICER' ? [{ 
       id: 'reception', 
       label: isAmharic ? 'መስተንግዶ እና ኪዮስክ' : 'Reception & Kiosk', 
       icon: Ticket, 
       badge: stats?.waiting !== undefined ? `${stats.waiting} Wait` : undefined,
       badgeColor: 'bg-amber-100 text-amber-800 border-amber-200'
-    },
+    }] : []),
     { 
       id: 'officer', 
       label: isAmharic ? 'መስኮት' : 'Counter Station', 
