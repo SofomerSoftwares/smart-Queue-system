@@ -32,10 +32,16 @@ const AppContent: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
-  // Guard: Automatically redirect Counter Service Officers away from reception & kiosk to counter station
+  // Guard: Role-based view routing guards
   React.useEffect(() => {
-    if (user?.role === 'SERVICE_OFFICER' && currentView === 'reception') {
+    if (!user) return;
+    // Counter Service Officers cannot access Reception & Kiosk
+    if (user.role === 'SERVICE_OFFICER' && currentView === 'reception') {
       setCurrentView('officer');
+    }
+    // Receptionists cannot access Service Officer Counter Station
+    if (user.role === 'RECEPTIONIST' && currentView === 'officer') {
+      setCurrentView('reception');
     }
   }, [user, currentView]);
 

@@ -23,10 +23,12 @@ import {
   RefreshCw,
   Eye,
   SlidersHorizontal,
-  Compass
+  Compass,
+  Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useQueue } from '../context/QueueContext';
+import { useAuth } from '../context/AuthContext';
 import { Counter, QueueTicket } from '../types';
 
 export const CounterDisplayView: React.FC = () => {
@@ -41,21 +43,29 @@ export const CounterDisplayView: React.FC = () => {
     unlockAudio 
   } = useQueue();
 
+  const { user } = useAuth();
+  const isOfficer = user?.role === 'SERVICE_OFFICER';
+  const assignedCounterId = user?.assignedCounterId;
+
   const isAmharic = uiLanguage === 'AMHARIC';
 
   // Mode: 'grid' (All Counter Stations) | 'overhead' (Dedicated Single Counter Overhead Sign)
   const [viewMode, setViewMode] = useState<'grid' | 'overhead'>(() => {
     try {
+      if (isOfficer) return 'overhead';
       const params = new URLSearchParams(window.location.search);
       return params.get('counter') ? 'overhead' : 'grid';
     } catch {
-      return 'grid';
+      return isOfficer ? 'overhead' : 'grid';
     }
   });
 
   // Selected counter for single-counter overhead screen
   const [selectedCounterId, setSelectedCounterId] = useState<string>(() => {
     try {
+      if (isOfficer && assignedCounterId) {
+        return assignedCounterId;
+      }
       const params = new URLSearchParams(window.location.search);
       const cntParam = params.get('counter');
       if (cntParam && counters.length > 0) {
@@ -63,15 +73,22 @@ export const CounterDisplayView: React.FC = () => {
         if (found) return found.id;
       }
     } catch {}
-    return counters[0]?.id || '';
+    return assignedCounterId || counters[0]?.id || '';
   });
 
-  // If selectedCounterId is empty but counters load, select first
+  // If selectedCounterId is empty but counters load, select first or assigned
   useEffect(() => {
-    if (!selectedCounterId && counters.length > 0) {
+    if (isOfficer && assignedCounterId) {
+      if (selectedCounterId !== assignedCounterId) {
+        setSelectedCounterId(assignedCounterId);
+      }
+      if (viewMode !== 'overhead') {
+        setViewMode('overhead');
+      }
+    } else if (!selectedCounterId && counters.length > 0) {
       setSelectedCounterId(counters[0].id);
     }
-  }, [counters, selectedCounterId]);
+  }, [counters, selectedCounterId, isOfficer, assignedCounterId, viewMode]);
 
   // Customer Station Finder Search
   const [searchTicketQuery, setSearchTicketQuery] = useState<string>('');
@@ -164,7 +181,13 @@ export const CounterDisplayView: React.FC = () => {
 
   // Filtered counters for grid
   const filteredCounters = useMemo(() => {
-    return counters.filter(cnt => {
+    let list = counters;
+    // Role-based counter display: Service Officers are strictly limited to their assigned counter
+    if (isOfficer && assignedCounterId) {
+      list = counters.filter(cnt => cnt.id === assignedCounterId);
+    }
+
+    return list.filter(cnt => {
       // Status filter
       if (statusFilter === 'ACTIVE' && cnt.status === 'CLOSED') return false;
       if (statusFilter === 'CLOSED' && cnt.status !== 'CLOSED') return false;
@@ -177,7 +200,7 @@ export const CounterDisplayView: React.FC = () => {
 
       return true;
     });
-  }, [counters, statusFilter, serviceFilter, servingTickets]);
+  }, [counters, statusFilter, serviceFilter, servingTickets, isOfficer, assignedCounterId]);
 
   const activeServingCount = counters.filter(c => c.status === 'SERVING').length;
   const readyAvailableCount = counters.filter(c => c.status === 'AVAILABLE').length;
@@ -235,52 +258,68 @@ export const CounterDisplayView: React.FC = () => {
         <div className="flex items-center gap-2.5 flex-wrap ml-auto">
           
           {/* Mode Tabs */}
-          <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex items-center gap-1">
-            <button
-              id="btn-counter-view-grid"
-              onClick={() => setViewMode('grid')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
-                viewMode === 'grid'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>{isAmharic ? 'የሁሉም መስኮቶች እይታ' : 'All Counters'}</span>
-            </button>
-            <button
-              id="btn-counter-view-overhead"
-              onClick={() => setViewMode('overhead')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
-                viewMode === 'overhead'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Tv className="w-3.5 h-3.5" />
-              <span>{isAmharic ? 'የአንድ መስኮት ታብሌት ስክሪን' : 'Overhead Sign Mode'}</span>
-            </button>
-          </div>
+          {isOfficer && assignedCounterId ? (
+            <div className="bg-indigo-950/80 px-3 py-1.5 rounded-xl border border-indigo-500/40 text-xs font-bold text-white flex items-center gap-1.5 shadow-sm">
+              <Tv className="w-3.5 h-3.5 text-indigo-400" />
+              <span>{isAmharic ? `የመስኮት ${activeSingleCounter?.number || 1} ስክሪን` : `Desk ${activeSingleCounter?.number || 1} Overhead Sign`}</span>
+            </div>
+          ) : (
+            <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex items-center gap-1">
+              <button
+                id="btn-counter-view-grid"
+                onClick={() => setViewMode('grid')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
+                  viewMode === 'grid'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>{isAmharic ? 'የሁሉም መስኮቶች እይታ' : 'All Counters'}</span>
+              </button>
+              <button
+                id="btn-counter-view-overhead"
+                onClick={() => setViewMode('overhead')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
+                  viewMode === 'overhead'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Tv className="w-3.5 h-3.5" />
+                <span>{isAmharic ? 'የአንድ መስኮት ታብሌት ስክሪን' : 'Overhead Sign Mode'}</span>
+              </button>
+            </div>
+          )}
 
           {/* Station Selector Dropdown (When in overhead sign mode) */}
           {viewMode === 'overhead' && (
-            <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
-              <span className="text-xs text-slate-400 font-medium">
-                {isAmharic ? 'መስኮት ምረጥ:' : 'Counter:'}
-              </span>
-              <select
-                id="select-overhead-counter"
-                value={selectedCounterId}
-                onChange={(e) => setSelectedCounterId(e.target.value)}
-                className="bg-slate-900 border border-slate-700 text-white text-xs font-bold rounded-lg px-2 py-1 focus:outline-hidden focus:border-indigo-500"
-              >
-                {counters.map(cnt => (
-                  <option key={cnt.id} value={cnt.id}>
-                    {isAmharic ? `መስኮት ${cnt.number}` : `Counter ${cnt.number}`} - {cnt.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            isOfficer && assignedCounterId ? (
+              <div className="flex items-center gap-1.5 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-slate-300 font-bold">
+                  {isAmharic ? `የተመደበ፡ መስኮት ${activeSingleCounter?.number || 1}` : `Assigned Station: Counter ${activeSingleCounter?.number || 1}`}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
+                <span className="text-xs text-slate-400 font-medium">
+                  {isAmharic ? 'መስኮት ምረጥ:' : 'Counter:'}
+                </span>
+                <select
+                  id="select-overhead-counter"
+                  value={selectedCounterId}
+                  onChange={(e) => setSelectedCounterId(e.target.value)}
+                  className="bg-slate-900 border border-slate-700 text-white text-xs font-bold rounded-lg px-2 py-1 focus:outline-hidden focus:border-indigo-500"
+                >
+                  {counters.map(cnt => (
+                    <option key={cnt.id} value={cnt.id}>
+                      {isAmharic ? `መስኮት ${cnt.number}` : `Counter ${cnt.number}`} - {cnt.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )
           )}
 
           {/* Live Clock Pill */}

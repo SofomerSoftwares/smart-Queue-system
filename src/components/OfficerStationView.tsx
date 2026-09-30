@@ -690,13 +690,26 @@ export const OfficerStationView: React.FC = () => {
           </div>
 
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 max-w-md mx-auto space-y-3">
+            {user?.role === 'RECEPTIONIST' && (
+              <button
+                type="button"
+                onClick={() => {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set('view', 'reception');
+                  window.location.href = url.toString();
+                }}
+                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer mb-1"
+              >
+                {isAmharic ? 'ወደ መስተንግዶ እና ኪዮስክ ተመለስ' : 'Go to Reception & Kiosk'}
+              </button>
+            )}
             <p className="text-xs font-medium text-slate-600 text-center">
               {isAmharic ? 'ወደ አገልግሎት ሰጪ መለያ ለመግባት እባክዎ መጀመሪያ ይውጡ:' : 'To sign in with an authorized officer account, please log out:'}
             </p>
             <button
               type="button"
               onClick={logout}
-              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+              className="w-full py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
             >
               {isAmharic ? 'ውጣና እንደገና ግባ (Log Out)' : 'Log Out Current Account'}
             </button>

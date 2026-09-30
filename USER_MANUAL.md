@@ -235,6 +235,8 @@ Before opening service to the public, an administrator should log in (`admin` / 
 ### 6.3 Per-Counter Overhead Mini-Displays
 **URL:** `/?view=counter-display&counter=1` *(replace `1` with counter number)*
 
+> **Role-Based Station Locking:** When accessed by a logged-in Counter Service Officer, the Counter Display automatically locks to their assigned counter desk overhead sign (`My Counter Sign`) and restricts them from switching to other counters. Administrators and receptionists retain full directory view across all counters.
+
 - **Purpose:** A dedicated, lightweight screen mounted above individual counter windows (e.g., an Android tablet or monitor).
 - **Features:**
   - Highlights counter number and officer name.

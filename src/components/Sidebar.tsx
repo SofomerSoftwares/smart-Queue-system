@@ -73,34 +73,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const isAmharic = uiLanguage === 'AMHARIC';
 
+  const isOfficer = user?.role === 'SERVICE_OFFICER';
+  const isReceptionist = user?.role === 'RECEPTIONIST';
+
   const operationalNav = [
-    { 
+    // TV Public Display: Visible to Admin, Receptionist, or Guest (hidden from Service Officer)
+    ...(!isOfficer ? [{ 
       id: 'display', 
       label: isAmharic ? 'የስክሪን እይታ' : 'TV Public Display', 
       icon: Tv, 
       badge: stats?.serving !== undefined ? `${stats.serving} Active` : undefined,
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200'
-    },
+    }] : []),
+
+    // Counter Display: Tailored per role
     { 
       id: 'counter-display', 
-      label: isAmharic ? 'የመስኮት ስክሪን' : 'Counter Display', 
+      label: isOfficer
+        ? (isAmharic ? 'የእኔ መስኮት ስክሪን' : 'My Counter Sign')
+        : (isAmharic ? 'የመስኮት ስክሪን' : 'Counter Display'), 
       icon: Monitor, 
-      badge: stats?.activeCounters !== undefined ? `${stats.activeCounters} Open` : undefined,
+      badge: isOfficer && user?.assignedCounterId 
+        ? (isAmharic ? `መስኮት ${user.assignedCounterId.replace('cnt-', '')}` : `Desk ${user.assignedCounterId.replace('cnt-', '')}`)
+        : (stats?.activeCounters !== undefined ? `${stats.activeCounters} Open` : undefined),
       badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200'
     },
-    // Reception & Kiosk is restricted from Counter Service Officers
-    ...(user?.role !== 'SERVICE_OFFICER' ? [{ 
+
+    // Reception & Kiosk: Strictly restricted from Counter Service Officers
+    ...(!isOfficer ? [{ 
       id: 'reception', 
       label: isAmharic ? 'መስተንግዶ እና ኪዮስክ' : 'Reception & Kiosk', 
       icon: Ticket, 
       badge: stats?.waiting !== undefined ? `${stats.waiting} Wait` : undefined,
       badgeColor: 'bg-amber-100 text-amber-800 border-amber-200'
     }] : []),
-    { 
+
+    // Service Counter Station: Strictly for Service Officers, Admins, or Guests (hidden from Receptionist)
+    ...(!isReceptionist ? [{ 
       id: 'officer', 
-      label: isAmharic ? 'መስኮት' : 'Counter Station', 
+      label: isAmharic ? 'የመስኮት ጣቢያ' : 'Counter Station', 
       icon: UserCheck 
-    },
+    }] : []),
+
+    // Mobile Customer Tracker: Public
     { 
       id: 'customer', 
       label: isAmharic ? 'የደንበኛ መከታተያ' : 'Mobile Tracker', 
