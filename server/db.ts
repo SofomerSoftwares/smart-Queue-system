@@ -1744,6 +1744,33 @@ class Database {
     this.save();
     return this.data.notificationSettings;
   }
+
+  public resetRolesToDefault(): Role[] {
+    this.data.roles = JSON.parse(JSON.stringify(DEFAULT_ROLES));
+    this.sanitizeRolePermissions();
+    this.save();
+    return this.getRoles();
+  }
+
+  public exportData(): DatabaseSchema {
+    return JSON.parse(JSON.stringify(this.data));
+  }
+
+  public importData(snapshot: Partial<DatabaseSchema>): boolean {
+    if (!snapshot) return false;
+    if (snapshot.users) this.data.users = snapshot.users;
+    if (snapshot.roles) this.data.roles = snapshot.roles;
+    if (snapshot.services) this.data.services = snapshot.services;
+    if (snapshot.counters) this.data.counters = snapshot.counters;
+    if (snapshot.tickets) this.data.tickets = snapshot.tickets;
+    if (snapshot.officeSetting) this.data.officeSetting = snapshot.officeSetting;
+    if (snapshot.audioSetting) this.data.audioSetting = snapshot.audioSetting;
+    if (snapshot.priorityPolicy) this.data.priorityPolicy = snapshot.priorityPolicy;
+    if (snapshot.notifications) this.data.notifications = snapshot.notifications;
+    if (snapshot.notificationSettings) this.data.notificationSettings = snapshot.notificationSettings;
+    this.save();
+    return true;
+  }
 }
 
 export const db = new Database();

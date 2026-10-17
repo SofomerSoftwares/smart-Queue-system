@@ -11,11 +11,13 @@ import queueRoutes from './server/routes/queue.routes.js';
 import audioRoutes from './server/routes/audio.routes.js';
 import adminRoutes from './server/routes/admin.routes.js';
 import notificationRoutes from './server/routes/notification.routes.js';
-import { broadcaster } from './server/websocket.js';
+import { broadcaster } from './server/sockets/broadcaster.js';
+import { config } from './server/config/index.js';
+import { errorHandler } from './server/middleware/errorHandler.js';
 
 dotenv.config();
 
-const PORT = 3000;
+const PORT = config.port;
 
 async function startServer() {
   const app = express();
@@ -67,6 +69,9 @@ async function startServer() {
   app.use('/api/audio', audioRoutes);
   app.use('/api/notifications', notificationRoutes);
   app.use('/api', adminRoutes);
+
+  // Centralized Error Handling Middleware
+  app.use(errorHandler);
 
   // Vite Middleware for development / Static files in production
   if (process.env.NODE_ENV !== 'production') {

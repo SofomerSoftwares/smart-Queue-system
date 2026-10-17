@@ -1,18 +1,13 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { QueueProvider, useQueue } from './context/QueueContext';
-import { Sidebar } from './components/Sidebar';
-import { TopHeader } from './components/TopHeader';
-import { DisplayView } from './components/DisplayView';
-import { ReceptionView } from './components/ReceptionView';
-import { OfficerStationView } from './components/OfficerStationView';
-import { CustomerTicketView } from './components/CustomerTicketView';
-import { AdminView } from './components/AdminView';
-import { ReportsView } from './components/ReportsView';
-import { OfficerPerformanceReportView } from './components/OfficerPerformanceReportView';
-import { CounterDisplayView } from './components/CounterDisplayView';
-import { LoginView } from './components/LoginView';
-import { ChangePasswordModal } from './components/ChangePasswordModal';
+import { Sidebar, TopHeader } from './components/layout';
+import { DisplayView, CounterDisplayView } from './features/display';
+import { ReceptionView } from './features/reception';
+import { OfficerStationView } from './features/counter';
+import { CustomerTicketView } from './features/customer';
+import { AdminView, ReportsView, OfficerPerformanceReportView } from './features/admin';
+import { LoginView, ChangePasswordModal } from './features/auth';
 
 const AppContent: React.FC = () => {
   const { user } = useAuth();

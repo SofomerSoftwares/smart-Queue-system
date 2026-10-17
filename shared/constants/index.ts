@@ -1,0 +1,57 @@
+export const ROLES = {
+  ADMIN: 'ADMIN',
+  RECEPTIONIST: 'RECEPTIONIST',
+  SERVICE_OFFICER: 'SERVICE_OFFICER'
+} as const;
+
+export const TICKET_STATUSES = {
+  WAITING: 'WAITING',
+  CALLED: 'CALLED',
+  SERVING: 'SERVING',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+  NO_SHOW: 'NO_SHOW',
+  TRANSFERRED: 'TRANSFERRED',
+  HOLD: 'HOLD'
+} as const;
+
+export const PRIORITY_LEVELS = {
+  NORMAL: 'NORMAL',
+  PRIORITY: 'PRIORITY',
+  URGENT: 'URGENT'
+} as const;
+
+export const NOTIFICATION_EVENT_TYPES = {
+  TICKET_CALLED: 'TICKET_CALLED',
+  TICKET_RECALLED: 'TICKET_RECALLED',
+  TICKET_COMPLETED: 'TICKET_COMPLETED',
+  TICKET_SKIPPED: 'TICKET_SKIPPED',
+  TICKET_HOLD: 'TICKET_HOLD',
+  TICKET_RESUMED: 'TICKET_RESUMED',
+  TICKET_TRANSFERRED: 'TICKET_TRANSFERRED',
+  COUNTER_OFFLINE: 'COUNTER_OFFLINE',
+  COUNTER_ONLINE: 'COUNTER_ONLINE',
+  COUNTER_BREAK: 'COUNTER_BREAK',
+  COUNTER_AVAILABLE: 'COUNTER_AVAILABLE'
+} as const;
+
+export const SOCKET_EVENTS = {
+  CONNECT: 'connect',
+  DISCONNECT: 'disconnect',
+  QUEUE_UPDATED: 'queue:updated',
+  TICKET_CALLED: 'ticket:called',
+  TICKET_STARTED: 'ticket:started',
+  TICKET_COMPLETED: 'ticket:completed',
+  TICKET_NO_SHOW: 'ticket:no-show',
+  TICKET_TRANSFERRED: 'ticket:transferred',
+  TICKET_PRIORITY_CHANGED: 'ticket:priority_changed',
+  COUNTER_UPDATED: 'counter:updated',
+  ANNOUNCEMENT_PLAY: 'announcement:play',
+  SETTINGS_UPDATED: 'settings:updated',
+  ROLE_UPDATED: 'role:updated',
+  USER_UPDATED: 'user:updated',
+  RECEPTION_NOTIFICATION: 'reception:notification',
+  NOTIFICATION_CREATED: 'notification:created',
+  NOTIFICATION_READ: 'notification:read',
+  NOTIFICATION_SETTINGS_UPDATED: 'notification:settings_updated'
+} as const;
