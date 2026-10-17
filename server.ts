@@ -10,6 +10,7 @@ import authRoutes from './server/routes/auth.routes.js';
 import queueRoutes from './server/routes/queue.routes.js';
 import audioRoutes from './server/routes/audio.routes.js';
 import adminRoutes from './server/routes/admin.routes.js';
+import notificationRoutes from './server/routes/notification.routes.js';
 import { broadcaster } from './server/websocket.js';
 
 dotenv.config();
@@ -64,6 +65,7 @@ async function startServer() {
   app.use('/api/auth', authRoutes);
   app.use('/api/queue', queueRoutes);
   app.use('/api/audio', audioRoutes);
+  app.use('/api/notifications', notificationRoutes);
   app.use('/api', adminRoutes);
 
   // Vite Middleware for development / Static files in production

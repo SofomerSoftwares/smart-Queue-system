@@ -77,14 +77,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isReceptionist = user?.role === 'RECEPTIONIST';
 
   const operationalNav = [
-    // TV Public Display: Visible to Admin, Receptionist, or Guest (hidden from Service Officer)
-    ...(!isOfficer ? [{ 
+    // TV Public Display / Service Display: Tailored per role
+    { 
       id: 'display', 
-      label: isAmharic ? 'የስክሪን እይታ' : 'TV Public Display', 
+      label: isOfficer 
+        ? (isAmharic ? 'የአገልግሎት ስክሪን' : 'Service Display') 
+        : (isAmharic ? 'የስክሪን እይታ' : 'TV Public Display'), 
       icon: Tv, 
-      badge: stats?.serving !== undefined ? `${stats.serving} Active` : undefined,
+      badge: isOfficer && user?.assignedCounterId 
+        ? (isAmharic ? `መስኮት ${user.assignedCounterId.replace('cnt-', '')}` : `Counter ${user.assignedCounterId.replace('cnt-', '')}`)
+        : (stats?.serving !== undefined ? `${stats.serving} Active` : undefined),
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200'
-    }] : []),
+    },
 
     // Counter Display: Tailored per role
     { 

@@ -518,6 +518,27 @@ router.post('/ticket/call-next', authenticate, authorize('ticket.call'), async (
     });
     broadcaster.broadcast('queue:updated', { action: 'TICKET_CALLED' });
 
+    // Persist real-time reception notification
+    const receptionNotif = db.createNotification({
+      recipientRole: 'RECEPTION',
+      branchId: 'main-branch',
+      type: 'TICKET_CALLED',
+      title: 'Queue Number Called',
+      message: `${counter?.name || `Counter ${counter?.number || 1}`} called ticket ${calledTicket.ticketNumber}`,
+      ticketId: calledTicket.id,
+      ticketNumber: calledTicket.ticketNumber,
+      counterId,
+      counterNumber: counter?.number,
+      counterName: counter?.name || `Counter ${counter?.number || 1}`,
+      serviceId: calledTicket.serviceId,
+      serviceName: calledTicket.serviceName,
+      officerId: req.user?.id,
+      officerName: req.user?.name,
+      action: 'Called'
+    });
+    broadcaster.broadcast('reception:notification', receptionNotif);
+    broadcaster.broadcast('notification:created', receptionNotif);
+
     // Asynchronously trigger AI voice announcement (DO NOT block the response)
     const { customAudioBase64, customAudioMimeType, customText } = req.body;
     triggerVoiceAnnouncement(
@@ -577,6 +598,27 @@ router.post('/ticket/:id/recall', authenticate, authorize('ticket.recall'), (req
     });
 
     broadcaster.broadcast('ticket:called', { ticket, counter });
+
+    // Persist real-time reception notification
+    const receptionNotif = db.createNotification({
+      recipientRole: 'RECEPTION',
+      branchId: 'main-branch',
+      type: 'TICKET_RECALLED',
+      title: 'Ticket Recalled',
+      message: `${counter?.name || `Counter ${counterNumber}`} recalled ticket ${ticket.ticketNumber}`,
+      ticketId: ticket.id,
+      ticketNumber: ticket.ticketNumber,
+      counterId: ticket.counterId,
+      counterNumber,
+      counterName: counter?.name || `Counter ${counterNumber}`,
+      serviceId: ticket.serviceId,
+      serviceName: ticket.serviceName,
+      officerId: req.user?.id,
+      officerName: req.user?.name,
+      action: 'Recalled'
+    });
+    broadcaster.broadcast('reception:notification', receptionNotif);
+    broadcaster.broadcast('notification:created', receptionNotif);
 
     // Trigger voice announcement with optional custom live audio
     triggerVoiceAnnouncement(
@@ -715,13 +757,35 @@ router.post('/ticket/:id/complete', authenticate, authorize('ticket.complete'), 
     broadcaster.broadcast('ticket:completed', { ticket: updated });
     broadcaster.broadcast('queue:updated', { action: 'TICKET_COMPLETED' });
 
+    // Persist real-time reception notification
+    const completeCounter = updated.counterId ? db.getCounterById(updated.counterId) : undefined;
+    const completeNotif = db.createNotification({
+      recipientRole: 'RECEPTION',
+      branchId: 'main-branch',
+      type: 'TICKET_COMPLETED',
+      title: 'Ticket Completed',
+      message: `${completeCounter?.name || `Counter ${updated.counterNumber || 1}`} completed ticket ${updated.ticketNumber}`,
+      ticketId: updated.id,
+      ticketNumber: updated.ticketNumber,
+      counterId: updated.counterId,
+      counterNumber: updated.counterNumber,
+      counterName: completeCounter?.name || `Counter ${updated.counterNumber || 1}`,
+      serviceId: updated.serviceId,
+      serviceName: updated.serviceName,
+      officerId: req.user?.id,
+      officerName: req.user?.name,
+      action: 'Completed'
+    });
+    broadcaster.broadcast('reception:notification', completeNotif);
+    broadcaster.broadcast('notification:created', completeNotif);
+
     return res.json({ success: true, ticket: updated });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// 8. POST /api/queue/ticket/:id/no-show - Customer didn't appear
+// 8. POST /api/queue/ticket/:id/no-show - Customer didn't appear (Skipped)
 router.post('/ticket/:id/no-show', authenticate, authorize('ticket.no_show'), (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
@@ -754,6 +818,28 @@ router.post('/ticket/:id/no-show', authenticate, authorize('ticket.no_show'), (r
     broadcaster.broadcast('ticket:no-show', { ticket: updated });
     broadcaster.broadcast('queue:updated', { action: 'TICKET_NO_SHOW' });
 
+    // Persist real-time reception notification for skipped/no-show
+    const skipCounter = updated.counterId ? db.getCounterById(updated.counterId) : undefined;
+    const skipNotif = db.createNotification({
+      recipientRole: 'RECEPTION',
+      branchId: 'main-branch',
+      type: 'TICKET_SKIPPED',
+      title: 'Ticket Skipped',
+      message: `${skipCounter?.name || `Counter ${updated.counterNumber || 1}`} skipped ticket ${updated.ticketNumber}`,
+      ticketId: updated.id,
+      ticketNumber: updated.ticketNumber,
+      counterId: updated.counterId,
+      counterNumber: updated.counterNumber,
+      counterName: skipCounter?.name || `Counter ${updated.counterNumber || 1}`,
+      serviceId: updated.serviceId,
+      serviceName: updated.serviceName,
+      officerId: req.user?.id,
+      officerName: req.user?.name,
+      action: 'Skipped'
+    });
+    broadcaster.broadcast('reception:notification', skipNotif);
+    broadcaster.broadcast('notification:created', skipNotif);
+
     return res.json({ success: true, ticket: updated });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: err.message });
@@ -764,13 +850,15 @@ router.post('/ticket/:id/no-show', authenticate, authorize('ticket.no_show'), (r
 router.post('/ticket/:id/transfer', authenticate, authorize('ticket.transfer'), (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { targetServiceId } = req.body;
+    const { targetServiceId, targetCounterId } = req.body;
 
-    if (!targetServiceId) {
-      return res.status(400).json({ success: false, message: 'targetServiceId is required.' });
+    if (!targetServiceId && !targetCounterId) {
+      return res.status(400).json({ success: false, message: 'targetServiceId or targetCounterId is required.' });
     }
 
-    const updated = db.transferTicket(id, targetServiceId, req.user?.id);
+    const updated = db.transferTicket(id, targetServiceId || 'srv-1', req.user?.id);
+    const targetService = targetServiceId ? db.getServiceById(targetServiceId) : undefined;
+    const targetCounter = targetCounterId ? db.getCounterById(targetCounterId) : undefined;
 
     db.addAuditLog({
       userId: req.user?.id,
@@ -778,11 +866,33 @@ router.post('/ticket/:id/transfer', authenticate, authorize('ticket.transfer'), 
       action: 'TRANSFER_TICKET',
       entity: 'QueueTicket',
       entityId: updated.id,
-      metadata: { ticketNumber: updated.ticketNumber, targetServiceId }
+      metadata: { ticketNumber: updated.ticketNumber, targetServiceId, targetCounterId }
     });
 
     broadcaster.broadcast('ticket:transferred', { ticket: updated });
     broadcaster.broadcast('queue:updated', { action: 'TICKET_TRANSFERRED' });
+
+    // Persist real-time reception notification for transfer
+    const destinationLabel = targetCounter ? targetCounter.name : (targetService ? targetService.name : 'another station');
+    const transferNotif = db.createNotification({
+      recipientRole: 'RECEPTION',
+      branchId: 'main-branch',
+      type: 'TICKET_TRANSFERRED',
+      title: 'Ticket Transferred',
+      message: `Ticket ${updated.ticketNumber} transferred to ${destinationLabel}`,
+      ticketId: updated.id,
+      ticketNumber: updated.ticketNumber,
+      counterId: targetCounter?.id || updated.counterId,
+      counterNumber: targetCounter?.number || updated.counterNumber,
+      counterName: destinationLabel,
+      serviceId: targetServiceId || updated.serviceId,
+      serviceName: targetService?.name || updated.serviceName,
+      officerId: req.user?.id,
+      officerName: req.user?.name,
+      action: 'Transferred'
+    });
+    broadcaster.broadcast('reception:notification', transferNotif);
+    broadcaster.broadcast('notification:created', transferNotif);
 
     return res.json({ success: true, ticket: updated });
   } catch (err: any) {
@@ -985,6 +1095,169 @@ router.post('/ticket/:id/priority', authenticate, authorize('ticket.priority'), 
       },
       message: `Ticket ${updated.ticketNumber} priority updated to ${updated.priority}.`
     });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 13. POST /api/queue/ticket/:id/hold - Place ticket on hold
+router.post('/ticket/:id/hold', authenticate, authorize('ticket.start'), (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const existing = db.getTicketById(id);
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Ticket not found.' });
+    }
+
+    const updated = db.holdTicket(id, req.user?.id);
+    const counter = updated.counterId ? db.getCounterById(updated.counterId) : undefined;
+    const counterName = counter?.name || `Counter ${updated.counterNumber || 1}`;
+
+    db.addAuditLog({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      action: 'HOLD_TICKET',
+      entity: 'QueueTicket',
+      entityId: updated.id,
+      metadata: { ticketNumber: updated.ticketNumber }
+    });
+
+    broadcaster.broadcast('queue:updated', { action: 'TICKET_HOLD' });
+
+    // Persist real-time reception notification
+    const holdNotif = db.createNotification({
+      recipientRole: 'RECEPTION',
+      branchId: 'main-branch',
+      type: 'TICKET_HOLD',
+      title: 'Ticket On Hold',
+      message: `${counterName} placed ticket ${updated.ticketNumber} on hold`,
+      ticketId: updated.id,
+      ticketNumber: updated.ticketNumber,
+      counterId: updated.counterId,
+      counterNumber: updated.counterNumber,
+      counterName,
+      serviceId: updated.serviceId,
+      serviceName: updated.serviceName,
+      officerId: req.user?.id,
+      officerName: req.user?.name,
+      action: 'Hold'
+    });
+    broadcaster.broadcast('reception:notification', holdNotif);
+    broadcaster.broadcast('notification:created', holdNotif);
+
+    return res.json({ success: true, ticket: updated });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 14. POST /api/queue/ticket/:id/resume - Resume held ticket
+router.post('/ticket/:id/resume', authenticate, authorize('ticket.start'), (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const existing = db.getTicketById(id);
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Ticket not found.' });
+    }
+
+    const updated = db.resumeTicket(id, req.user?.id);
+    const counter = updated.counterId ? db.getCounterById(updated.counterId) : undefined;
+    const counterName = counter?.name || `Counter ${updated.counterNumber || 1}`;
+
+    db.addAuditLog({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      action: 'RESUME_TICKET',
+      entity: 'QueueTicket',
+      entityId: updated.id,
+      metadata: { ticketNumber: updated.ticketNumber }
+    });
+
+    broadcaster.broadcast('queue:updated', { action: 'TICKET_RESUMED' });
+
+    // Persist real-time reception notification
+    const resumeNotif = db.createNotification({
+      recipientRole: 'RECEPTION',
+      branchId: 'main-branch',
+      type: 'TICKET_RESUMED',
+      title: 'Ticket Resumed',
+      message: `${counterName} resumed ticket ${updated.ticketNumber}`,
+      ticketId: updated.id,
+      ticketNumber: updated.ticketNumber,
+      counterId: updated.counterId,
+      counterNumber: updated.counterNumber,
+      counterName,
+      serviceId: updated.serviceId,
+      serviceName: updated.serviceName,
+      officerId: req.user?.id,
+      officerName: req.user?.name,
+      action: 'Resumed'
+    });
+    broadcaster.broadcast('reception:notification', resumeNotif);
+    broadcaster.broadcast('notification:created', resumeNotif);
+
+    return res.json({ success: true, ticket: updated });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 15. POST /api/queue/counter/:id/status - Update counter online/break/available status
+router.post('/counter/:id/status', authenticate, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status, isBreak } = req.body;
+
+    const counter = db.getCounterById(id);
+    if (!counter) {
+      return res.status(404).json({ success: false, message: 'Counter not found.' });
+    }
+
+    const updated = db.updateCounter(id, {
+      status: status || (isBreak ? 'CLOSED' : 'AVAILABLE'),
+      currentOfficerId: req.user?.id,
+      currentOfficerName: req.user?.name
+    });
+
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'Failed to update counter.' });
+    }
+
+    broadcaster.broadcast('counter:updated', { counter: updated });
+    broadcaster.broadcast('queue:updated', { action: 'COUNTER_STATUS_CHANGED' });
+
+    // Determine notification event type
+    let notifType: 'COUNTER_AVAILABLE' | 'COUNTER_BREAK' | 'COUNTER_OFFLINE' | 'COUNTER_ONLINE' = 'COUNTER_AVAILABLE';
+    let notifTitle = 'Counter Status Changed';
+    let notifMsg = `${updated.name} status updated`;
+
+    if (isBreak || updated.status === 'CLOSED') {
+      notifType = isBreak ? 'COUNTER_BREAK' : 'COUNTER_OFFLINE';
+      notifTitle = isBreak ? 'Counter On Break' : 'Counter Offline';
+      notifMsg = isBreak ? `${updated.name} started a break` : `${updated.name} disconnected`;
+    } else if (updated.status === 'AVAILABLE') {
+      notifType = 'COUNTER_AVAILABLE';
+      notifTitle = 'Counter Available';
+      notifMsg = `${updated.name} is available`;
+    }
+
+    const counterNotif = db.createNotification({
+      recipientRole: 'RECEPTION',
+      branchId: 'main-branch',
+      type: notifType,
+      title: notifTitle,
+      message: notifMsg,
+      counterId: updated.id,
+      counterNumber: updated.number,
+      counterName: updated.name,
+      officerId: req.user?.id,
+      officerName: req.user?.name,
+      action: updated.status
+    });
+    broadcaster.broadcast('reception:notification', counterNotif);
+    broadcaster.broadcast('notification:created', counterNotif);
+
+    return res.json({ success: true, counter: updated });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: err.message });
   }

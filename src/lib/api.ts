@@ -15,7 +15,9 @@ import {
   RoleName,
   PriorityPolicy,
   PermissionDefinition,
-  AnnouncementPayload
+  AnnouncementPayload,
+  ReceptionNotification,
+  NotificationSettings
 } from '../types';
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -448,5 +450,60 @@ export const api = {
     request<{ success: boolean; user: User }>(`/api/users/${userId}/priority`, {
       method: 'PATCH',
       body: JSON.stringify({ canManagePriority })
+    }),
+
+  // --- HOLD / RESUME TICKET ---
+  holdTicket: (ticketId: string) =>
+    request<{ success: boolean; ticket: QueueTicket }>(`/api/queue/ticket/${ticketId}/hold`, {
+      method: 'POST'
+    }),
+
+  resumeTicket: (ticketId: string) =>
+    request<{ success: boolean; ticket: QueueTicket }>(`/api/queue/ticket/${ticketId}/resume`, {
+      method: 'POST'
+    }),
+
+  updateCounterStatus: (counterId: string, data: { status?: string; isBreak?: boolean }) =>
+    request<{ success: boolean; counter: Counter }>(`/api/queue/counter/${counterId}/status`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+
+  // --- RECEPTION NOTIFICATIONS ---
+  getNotifications: (filter?: string, limit: number = 30, offset: number = 0) => {
+    const params = new URLSearchParams();
+    if (filter) params.append('filter', filter);
+    params.append('limit', limit.toString());
+    params.append('offset', offset.toString());
+    return request<{
+      success: boolean;
+      notifications: ReceptionNotification[];
+      total: number;
+      unreadCount: number;
+      limit: number;
+      offset: number;
+    }>(`/api/notifications?${params.toString()}`);
+  },
+
+  getUnreadNotificationCount: () =>
+    request<{ success: boolean; unreadCount: number }>('/api/notifications/unread-count'),
+
+  markNotificationAsRead: (id: string) =>
+    request<{ success: boolean; notification: ReceptionNotification; unreadCount: number }>(`/api/notifications/${id}/read`, {
+      method: 'PATCH'
+    }),
+
+  markAllNotificationsAsRead: () =>
+    request<{ success: boolean; message: string; updatedCount: number; unreadCount: number }>('/api/notifications/read-all', {
+      method: 'PATCH'
+    }),
+
+  getNotificationSettings: () =>
+    request<{ success: boolean; settings: NotificationSettings }>('/api/notifications/settings'),
+
+  updateNotificationSettings: (settings: Partial<NotificationSettings>) =>
+    request<{ success: boolean; message: string; settings: NotificationSettings }>('/api/notifications/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(settings)
     })
 };

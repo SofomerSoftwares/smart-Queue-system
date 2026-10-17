@@ -231,8 +231,71 @@ class NotificationManager {
       };
 
       return notification;
-    } catch (e) {
-      console.warn('Failed to send test notification:', e);
+    } catch (err) {
+      console.warn('Failed to send test notification:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Display a reception officer desktop notification for counter actions
+   */
+  public notifyReceptionEvent(notif: {
+    id: string;
+    type: string;
+    title: string;
+    message: string;
+    ticketNumber?: string;
+    counterName?: string;
+    serviceName?: string;
+    playSound?: boolean;
+  }): Notification | null {
+    if (!this.isNotificationSupported || Notification.permission !== 'granted') {
+      return null;
+    }
+
+    // Deduplicate by notification id
+    if (this.lastNotifiedMap.has(notif.id)) {
+      return null;
+    }
+    this.lastNotifiedMap.set(notif.id, Date.now());
+
+    // Clean up map periodically
+    if (this.lastNotifiedMap.size > 200) {
+      const cutoff = Date.now() - 30000;
+      for (const [key, timestamp] of this.lastNotifiedMap.entries()) {
+        if (timestamp < cutoff) this.lastNotifiedMap.delete(key);
+      }
+    }
+
+    if (notif.playSound) {
+      this.playAlertChime();
+    }
+
+    try {
+      const notification = new Notification(notif.title || 'Queue Management Event', {
+        body: notif.message,
+        icon: '/favicon.ico',
+        tag: `reception-event-${notif.id}`,
+        requireInteraction: false
+      });
+
+      notification.onclick = (e) => {
+        e.preventDefault();
+        window.focus();
+        notification.close();
+      };
+
+      // Auto close after 10 seconds
+      setTimeout(() => {
+        try {
+          notification.close();
+        } catch {}
+      }, 10000);
+
+      return notification;
+    } catch (err) {
+      console.warn('Failed to display reception desktop notification:', err);
       return null;
     }
   }

@@ -14,7 +14,10 @@ import {
   RoleName,
   PriorityLevel,
   PriorityPolicy,
-  DatabaseSchema
+  DatabaseSchema,
+  ReceptionNotification,
+  NotificationSettings,
+  NotificationEventType
 } from './types.js';
 import { mongoService } from './mongodb.js';
 
@@ -112,6 +115,25 @@ export const DEFAULT_PRIORITY_POLICY: PriorityPolicy = {
   allowOfficerTriage: true,
   allowReceptionTriage: true,
   autoAuditPriorityChanges: true
+};
+
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  inAppEnabled: true,
+  desktopEnabled: false,
+  soundEnabled: true,
+  eventTypes: {
+    TICKET_CALLED: true,
+    TICKET_RECALLED: true,
+    TICKET_COMPLETED: true,
+    TICKET_SKIPPED: true,
+    TICKET_HOLD: true,
+    TICKET_RESUMED: true,
+    TICKET_TRANSFERRED: true,
+    COUNTER_OFFLINE: true,
+    COUNTER_ONLINE: true,
+    COUNTER_BREAK: true,
+    COUNTER_AVAILABLE: true
+  }
 };
 
 export const ROLES: Record<RoleName, Role> = {
@@ -434,6 +456,60 @@ function seedDatabase(): DatabaseSchema {
   counters[0].currentTicketId = 'tkt-001';
   counters[0].currentTicketNumber = 'A-001';
 
+  const sampleNotifications: ReceptionNotification[] = [
+    {
+      id: 'notif-seed-1',
+      recipientRole: 'RECEPTION',
+      recipientUserId: null,
+      branchId: 'main-branch',
+      type: 'TICKET_CALLED',
+      title: 'Queue Number Called',
+      message: 'Counter 1 (Main Registration) has called ticket A-001',
+      ticketId: 'tkt-001',
+      ticketNumber: 'A-001',
+      counterId: 'cnt-1',
+      counterNumber: 1,
+      counterName: 'Counter 1 (Main Registration)',
+      serviceName: 'New Application',
+      isRead: false,
+      readAt: null,
+      createdAt: new Date(Date.now() - 15 * 60000).toISOString()
+    },
+    {
+      id: 'notif-seed-2',
+      recipientRole: 'RECEPTION',
+      recipientUserId: null,
+      branchId: 'main-branch',
+      type: 'TICKET_COMPLETED',
+      title: 'Ticket Completed',
+      message: 'Counter 2 (Applications & Renewals) completed ticket R-001',
+      ticketId: 'tkt-002',
+      ticketNumber: 'R-001',
+      counterId: 'cnt-2',
+      counterNumber: 2,
+      counterName: 'Counter 2 (Applications & Renewals)',
+      serviceName: 'Renewal & Extension',
+      isRead: true,
+      readAt: new Date(Date.now() - 4 * 60000).toISOString(),
+      createdAt: new Date(Date.now() - 5 * 60000).toISOString()
+    },
+    {
+      id: 'notif-seed-3',
+      recipientRole: 'RECEPTION',
+      recipientUserId: null,
+      branchId: 'main-branch',
+      type: 'COUNTER_AVAILABLE',
+      title: 'Counter Available',
+      message: 'Counter 3 (Cashier & Payments) is available',
+      counterId: 'cnt-3',
+      counterNumber: 3,
+      counterName: 'Counter 3 (Cashier & Payments)',
+      isRead: true,
+      readAt: new Date(Date.now() - 2 * 60000).toISOString(),
+      createdAt: new Date(Date.now() - 2 * 60000).toISOString()
+    }
+  ];
+
   return {
     users,
     roles: JSON.parse(JSON.stringify(DEFAULT_ROLES)),
@@ -445,7 +521,9 @@ function seedDatabase(): DatabaseSchema {
     audioSetting,
     auditLogs: [],
     customerReviews: [],
-    priorityPolicy: { ...DEFAULT_PRIORITY_POLICY }
+    priorityPolicy: { ...DEFAULT_PRIORITY_POLICY },
+    notifications: sampleNotifications,
+    notificationSettings: { ...DEFAULT_NOTIFICATION_SETTINGS }
   };
 }
 
@@ -1490,6 +1568,181 @@ class Database {
     }
 
     return { officerStats, performanceTrend: trend };
+  }
+
+  public holdTicket(id: string, userId?: string): QueueTicket {
+    const ticket = this.getTicketById(id);
+    if (!ticket) throw new Error('Ticket not found.');
+    ticket.status = 'HOLD';
+    ticket.updatedAt = new Date().toISOString();
+    this.save();
+    return ticket;
+  }
+
+  public resumeTicket(id: string, userId?: string): QueueTicket {
+    const ticket = this.getTicketById(id);
+    if (!ticket) throw new Error('Ticket not found.');
+    ticket.status = 'SERVING';
+    ticket.updatedAt = new Date().toISOString();
+    this.save();
+    return ticket;
+  }
+
+  // --- RECEPTION NOTIFICATIONS ---
+  public createNotification(data: {
+    recipientRole?: string;
+    recipientUserId?: string | null;
+    branchId?: string;
+    type: NotificationEventType;
+    title: string;
+    message: string;
+    ticketId?: string;
+    ticketNumber?: string;
+    counterId?: string;
+    counterNumber?: number;
+    counterName?: string;
+    serviceId?: string;
+    serviceName?: string;
+    officerId?: string;
+    officerName?: string;
+    action?: string;
+  }): ReceptionNotification {
+    if (!this.data.notifications) {
+      this.data.notifications = [];
+    }
+
+    const newNotif: ReceptionNotification = {
+      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+      recipientRole: data.recipientRole || 'RECEPTION',
+      recipientUserId: data.recipientUserId || null,
+      branchId: data.branchId || 'main-branch',
+      type: data.type,
+      title: data.title,
+      message: data.message,
+      ticketId: data.ticketId,
+      ticketNumber: data.ticketNumber,
+      counterId: data.counterId,
+      counterNumber: data.counterNumber,
+      counterName: data.counterName,
+      serviceId: data.serviceId,
+      serviceName: data.serviceName,
+      officerId: data.officerId,
+      officerName: data.officerName,
+      action: data.action,
+      isRead: false,
+      readAt: null,
+      createdAt: new Date().toISOString()
+    };
+
+    // Keep up to 500 recent notifications for storage efficiency
+    this.data.notifications.unshift(newNotif);
+    if (this.data.notifications.length > 500) {
+      this.data.notifications = this.data.notifications.slice(0, 500);
+    }
+
+    this.save();
+    return newNotif;
+  }
+
+  public getNotifications(options: {
+    filter?: string; // 'ALL' | 'UNREAD' | 'CALLS' | 'COMPLETED' | 'SYSTEM'
+    limit?: number;
+    offset?: number;
+    role?: string;
+  } = {}) {
+    if (!this.data.notifications) {
+      this.data.notifications = [];
+    }
+
+    let list = [...this.data.notifications];
+    const unreadCount = list.filter(n => !n.isRead).length;
+
+    const filter = (options.filter || 'ALL').toUpperCase();
+    if (filter === 'UNREAD') {
+      list = list.filter(n => !n.isRead);
+    } else if (filter === 'CALLS') {
+      list = list.filter(n => n.type === 'TICKET_CALLED' || n.type === 'TICKET_RECALLED');
+    } else if (filter === 'COMPLETED') {
+      list = list.filter(n => 
+        n.type === 'TICKET_COMPLETED' || 
+        n.type === 'TICKET_SKIPPED' || 
+        n.type === 'TICKET_HOLD' || 
+        n.type === 'TICKET_RESUMED' || 
+        n.type === 'TICKET_TRANSFERRED'
+      );
+    } else if (filter === 'SYSTEM' || filter === 'COUNTERS') {
+      list = list.filter(n => n.type.startsWith('COUNTER_'));
+    }
+
+    const total = list.length;
+    const limit = Math.max(1, Math.min(100, options.limit || 30));
+    const offset = Math.max(0, options.offset || 0);
+    const paginated = list.slice(offset, offset + limit);
+
+    return {
+      notifications: paginated,
+      total,
+      unreadCount,
+      limit,
+      offset
+    };
+  }
+
+  public getUnreadNotificationCount(): number {
+    if (!this.data.notifications) return 0;
+    return this.data.notifications.filter(n => !n.isRead).length;
+  }
+
+  public markNotificationAsRead(id: string): ReceptionNotification | null {
+    if (!this.data.notifications) return null;
+    const notif = this.data.notifications.find(n => n.id === id);
+    if (notif) {
+      notif.isRead = true;
+      notif.readAt = new Date().toISOString();
+      this.save();
+      return notif;
+    }
+    return null;
+  }
+
+  public markAllNotificationsAsRead(): number {
+    if (!this.data.notifications) return 0;
+    let count = 0;
+    const now = new Date().toISOString();
+    for (const notif of this.data.notifications) {
+      if (!notif.isRead) {
+        notif.isRead = true;
+        notif.readAt = now;
+        count++;
+      }
+    }
+    if (count > 0) {
+      this.save();
+    }
+    return count;
+  }
+
+  public getNotificationSettings(): NotificationSettings {
+    if (!this.data.notificationSettings) {
+      this.data.notificationSettings = { ...DEFAULT_NOTIFICATION_SETTINGS };
+    }
+    return this.data.notificationSettings;
+  }
+
+  public updateNotificationSettings(updates: Partial<NotificationSettings>): NotificationSettings {
+    if (!this.data.notificationSettings) {
+      this.data.notificationSettings = { ...DEFAULT_NOTIFICATION_SETTINGS };
+    }
+    this.data.notificationSettings = {
+      ...this.data.notificationSettings,
+      ...updates,
+      eventTypes: {
+        ...this.data.notificationSettings.eventTypes,
+        ...(updates.eventTypes || {})
+      }
+    };
+    this.save();
+    return this.data.notificationSettings;
   }
 }
 

@@ -15,7 +15,11 @@ export interface RealtimeEvent<T = any> {
     | 'announcement:play'
     | 'settings:updated'
     | 'role:updated'
-    | 'user:updated';
+    | 'user:updated'
+    | 'reception:notification'
+    | 'notification:created'
+    | 'notification:read'
+    | 'notification:settings_updated';
   data: T;
   timestamp: string;
 }

@@ -61,16 +61,24 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
     switch (currentView) {
       case 'display':
         return {
-          title: t('display_screen', 'Public Display Screen'),
-          subtitle: isAmharic ? 'የቀጥታ ወረፋ እና ጥሪ ስክሪን' : 'Live queue status & audio broadcasting',
+          title: user?.role === 'SERVICE_OFFICER'
+            ? (isAmharic ? 'የአገልግሎት ስክሪን (የእኔ መስኮት)' : 'Service Officer Counter Display')
+            : t('display_screen', 'Public Display Screen'),
+          subtitle: user?.role === 'SERVICE_OFFICER'
+            ? (isAmharic ? 'የተመደበልዎትን መስኮት እና አገልግሎት ብቻ ያሳያል' : 'Filtered strictly to your assigned counter & services based on your role')
+            : (isAmharic ? 'የቀጥታ ወረፋ እና ጥሪ ስክሪን' : 'Live queue status & audio broadcasting'),
           icon: Tv
         };
       case 'counter-display':
       case 'counter_display':
       case 'counters':
         return {
-          title: isAmharic ? 'የመስኮት መከታተያ ስክሪን' : 'Counter Station Directory & Overhead Display',
-          subtitle: isAmharic ? 'የመስኮት ሁኔታዎች፣ የአገልግሎት ዝርዝር እና የዴስክ ታብሌት ስክሪን' : 'Live counter status, service directory & dedicated desk signage',
+          title: user?.role === 'SERVICE_OFFICER'
+            ? (isAmharic ? 'የእኔ መስኮት ስክሪን' : 'My Counter Overhead Sign')
+            : (isAmharic ? 'የመስኮት መከታተያ ስክሪን' : 'Counter Station Directory & Overhead Display'),
+          subtitle: user?.role === 'SERVICE_OFFICER'
+            ? (isAmharic ? 'ለተመደበልዎት መስኮት የተዘጋጀ ስክሪን' : 'Dedicated overhead display for your assigned workstation')
+            : (isAmharic ? 'የመስኮት ሁኔታዎች፣ የአገልግሎት ዝርዝር እና የዴስክ ታብሌት ስክሪን' : 'Live counter status, service directory & dedicated desk signage'),
           icon: Monitor
         };
       case 'reception':

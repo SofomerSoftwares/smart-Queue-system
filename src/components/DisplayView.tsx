@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Tv, 
   Volume2, 
@@ -16,9 +16,12 @@ import {
   ChevronDown,
   LayoutGrid,
   Flame,
-  Zap
+  Zap,
+  Lock,
+  UserCheck
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
+import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { DisplayVideoPlayer, PRESET_VIDEOS } from './DisplayVideoPlayer';
 import { videoStorage } from '../lib/videoStorage';
@@ -164,18 +167,51 @@ export const DisplayView: React.FC = () => {
     }
   };
 
-  // Find the most recently called or currently active ticket
-  const primaryCalledTicket = servingTickets.length > 0 
-    ? servingTickets[servingTickets.length - 1] 
-    : null;
+  const { user } = useAuth();
+  const isOfficer = user?.role === 'SERVICE_OFFICER';
+  const assignedCounterId = user?.assignedCounterId || counters.find(c => c.currentOfficerId === user?.id)?.id;
+  const assignedCounter = useMemo(() => counters.find(c => c.id === assignedCounterId), [counters, assignedCounterId]);
 
-  // Priority sorted waiting tickets: URGENT (3) > PRIORITY (2) > NORMAL (1), then issuedAt
-  const sortedWaitingTickets = [...waitingTickets].sort((a, b) => {
-    const scoreA = a.priority === 'URGENT' ? 3 : a.priority === 'PRIORITY' ? 2 : 1;
-    const scoreB = b.priority === 'URGENT' ? 3 : b.priority === 'PRIORITY' ? 2 : 1;
-    if (scoreA !== scoreB) return scoreB - scoreA;
-    return new Date(a.issuedAt).getTime() - new Date(b.issuedAt).getTime();
-  });
+  // Role-based counter display: Service Officers are strictly limited to their assigned counter
+  const displayedCounters = useMemo(() => {
+    if (isOfficer) {
+      if (assignedCounterId) {
+        return counters.filter(c => c.id === assignedCounterId);
+      }
+      return [];
+    }
+    return counters;
+  }, [counters, isOfficer, assignedCounterId]);
+
+  // Find the primary active ticket (for Service Officer: ticket at their assigned desk; for general: latest called)
+  const primaryCalledTicket = useMemo(() => {
+    if (isOfficer && assignedCounterId) {
+      const myCounter = counters.find(c => c.id === assignedCounterId);
+      const myTicket = servingTickets.find(t => 
+        t.counterId === assignedCounterId || 
+        (myCounter && t.counterNumber === myCounter.number)
+      );
+      return myTicket || null;
+    }
+    return servingTickets.length > 0 ? servingTickets[servingTickets.length - 1] : null;
+  }, [servingTickets, isOfficer, assignedCounterId, counters]);
+
+  // Priority sorted waiting tickets: for Service Officer, prioritize their station services
+  const sortedWaitingTickets = useMemo(() => {
+    let list = [...waitingTickets];
+    if (isOfficer && assignedCounterId) {
+      const myCounter = counters.find(c => c.id === assignedCounterId);
+      if (myCounter) {
+        list = list.filter(t => !t.counterNumber || t.counterNumber === myCounter.number);
+      }
+    }
+    return list.sort((a, b) => {
+      const scoreA = a.priority === 'URGENT' ? 3 : a.priority === 'PRIORITY' ? 2 : 1;
+      const scoreB = b.priority === 'URGENT' ? 3 : b.priority === 'PRIORITY' ? 2 : 1;
+      if (scoreA !== scoreB) return scoreB - scoreA;
+      return new Date(a.issuedAt).getTime() - new Date(b.issuedAt).getTime();
+    });
+  }, [waitingTickets, isOfficer, assignedCounterId, counters]);
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-950 text-white flex flex-col justify-between p-3 sm:p-6 lg:p-8 select-none">
@@ -189,6 +225,16 @@ export const DisplayView: React.FC = () => {
           <div className="min-w-0">
             <h1 className="text-base sm:text-xl font-black tracking-tight text-white uppercase flex items-center truncate space-x-2">
               <span className="truncate">{officeNameDisplay}</span>
+              {isOfficer && (
+                <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-600/90 text-white border border-indigo-400/50 shadow-xs">
+                  <UserCheck className="w-3 h-3" />
+                  <span>
+                    {assignedCounter 
+                      ? (isAmharic ? `መስኮት ${assignedCounter.number} (የእኔ ጣቢያ)` : `Counter ${assignedCounter.number} (Officer View)`)
+                      : (isAmharic ? 'የአገልግሎት ሰጪ እይታ' : 'Officer View')}
+                  </span>
+                </span>
+              )}
             </h1>
             <div className="flex items-center space-x-2 text-[11px] text-slate-400 font-medium truncate mt-0.5">
               <span className="flex items-center space-x-1 text-emerald-400">
@@ -200,6 +246,14 @@ export const DisplayView: React.FC = () => {
                 <Sparkles className="w-3 h-3 text-indigo-400" />
                 <span>Addis AI Voice</span>
               </span>
+              {isOfficer && assignedCounter && (
+                <>
+                  <span>•</span>
+                  <span className="text-amber-300 font-bold">
+                    {isAmharic ? `መስኮት ${assignedCounter.number} ብቻ ተመርጧል` : `Showing Counter ${assignedCounter.number} only`}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -311,6 +365,23 @@ export const DisplayView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Role-Based Indicator Banner */}
+      {isOfficer && (
+        <div className="bg-indigo-950/80 border border-indigo-500/40 rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3 text-xs text-indigo-200 mb-4 shadow-lg shadow-indigo-950/40">
+          <div className="flex items-center gap-2.5">
+            <UserCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="font-bold">
+              {isAmharic 
+                ? `የተመደበ የመስኮት እይታ (የእርስዎ ሚና: የመስኮት ሰራተኛ - መስኮት ${user?.assignedCounterId?.replace('cnt-', '') || 1} • ${user?.name})`
+                : `Role-Restricted Service Display: Assigned to Counter ${user?.assignedCounterId?.replace('cnt-', '') || 1} (${user?.name})`}
+            </span>
+          </div>
+          <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase font-mono">
+            {isAmharic ? 'የእርስዎ መስኮት ብቻ' : 'Assigned Desk Only'}
+          </span>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* LAYOUT OPTION 1: SPLIT SCREEN (Large Video on Left + Now Serving on Right) */}
@@ -475,7 +546,7 @@ export const DisplayView: React.FC = () => {
 
               {/* Active Serving Counters Mini-Strip */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-slate-800 z-10">
-                {counters.slice(0, 4).map((cnt) => {
+                {displayedCounters.slice(0, 4).map((cnt) => {
                   const isBusy = cnt.status === 'SERVING' && cnt.currentTicketNumber;
                   const displayVal = cnt.currentTicketNumber || (cnt.status === 'CLOSED' ? 'CLOSED' : 'READY');
                   return (
@@ -818,7 +889,7 @@ export const DisplayView: React.FC = () => {
 
             {/* Serving Counters Mini-Strip */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-5 border-t border-slate-800 z-10">
-              {counters.map((cnt) => {
+              {displayedCounters.map((cnt) => {
                 const isBusy = cnt.status === 'SERVING' && cnt.currentTicketNumber;
                 const displayVal = cnt.currentTicketNumber || (cnt.status === 'CLOSED' ? 'CLOSED' : 'READY');
                 return (

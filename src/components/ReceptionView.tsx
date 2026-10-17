@@ -48,6 +48,9 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { TicketPrintModal } from './TicketPrintModal';
 import { PrintTicketData, Service, PriorityLevel, QueueTicket } from '../types';
+import { useReceptionNotifications } from '../hooks/useReceptionNotifications';
+import { NotificationBell } from './notifications/NotificationBell';
+import { NotificationPanel } from './notifications/NotificationPanel';
 
 export const URGENCY_PRESETS = [
   { id: 'elderly', labelEn: 'Elderly Citizen (60+)', labelAm: 'አረጋውያን (60+)', icon: Star, color: 'text-amber-600 bg-amber-50 border-amber-200' },
@@ -99,6 +102,24 @@ export const ReceptionView: React.FC<ReceptionViewProps> = ({ onNavigate }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | PriorityLevel>('ALL');
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState<boolean>(false);
+  const [notificationTabFilter, setNotificationTabFilter] = useState<'ALL' | 'UNREAD' | 'CALLS' | 'COMPLETED' | 'SYSTEM'>('ALL');
+
+  // Real-Time Reception Notifications Hook
+  const {
+    notifications,
+    unreadCount,
+    totalCount: totalNotificationsCount,
+    isLoading: isNotificationsLoading,
+    connectionStatus: notificationConnectionStatus,
+    settings: notificationSettings,
+    desktopPermission,
+    requestDesktopPermission,
+    updateSettings: updateNotificationSettings,
+    markAsRead: markNotificationAsRead,
+    markAllAsRead: markAllNotificationsAsRead,
+    refreshNotifications
+  } = useReceptionNotifications(notificationTabFilter);
 
   // Admin Priority Authorization Modal State (for optional credential elevation if needed)
   const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState<boolean>(false);
@@ -827,6 +848,14 @@ export const ReceptionView: React.FC<ReceptionViewProps> = ({ onNavigate }) => {
             </button>
           </div>
 
+          {/* Real-Time Notification Bell */}
+          <NotificationBell
+            unreadCount={unreadCount}
+            isOpen={isNotificationDrawerOpen}
+            onClick={() => setIsNotificationDrawerOpen(!isNotificationDrawerOpen)}
+            isAmharic={isAmharic}
+          />
+
           {/* Fullscreen Button */}
           <button
             type="button"
@@ -857,8 +886,38 @@ export const ReceptionView: React.FC<ReceptionViewProps> = ({ onNavigate }) => {
       {/* ========================================================================= */}
       {viewMode === 'DESK' && (
         <div className="space-y-6">
-          {/* Priority Mode Selector Bar */}
-          <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 space-y-4">
+          {/* Quick Popover Notification Drawer for Mobile / Bell toggle */}
+          {isNotificationDrawerOpen && (
+            <div className="lg:hidden animate-in fade-in duration-150">
+              <NotificationPanel
+                notifications={notifications}
+                unreadCount={unreadCount}
+                totalCount={totalNotificationsCount}
+                isLoading={isNotificationsLoading}
+                connectionStatus={notificationConnectionStatus}
+                activeFilter={notificationTabFilter}
+                onFilterChange={setNotificationTabFilter}
+                onMarkAsRead={markNotificationAsRead}
+                onMarkAllAsRead={markAllNotificationsAsRead}
+                onRefresh={refreshNotifications}
+                settings={notificationSettings}
+                onUpdateSettings={updateNotificationSettings}
+                desktopPermission={desktopPermission}
+                onRequestPermission={requestDesktopPermission}
+                isAmharic={isAmharic}
+                isCollapsible={true}
+                onClose={() => setIsNotificationDrawerOpen(false)}
+              />
+            </div>
+          )}
+
+          {/* Main 2-Column Grid: Queue Operations on Left (8 cols) & Live Notifications on Right (4 cols) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            {/* Left Column (lg:col-span-8): Urgent Triage, Service Buttons & Waiting Queue Table */}
+            <div className="lg:col-span-8 space-y-6 min-w-0">
+              {/* Priority Mode Selector Bar */}
+              <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
@@ -1275,7 +1334,32 @@ export const ReceptionView: React.FC<ReceptionViewProps> = ({ onNavigate }) => {
             )}
           </div>
         </div>
-      )}
+
+        {/* Right Column (lg:col-span-4): Dedicated Reception Real-Time Notification Management Panel */}
+        <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-20">
+          <NotificationPanel
+            notifications={notifications}
+            unreadCount={unreadCount}
+            totalCount={totalNotificationsCount}
+            isLoading={isNotificationsLoading}
+            connectionStatus={notificationConnectionStatus}
+            activeFilter={notificationTabFilter}
+            onFilterChange={setNotificationTabFilter}
+            onMarkAsRead={markNotificationAsRead}
+            onMarkAllAsRead={markAllNotificationsAsRead}
+            onRefresh={refreshNotifications}
+            settings={notificationSettings}
+            onUpdateSettings={updateNotificationSettings}
+            desktopPermission={desktopPermission}
+            onRequestPermission={requestDesktopPermission}
+            isAmharic={isAmharic}
+            isCollapsible={false}
+          />
+        </div>
+
+      </div>
+    </div>
+  )}
 
       {/* ========================================================================= */}
       {/* MODE 2: STANDALONE TOUCHSCREEN TICKET KIOSK VIEW (For Walk-up Customers) */}

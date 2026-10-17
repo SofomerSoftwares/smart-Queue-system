@@ -45,7 +45,7 @@ export const CounterDisplayView: React.FC = () => {
 
   const { user } = useAuth();
   const isOfficer = user?.role === 'SERVICE_OFFICER';
-  const assignedCounterId = user?.assignedCounterId;
+  const assignedCounterId = user?.assignedCounterId || counters.find(c => c.currentOfficerId === user?.id)?.id;
 
   const isAmharic = uiLanguage === 'AMHARIC';
 

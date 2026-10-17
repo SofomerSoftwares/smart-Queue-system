@@ -7,7 +7,8 @@ export type TicketStatus =
   | 'COMPLETED' 
   | 'CANCELLED' 
   | 'NO_SHOW' 
-  | 'TRANSFERRED';
+  | 'TRANSFERRED'
+  | 'HOLD';
 
 export type PriorityLevel = 'NORMAL' | 'PRIORITY' | 'URGENT';
 
@@ -109,6 +110,7 @@ export interface QueueTicket {
   isCheckedIn?: boolean;
   checkedInAt?: string;
   customerReview?: CustomerReview;
+  updatedAt?: string;
 }
 
 export interface CustomerReview {
@@ -272,5 +274,48 @@ export interface PermissionDefinition {
   id: string;
   name: string;
   description: string;
+}
+
+export type NotificationEventType =
+  | 'TICKET_CALLED'
+  | 'TICKET_RECALLED'
+  | 'TICKET_COMPLETED'
+  | 'TICKET_SKIPPED'
+  | 'TICKET_HOLD'
+  | 'TICKET_RESUMED'
+  | 'TICKET_TRANSFERRED'
+  | 'COUNTER_OFFLINE'
+  | 'COUNTER_ONLINE'
+  | 'COUNTER_BREAK'
+  | 'COUNTER_AVAILABLE';
+
+export interface ReceptionNotification {
+  id: string;
+  recipientRole: string; // 'RECEPTION' | 'ADMIN'
+  recipientUserId?: string | null;
+  branchId: string;
+  type: NotificationEventType;
+  title: string;
+  message: string;
+  ticketId?: string;
+  ticketNumber?: string;
+  counterId?: string;
+  counterNumber?: number;
+  counterName?: string;
+  serviceId?: string;
+  serviceName?: string;
+  officerId?: string;
+  officerName?: string;
+  action?: string;
+  isRead: boolean;
+  readAt?: string | null;
+  createdAt: string;
+}
+
+export interface NotificationSettings {
+  inAppEnabled: boolean;
+  desktopEnabled: boolean;
+  soundEnabled: boolean;
+  eventTypes: Record<NotificationEventType, boolean>;
 }
 
