@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../lib/api';
 import { 
   BarChart, 
   Bar, 
@@ -79,10 +80,12 @@ export const OfficerPerformanceReportView: React.FC = () => {
   const fetchReport = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch('/api/reports/officer-performance');
-      const data = await res.json();
-      if (data.success) {
-        setReportData({ officerStats: data.officerStats, performanceTrend: data.performanceTrend });
+      const data = await api.getOfficerPerformanceReport();
+      if (data && data.success) {
+        setReportData({ 
+          officerStats: data.officerStats || [], 
+          performanceTrend: data.performanceTrend || [] 
+        });
       }
     } catch (err) {
       console.error('Failed to fetch officer performance report', err);

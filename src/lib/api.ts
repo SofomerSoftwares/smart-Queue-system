@@ -374,6 +374,9 @@ export const api = {
   getReportsSummary: (date?: string) =>
     request<{ success: boolean; stats: QueueStats }>(`/api/reports/summary${date ? `?date=${date}` : ''}`),
 
+  getOfficerPerformanceReport: () =>
+    request<{ success: boolean; officerStats: any[]; performanceTrend: any[] }>('/api/reports/officer-performance'),
+
   getAuditLogs: () =>
     request<{ success: boolean; logs: AuditLog[] }>('/api/audit-logs'),
 

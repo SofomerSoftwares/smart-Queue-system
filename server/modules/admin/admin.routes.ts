@@ -39,8 +39,8 @@ router.put('/settings/office', authenticate, requireAdmin, (req, res, next) => a
 
 // Audit Logs & Reports
 router.get('/audit-logs', authenticate, requireAdmin, (req, res, next) => adminController.getAuditLogs(req as any, res, next));
-router.get('/reports/daily', authenticate, (req, res, next) => adminController.getDailyStats(req as any, res, next));
-router.get('/reports/officers', authenticate, (req, res, next) => adminController.getOfficerPerformanceReport(req as any, res, next));
+router.get(['/reports/daily', '/reports/summary'], (req, res, next) => adminController.getDailyStats(req as any, res, next));
+router.get(['/reports/officers', '/reports/officer-performance'], (req, res, next) => adminController.getOfficerPerformanceReport(req as any, res, next));
 
 // Backup & Restore
 router.get('/system/backup', authenticate, requireAdmin, (req, res, next) => adminController.exportBackup(req as any, res, next));

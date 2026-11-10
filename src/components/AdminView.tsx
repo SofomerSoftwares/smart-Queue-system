@@ -123,7 +123,7 @@ export const AdminView: React.FC = () => {
   const [voiceSpeed, setVoiceSpeed] = useState<number>(1.0);
 
   // MongoDB Atlas State
-  const [dbStatus, setDbStatus] = useState<any>(null);
+  const [dbStatus, setDbStatus] = useState<any>({ connected: false, configured: false, database: 'office_queue_db', error: null });
   const [mongoUriInput, setMongoUriInput] = useState<string>('');
   const [isConnectingDb, setIsConnectingDb] = useState<boolean>(false);
   const [isSyncingDb, setIsSyncingDb] = useState<boolean>(false);
@@ -1660,12 +1660,12 @@ export const AdminView: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${
-                  dbStatus.connected
+                  dbStatus?.connected
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     : 'bg-slate-100 text-slate-700 border-slate-200'
                 }`}>
                   <Database className="w-3 h-3" />
-                  <span>{dbStatus.connected ? (isAmharic ? 'MongoDB ተገናኝቷል' : 'MongoDB Synced') : 'MongoDB Ready'}</span>
+                  <span>{dbStatus?.connected ? (isAmharic ? 'MongoDB ተገናኝቷል' : 'MongoDB Synced') : 'MongoDB Ready'}</span>
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
