@@ -951,7 +951,7 @@ export const CustomerTicketView: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isSubmittingReview}
-                  className="flex-1 py-3 px-5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-2xl text-xs font-bold transition shadow-md shadow-indigo-100 flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+                  className="flex-1 py-3 px-5 bg-[#2563EB] hover:bg-[#1d4ed8] active:scale-98 text-white rounded-2xl text-xs font-bold transition shadow-md shadow-[#2563EB]/20 flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
                 >
                   {isSubmittingReview ? (
                     <>
@@ -970,7 +970,7 @@ export const CustomerTicketView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setIsEditingReview(false)}
-                    className="py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition cursor-pointer"
+                    className="py-3 px-4 bg-[#F5F7FB] hover:bg-slate-200 text-[#172033] rounded-2xl text-xs font-bold transition cursor-pointer"
                   >
                     {isAmharic ? 'ተመለስ' : 'Cancel'}
                   </button>
@@ -986,7 +986,7 @@ export const CustomerTicketView: React.FC = () => {
       {/* ========================================================= */}
       {isQrModalOpen && ticketData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center space-y-5 shadow-2xl border border-slate-200 animate-in zoom-in-95">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center space-y-5 shadow-2xl border border-[#E2E8F0] animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center space-x-2">
                 <QrCode className="w-5 h-5 text-indigo-600" />

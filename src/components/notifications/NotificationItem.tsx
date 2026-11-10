@@ -35,74 +35,74 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
       case 'TICKET_CALLED':
         return {
           icon: Megaphone,
-          bg: 'bg-indigo-50 text-indigo-600 border-indigo-200',
+          bg: 'bg-[#2563EB]/10 text-[#2563EB] border-[#2563EB]/30',
           badge: isAmharic ? 'ተጠርቷል' : 'Called',
-          color: 'text-indigo-600'
+          color: 'text-[#2563EB]'
         };
       case 'TICKET_RECALLED':
         return {
           icon: RotateCcw,
-          bg: 'bg-amber-50 text-amber-600 border-amber-200',
+          bg: 'bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/30',
           badge: isAmharic ? 'እንደገና ተጠርቷል' : 'Recalled',
-          color: 'text-amber-600'
+          color: 'text-[#F59E0B]'
         };
       case 'TICKET_COMPLETED':
         return {
           icon: CheckCircle2,
-          bg: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+          bg: 'bg-[#16A34A]/10 text-[#16A34A] border-[#16A34A]/30',
           badge: isAmharic ? 'ተጠናቋል' : 'Completed',
-          color: 'text-emerald-600'
+          color: 'text-[#16A34A]'
         };
       case 'TICKET_SKIPPED':
         return {
           icon: UserX,
-          bg: 'bg-rose-50 text-rose-600 border-rose-200',
+          bg: 'bg-[#DC2626]/10 text-[#DC2626] border-[#DC2626]/30',
           badge: isAmharic ? 'ያልቀረበ (Skipped)' : 'Skipped',
-          color: 'text-rose-600'
+          color: 'text-[#DC2626]'
         };
       case 'TICKET_HOLD':
         return {
           icon: Pause,
-          bg: 'bg-orange-50 text-orange-600 border-orange-200',
+          bg: 'bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/30',
           badge: isAmharic ? 'በይደር ቆሟል' : 'On Hold',
-          color: 'text-orange-600'
+          color: 'text-[#F59E0B]'
         };
       case 'TICKET_RESUMED':
         return {
           icon: Play,
-          bg: 'bg-teal-50 text-teal-600 border-teal-200',
+          bg: 'bg-[#0D9488]/10 text-[#0D9488] border-[#0D9488]/30',
           badge: isAmharic ? 'ቀጥሏል' : 'Resumed',
-          color: 'text-teal-600'
+          color: 'text-[#0D9488]'
         };
       case 'TICKET_TRANSFERRED':
         return {
           icon: ArrowRight,
-          bg: 'bg-purple-50 text-purple-600 border-purple-200',
+          bg: 'bg-[#173B65]/10 text-[#173B65] border-[#173B65]/30',
           badge: isAmharic ? 'ተላልፏል' : 'Transferred',
-          color: 'text-purple-600'
+          color: 'text-[#173B65]'
         };
       case 'COUNTER_BREAK':
         return {
           icon: Coffee,
-          bg: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+          bg: 'bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/30',
           badge: isAmharic ? 'እረፍት' : 'Break',
-          color: 'text-yellow-700'
+          color: 'text-[#F59E0B]'
         };
       case 'COUNTER_OFFLINE':
         return {
           icon: PowerOff,
-          bg: 'bg-slate-100 text-slate-600 border-slate-300',
+          bg: 'bg-slate-100 text-[#64748B] border-[#E2E8F0]',
           badge: isAmharic ? 'ዝግ' : 'Offline',
-          color: 'text-slate-600'
+          color: 'text-[#64748B]'
         };
       case 'COUNTER_ONLINE':
       case 'COUNTER_AVAILABLE':
       default:
         return {
           icon: Monitor,
-          bg: 'bg-blue-50 text-blue-600 border-blue-200',
+          bg: 'bg-[#2563EB]/10 text-[#2563EB] border-[#2563EB]/30',
           badge: isAmharic ? 'ዝግጁ' : 'Available',
-          color: 'text-blue-600'
+          color: 'text-[#2563EB]'
         };
     }
   };
@@ -129,13 +129,13 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
       }}
       className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none group relative ${
         notification.isRead 
-          ? 'bg-white hover:bg-slate-50 border-slate-200/90 text-slate-700' 
-          : 'bg-indigo-50/40 hover:bg-indigo-50/70 border-indigo-200/80 shadow-xs text-slate-900'
+          ? 'bg-white hover:bg-[#F5F7FB] border-[#E2E8F0] text-[#172033]' 
+          : 'bg-[#2563EB]/5 hover:bg-[#2563EB]/10 border-[#2563EB]/30 shadow-xs text-[#172033]'
       }`}
     >
       {/* Unread Indicator Bar */}
       {!notification.isRead && (
-        <div className="absolute left-0 top-3 bottom-3 w-1 bg-indigo-600 rounded-r-full" />
+        <div className="absolute left-0 top-3 bottom-3 w-1 bg-[#2563EB] rounded-r-full" />
       )}
 
       <div className="flex items-start gap-3 pl-1">
@@ -169,23 +169,23 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
           </p>
 
           {/* Meta Badges */}
-          <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
+          <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-[#E2E8F0]">
             {notification.ticketNumber && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-900 text-white text-[11px] font-mono font-black">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#173B65] text-white text-[11px] font-mono font-black">
                 <Tag className="w-2.5 h-2.5" />
                 <span>{notification.ticketNumber}</span>
               </span>
             )}
 
             {notification.counterName && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-bold">
-                <Building2 className="w-2.5 h-2.5 text-slate-400" />
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#F5F7FB] text-[#172033] border border-[#E2E8F0] text-[10px] font-bold">
+                <Building2 className="w-2.5 h-2.5 text-[#64748B]" />
                 <span className="truncate max-w-[120px]">{notification.counterName}</span>
               </span>
             )}
 
             {notification.serviceName && (
-              <span className="text-[10px] font-semibold text-slate-500 truncate max-w-[140px]">
+              <span className="text-[10px] font-semibold text-[#64748B] truncate max-w-[140px]">
                 {notification.serviceName}
               </span>
             )}
@@ -198,7 +198,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
                   e.stopPropagation();
                   onMarkAsRead(notification.id);
                 }}
-                className="ml-auto text-[10px] text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-0.5 opacity-90 group-hover:opacity-100"
+                className="ml-auto text-[10px] text-[#2563EB] hover:text-[#1d4ed8] font-bold flex items-center gap-0.5 opacity-90 group-hover:opacity-100"
                 title={isAmharic ? 'እንደተነበበ ምልክት አድርግ' : 'Mark as read'}
               >
                 <Check className="w-3 h-3" />

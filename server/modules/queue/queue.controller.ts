@@ -53,6 +53,19 @@ export class QueueController {
     }
   }
 
+  public getPublicTicket(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const data = queueService.getPublicTicket(id);
+      return res.json({
+        success: true,
+        ...data
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   public checkIn(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
@@ -67,11 +80,28 @@ export class QueueController {
     }
   }
 
+  public submitTicketReview(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const { rating, tags, comment } = req.body;
+      const result = queueService.submitTicketReview(id, { rating, tags, comment });
+      return res.status(201).json({
+        success: true,
+        message: 'Customer review submitted successfully. Thank you for your feedback!',
+        review: result.review,
+        ticket: result.ticket
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   public async callNext(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const { counterId, targetServiceId, customAudioBase64, customAudioMimeType, customText } = req.body;
+      const { counterId, specificTicketId, targetServiceId, customAudioBase64, customAudioMimeType, customText } = req.body;
       const result = await queueService.callNext({
         counterId,
+        specificTicketId,
         targetServiceId,
         customAudioBase64,
         customAudioMimeType,
@@ -82,6 +112,8 @@ export class QueueController {
       if (result.noTicket) {
         return res.status(200).json({
           success: false,
+          ticket: null,
+          counter: result.counter || null,
           message: result.message
         });
       }

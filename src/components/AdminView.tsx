@@ -894,16 +894,16 @@ export const AdminView: React.FC = () => {
     <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
       
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-xs border border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-xs border border-[#E2E8F0]">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold shadow-xs">
+          <div className="w-10 h-10 rounded-lg bg-[#173B65] text-white flex items-center justify-center font-bold shadow-xs">
             <Shield className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#172033] tracking-tight">
               {isAmharic ? 'የአስተዳዳሪ መቆጣጠሪያ ማዕከል' : 'Administrator Control Center'}
             </h1>
-            <p className="text-xs text-slate-500 font-medium">
+            <p className="text-xs text-[#64748B] font-medium">
               {isAmharic ? 'አገልግሎቶች፣ መስኮት፣ ሰራተኞች፣ የአማርኛ ድምፅ እና የቢሮ ቅንብሮች' : 'Manage services, counters, staff, Amharic voice and office settings'}
             </p>
           </div>
@@ -919,10 +919,10 @@ export const AdminView: React.FC = () => {
               setRenameModalError('');
               setIsRenameModalOpen(true);
             }}
-            className="flex items-center space-x-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
+            className="flex items-center space-x-1.5 px-3.5 py-2 bg-[#F5F7FB] hover:bg-slate-200 text-[#173B65] border border-[#E2E8F0] rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
             title="Rename Office Name"
           >
-            <Building2 className="w-4 h-4" />
+            <Building2 className="w-4 h-4 text-[#0D9488]" />
             <span>{isAmharic ? 'የቢሮ ስም ቀይር' : 'Rename Office'}</span>
           </button>
 
@@ -933,7 +933,7 @@ export const AdminView: React.FC = () => {
                 resetDailyQueue();
               }
             }}
-            className="flex items-center space-x-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition cursor-pointer"
+            className="flex items-center space-x-1.5 px-3.5 py-2 bg-[#DC2626]/10 hover:bg-[#DC2626]/20 text-[#DC2626] border border-[#DC2626]/30 rounded-xl text-xs font-bold transition cursor-pointer"
           >
             <RotateCcw className="w-4 h-4" />
             <span>{isAmharic ? 'የዛሬውን ወረፋ አድስ' : 'Reset Daily Queue'}</span>
@@ -942,14 +942,14 @@ export const AdminView: React.FC = () => {
       </div>
 
       {saveSuccessMsg && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center space-x-2 animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+        <div className="p-3 bg-[#16A34A]/10 border border-[#16A34A]/30 text-[#16A34A] rounded-xl text-xs font-bold flex items-center space-x-2 animate-in fade-in">
+          <CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0" />
           <span>{saveSuccessMsg}</span>
         </div>
       )}
 
       {/* Navigation Sub-Tabs */}
-      <div className="flex items-center space-x-1 overflow-x-auto pb-2 border-b border-slate-200">
+      <div className="flex items-center space-x-1 overflow-x-auto pb-2 border-b border-[#E2E8F0]">
         {[
           { id: 'overview', label: isAmharic ? 'አጠቃላይ እይታ' : 'Overview', icon: Activity },
           { id: 'services', label: isAmharic ? 'አገልግሎቶች' : 'Services', icon: Layers },
@@ -967,13 +967,13 @@ export const AdminView: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+              className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                 active
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  ? 'bg-[#173B65] text-white shadow-xs'
+                  : 'text-[#64748B] hover:text-[#172033] hover:bg-[#F5F7FB]'
               }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className={`w-4 h-4 ${active ? 'text-[#0D9488]' : ''}`} />
               <span>{tab.label}</span>
             </button>
           );

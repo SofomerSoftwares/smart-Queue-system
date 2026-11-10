@@ -128,23 +128,23 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
 
   return (
     <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-3xl p-7 sm:p-8 shadow-xs border border-slate-200 space-y-6">
+      <div className="w-full max-w-md bg-white rounded-3xl p-7 sm:p-8 shadow-xs border border-[#E2E8F0] space-y-6">
         
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-xs">
+          <div className="w-11 h-11 rounded-2xl bg-[#173B65] text-white flex items-center justify-center mx-auto shadow-xs">
             {mode === 'LOGIN' ? (
-              <Lock className="w-5 h-5" />
+              <Lock className="w-5 h-5 text-[#0D9488]" />
             ) : (
-              <KeyRound className="w-5 h-5" />
+              <KeyRound className="w-5 h-5 text-[#0D9488]" />
             )}
           </div>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-black text-[#172033] tracking-tight">
             {mode === 'LOGIN' && (isAmharic ? 'የሰራተኞች መግቢያ' : 'Staff Portal Login')}
             {mode === 'FORGOT_REQUEST' && (isAmharic ? 'የይለፍ ቃል ረሱ?' : 'Reset Your Password')}
             {mode === 'FORGOT_VERIFY' && (isAmharic ? 'አዲስ የይለፍ ቃል ይፍጠሩ' : 'Set New Password')}
           </h1>
-          <p className="text-xs text-slate-500 font-medium">
+          <p className="text-xs text-[#64748B] font-medium">
             {mode === 'LOGIN' && (isAmharic ? 'ለአስተዳዳሪዎች፣ ለመስተንግዶ እና ለአገልግሎት ሰጪዎች' : 'Secure role-based access for office staff')}
             {mode === 'FORGOT_REQUEST' && (isAmharic ? 'የይለፍ ቃልዎን ለመቀየር የተጠቃሚ ስምዎን ያስገቡ' : 'Enter your staff username to receive a verification reset code')}
             {mode === 'FORGOT_VERIFY' && (isAmharic ? `ለ ${targetStaffName || resetUsername} አዲስ የይለፍ ቃል ያዘጋጁ` : `Enter the 6-digit code to update credentials for ${targetStaffName || resetUsername}`)}
@@ -153,15 +153,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
 
         {/* Feedback Banners */}
         {errorMessage && (
-          <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium flex items-start space-x-2 animate-in fade-in">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+          <div className="p-3.5 bg-[#DC2626]/10 border border-[#DC2626]/30 text-[#DC2626] text-xs rounded-xl font-medium flex items-start space-x-2 animate-in fade-in">
+            <AlertCircle className="w-4 h-4 shrink-0 text-[#DC2626] mt-0.5" />
             <span>{errorMessage}</span>
           </div>
         )}
 
         {successMessage && (
-          <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl font-medium flex items-start space-x-2 animate-in fade-in">
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
+          <div className="p-3.5 bg-[#16A34A]/10 border border-[#16A34A]/30 text-[#16A34A] text-xs rounded-xl font-medium flex items-start space-x-2 animate-in fade-in">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-[#16A34A] mt-0.5" />
             <span>{successMessage}</span>
           </div>
         )}
@@ -170,17 +170,17 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
         {mode === 'LOGIN' && (
           <form onSubmit={handleLoginSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+              <label className="block text-xs font-bold text-[#172033] mb-1.5">
                 {isAmharic ? 'የተጠቃሚ ስም (Username)' : 'Username'}
               </label>
               <div className="relative">
-                <User className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
+                <User className="w-4 h-4 absolute left-3.5 top-3 text-[#64748B]" />
                 <input
                   type="text"
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full pl-10 pr-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium text-slate-900"
+                  className="w-full pl-10 pr-3.5 py-2.5 text-xs bg-[#F5F7FB] border border-[#E2E8F0] rounded-xl focus:ring-2 focus:ring-[#2563EB] focus:outline-none font-medium text-[#172033]"
                   placeholder="e.g. admin or officer1"
                 />
               </div>
@@ -188,7 +188,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold text-slate-700">
+                <label className="block text-xs font-bold text-[#172033]">
                   {isAmharic ? 'የይለፍ ቃል (Password)' : 'Password'}
                 </label>
                 <button
@@ -199,25 +199,25 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
                     setResetUsername(username);
                     setMode('FORGOT_REQUEST');
                   }}
-                  className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition cursor-pointer"
+                  className="text-[11px] font-bold text-[#2563EB] hover:text-[#1d4ed8] transition cursor-pointer"
                 >
                   {isAmharic ? 'የይለፍ ቃል ረሱ?' : 'Forgot password?'}
                 </button>
               </div>
               <div className="relative">
-                <KeyRound className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
+                <KeyRound className="w-4 h-4 absolute left-3.5 top-3 text-[#64748B]" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium text-slate-900"
+                  className="w-full pl-10 pr-10 py-2.5 text-xs bg-[#F5F7FB] border border-[#E2E8F0] rounded-xl focus:ring-2 focus:ring-[#2563EB] focus:outline-none font-medium text-[#172033]"
                   placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  className="absolute right-3 top-2.5 text-[#64748B] hover:text-[#172033] cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -227,7 +227,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center justify-center space-x-1.5 mt-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-2.5 bg-[#2563EB] hover:bg-[#1d4ed8] text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center justify-center space-x-1.5 mt-2 cursor-pointer disabled:opacity-50"
             >
               <span>{isLoading ? (isAmharic ? 'በመግባት ላይ...' : 'Logging in...') : (isAmharic ? 'ግባ (Login)' : 'Sign In')}</span>
               <ArrowRight className="w-4 h-4" />

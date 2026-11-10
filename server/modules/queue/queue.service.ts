@@ -260,13 +260,72 @@ export class QueueService {
     return { ticket, printData };
   }
 
+  public getPublicTicket(idOrNumber: string) {
+    const ticket = db.getTicketById(idOrNumber) || db.getTicketByNumber(idOrNumber);
+    if (!ticket) {
+      throw new NotFoundError('Ticket not found.');
+    }
+
+    const today = ticket.dateKey || new Date().toISOString().split('T')[0];
+    const peopleAhead = db.getTickets({ dateKey: today, status: 'WAITING' }).filter(t =>
+      t.serviceId === ticket.serviceId &&
+      t.id !== ticket.id &&
+      (new Date(t.issuedAt) < new Date(ticket.issuedAt))
+    ).length;
+
+    const officeSetting = db.getOfficeSetting();
+    const estimatedWaitMinutes = Math.max(
+      1,
+      peopleAhead * (officeSetting.estimatedWaitPerPersonMinutes || 5)
+    );
+
+    const servingCounter = db.getCounters().find(c => 
+      c.currentTicketNumber && (!c.serviceIds?.length || c.serviceIds.includes(ticket.serviceId))
+    );
+    const currentlyServingTicketNumber = servingCounter?.currentTicketNumber || 'None';
+
+    return {
+      ticket: {
+        ...ticket,
+        ticketNumberAmharic: getAmharicTicketNumber(ticket.ticketNumber)
+      },
+      progress: {
+        peopleAhead,
+        estimatedWaitMinutes,
+        currentlyServingTicketNumber
+      },
+      office: {
+        name: officeSetting.officeName,
+        nameAmharic: officeSetting.officeNameAmharic,
+        displayNotice: officeSetting.displayNotice || '',
+        displayNoticeAmharic: officeSetting.displayNoticeAmharic || ''
+      }
+    };
+  }
+
+  public submitTicketReview(idOrNumber: string, reviewInput: { rating: number; tags?: string[]; comment?: string }) {
+    const ticket = db.getTicketById(idOrNumber) || db.getTicketByNumber(idOrNumber);
+    if (!ticket) {
+      throw new NotFoundError('Ticket not found.');
+    }
+
+    const result = db.addCustomerReview(ticket.id, reviewInput);
+    return {
+      review: result.review,
+      ticket: {
+        ...result.ticket,
+        ticketNumberAmharic: getAmharicTicketNumber(result.ticket.ticketNumber)
+      }
+    };
+  }
+
   public checkIn(id: string) {
-    const existing = db.getTicketById(id);
+    const existing = db.getTicketById(id) || db.getTicketByNumber(id);
     if (!existing) {
       throw new NotFoundError('Ticket not found.');
     }
 
-    const ticket = db.checkInTicket(id);
+    const ticket = db.checkInTicket(existing.id);
     if (!ticket) {
       throw new NotFoundError('Ticket not found.');
     }
@@ -282,13 +341,14 @@ export class QueueService {
 
   public async callNext(options: {
     counterId: string;
+    specificTicketId?: string;
     targetServiceId?: string;
     customAudioBase64?: string;
     customAudioMimeType?: string;
     customText?: string;
     user: any;
   }) {
-    const { counterId, targetServiceId, customAudioBase64, customAudioMimeType, customText, user } = options;
+    const { counterId, specificTicketId, customAudioBase64, customAudioMimeType, customText, user } = options;
 
     if (!counterId) {
       throw new BadRequestError('counterId is required.');
@@ -317,9 +377,9 @@ export class QueueService {
     }
 
     // Call the next eligible ticket
-    const calledTicket = await db.callNextTicket(counterId, user.id, targetServiceId);
+    const calledTicket = await db.callNextTicket(counterId, user.id, specificTicketId);
     if (!calledTicket) {
-      return { noTicket: true, message: 'No eligible waiting customers in line.' };
+      return { noTicket: true, counter: assignedCounter, message: 'No eligible waiting customers in line.' };
     }
 
     const counter = db.getCounterById(counterId);

@@ -376,7 +376,7 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
                 <Clock className="w-3.5 h-3.5 text-slate-400" />
                 <span>{isAmharic ? 'ግምታዊ የጥበቃ ጊዜ:' : 'Estimated Wait:'}</span>
               </span>
-              <span className="font-bold text-indigo-600 text-sm font-mono">
+              <span className="font-bold text-[#2563EB] text-sm font-mono">
                 ~{printData.estimatedWaitMinutes} {isAmharic ? 'ደቂቃ' : 'Mins'}
               </span>
             </div>
@@ -475,9 +475,9 @@ export const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
               id="btn-print-thermal-ticket"
               onClick={handlePrint}
               disabled={isPrinting}
-              className="flex-1 flex items-center justify-center space-x-1.5 px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 rounded-xl shadow-xs transition"
+              className="flex-1 flex items-center justify-center space-x-1.5 px-4 py-2 text-xs font-bold text-white bg-[#173B65] hover:bg-[#0f2744] active:bg-[#0a192f] disabled:opacity-50 rounded-xl shadow-xs transition cursor-pointer"
             >
-              <Printer className="w-4 h-4" />
+              <Printer className="w-4 h-4 text-[#0D9488]" />
               <span>{isPrinting ? (isAmharic ? 'በማተም ላይ...' : 'Printing...') : (isAmharic ? 'ቲኬት አትም (Print)' : 'Print Thermal Ticket')}</span>
             </button>
           </div>

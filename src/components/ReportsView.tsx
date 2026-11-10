@@ -232,35 +232,35 @@ export const ReportsView: React.FC = () => {
     <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
       
       {/* Header & Date Picker */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-xs border border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-xs border border-[#E2E8F0]">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
-            <BarChart3 className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-lg bg-[#173B65] text-white flex items-center justify-center font-bold text-lg shadow-sm">
+            <BarChart3 className="w-5 h-5 text-[#0D9488]" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#172033]">
               {isAmharic ? 'የወረፋ እና የአገልግሎት ሪፖርቶች' : 'Queue Analytics & Reports'}
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium">
+            <p className="text-xs sm:text-sm text-[#64748B] font-medium">
               {isAmharic ? 'የደንበኞች ቁጥር፣ የቆይታ ጊዜ እና የመስኮቶች አፈፃፀም' : 'Daily throughput, wait times and counter efficiency breakdown'}
             </p>
           </div>
         </div>
 
         <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-2 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200">
-            <Calendar className="w-4 h-4 text-slate-400" />
+          <div className="flex items-center space-x-2 bg-[#F5F7FB] px-3.5 py-2 rounded-xl border border-[#E2E8F0]">
+            <Calendar className="w-4 h-4 text-[#64748B]" />
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none"
+              className="bg-transparent text-xs font-bold text-[#172033] focus:outline-none"
             />
           </div>
 
           <button
             onClick={handleExportCSV}
-            className="flex items-center space-x-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-xs"
+            className="flex items-center space-x-1.5 px-4 py-2 bg-[#2563EB] hover:bg-[#1d4ed8] text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>{isAmharic ? 'CSV አውርድ' : 'Export CSV'}</span>

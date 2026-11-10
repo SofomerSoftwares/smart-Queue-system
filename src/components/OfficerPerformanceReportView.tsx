@@ -264,18 +264,18 @@ export const OfficerPerformanceReportView: React.FC = () => {
   }
 
   return (
-    <div ref={reportRef} className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 bg-slate-50 min-h-screen">
+    <div ref={reportRef} className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 bg-[#F5F7FB] min-h-screen">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-xs border border-[#E2E8F0]">
         <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-md">
-            <Medal className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-xl bg-[#173B65] text-white flex items-center justify-center font-bold text-lg shadow-md">
+            <Medal className="w-6 h-6 text-[#0D9488]" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#172033]">
               {isAmharic ? 'የሰራተኞች አፈፃፀም ሪፖርት' : 'Officer Performance Report'}
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium">
+            <p className="text-xs sm:text-sm text-[#64748B] font-medium">
               {isAmharic ? 'የእያንዳንዱ ሰራተኛ አገልግሎት እና የስራ አፈፃፀም መከታተያ' : 'Comprehensive dashboard for tracking officer productivity and service quality'}
             </p>
           </div>
@@ -285,7 +285,7 @@ export const OfficerPerformanceReportView: React.FC = () => {
           onClick={handleExportPDF}
           disabled={isExporting}
           data-html2canvas-ignore
-          className="flex items-center space-x-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold transition shadow-sm print:hidden cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+          className="flex items-center space-x-2 px-4 py-2 bg-[#2563EB] hover:bg-[#1d4ed8] text-white rounded-xl text-sm font-bold transition shadow-sm print:hidden cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
         >
           {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
           <span>

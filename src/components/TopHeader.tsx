@@ -130,35 +130,35 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
   const Icon = meta.icon;
 
   return (
-    <header className="h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-2xs print:hidden">
+    <header className="h-16 bg-white/95 backdrop-blur-md border-b border-[#E2E8F0] px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs print:hidden">
       
       {/* Left: Mobile Sidebar Trigger + View Title & Subtitle */}
       <div className="flex items-center gap-3">
         <button
           id="btn-open-sidebar-mobile"
           onClick={onOpenMobileSidebar}
-          className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 md:hidden transition"
+          className="p-2 rounded-xl text-[#64748B] hover:text-[#172033] hover:bg-[#F5F7FB] md:hidden transition"
           aria-label="Open Sidebar"
         >
           <Menu className="w-5 h-5" />
         </button>
 
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shrink-0 hidden sm:flex">
+          <div className="w-9 h-9 rounded-xl bg-[#F5F7FB] text-[#173B65] border border-[#E2E8F0] flex items-center justify-center shrink-0 hidden sm:flex">
             <Icon className="w-4.5 h-4.5" />
           </div>
 
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-sm sm:text-base font-bold text-slate-900 leading-tight">
+              <h1 className="text-sm sm:text-base font-bold text-[#172033] leading-tight">
                 {meta.title}
               </h1>
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 hidden sm:inline-flex">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse" />
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#16A34A]/10 text-[#16A34A] border border-[#16A34A]/30 hidden sm:inline-flex">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] mr-1 animate-pulse" />
                 Live
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 hidden md:block leading-none mt-0.5">
+            <p className="text-[11px] text-[#64748B] hidden md:block leading-none mt-0.5">
               {meta.subtitle}
             </p>
           </div>
@@ -184,8 +184,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
           }}
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-bold transition cursor-pointer ${
             isNotificationsEnabled
-              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-              : 'bg-slate-100/80 text-slate-600 border-slate-200/60 hover:bg-slate-200'
+              ? 'bg-[#16A34A]/10 text-[#16A34A] border-[#16A34A]/30 hover:bg-[#16A34A]/20'
+              : 'bg-[#F5F7FB] text-[#64748B] border-[#E2E8F0] hover:bg-slate-200/60'
           }`}
           title={
             isNotificationsEnabled
@@ -195,12 +195,12 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
         >
           {isNotificationsEnabled ? (
             <>
-              <BellRing className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+              <BellRing className="w-3.5 h-3.5 text-[#16A34A] animate-pulse" />
               <span className="text-[11px] hidden sm:inline">{isAmharic ? 'ማሳወቂያ' : 'Alerts'}</span>
             </>
           ) : (
             <>
-              <Bell className="w-3.5 h-3.5 text-slate-500" />
+              <Bell className="w-3.5 h-3.5 text-[#64748B]" />
               <span className="text-[11px] hidden sm:inline">{isAmharic ? 'ማሳወቂያ አንቃ' : 'Enable Alerts'}</span>
             </>
           )}
@@ -210,23 +210,23 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
         {!isAudioUnlocked && (
           <button
             onClick={unlockAudio}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold transition animate-pulse"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#F59E0B]/10 hover:bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40 text-xs font-bold transition animate-pulse"
             title="Enable Amharic audio announcements"
           >
-            <Volume2 className="w-3.5 h-3.5 text-amber-700" />
+            <Volume2 className="w-3.5 h-3.5 text-[#F59E0B]" />
             <span className="text-[11px] hidden sm:inline">{isAmharic ? 'ድምፅ አንቃ' : 'Audio On'}</span>
           </button>
         )}
 
         {/* Live Clock Pill */}
-        <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100/80 rounded-xl border border-slate-200/60 text-xs font-mono font-bold text-slate-700 shadow-2xs">
-          <Clock className="w-3.5 h-3.5 text-slate-500" />
+        <div className="flex items-center gap-1.5 px-3 py-1 bg-[#F5F7FB] rounded-xl border border-[#E2E8F0] text-xs font-mono font-bold text-[#172033] shadow-2xs">
+          <Clock className="w-3.5 h-3.5 text-[#64748B]" />
           <span>{timeStr || '--:--:--'}</span>
         </div>
 
         {/* Addis AI Active Badge */}
-        <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 border border-indigo-100/80 text-xs font-semibold text-indigo-700">
-          <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+        <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#0D9488]/10 border border-[#0D9488]/30 text-xs font-semibold text-[#0D9488]">
+          <Sparkles className="w-3.5 h-3.5 text-[#0D9488]" />
           <span className="text-[11px]">{isAmharic ? 'Addis AI ድምፅ' : 'Addis AI Voice'}</span>
         </div>
 

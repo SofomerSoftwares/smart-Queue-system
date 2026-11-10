@@ -21,10 +21,10 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
       onClick={onClick}
       className={`relative p-2.5 rounded-xl border transition-all flex items-center justify-center cursor-pointer ${
         isOpen
-          ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/30'
+          ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-md shadow-[#2563EB]/30'
           : unreadCount > 0
-            ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
-            : 'bg-white hover:bg-slate-100 text-slate-600 border-slate-200'
+            ? 'bg-[#2563EB]/10 hover:bg-[#2563EB]/20 text-[#2563EB] border-[#2563EB]/30'
+            : 'bg-white hover:bg-[#F5F7FB] text-[#64748B] border-[#E2E8F0]'
       }`}
       title={isAmharic ? `ማሳወቂያዎች (${unreadCount} ያልተነበቡ)` : `Notifications (${unreadCount} unread)`}
     >
@@ -32,8 +32,8 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
 
       {/* Unread Badge Counter */}
       {unreadCount > 0 && (
-        <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 bg-rose-600 text-white text-[10px] font-black font-mono rounded-full flex items-center justify-center shadow-xs border-2 border-white">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-60 pointer-events-none"></span>
+        <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 bg-[#DC2626] text-white text-[10px] font-black font-mono rounded-full flex items-center justify-center shadow-xs border-2 border-white">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60 pointer-events-none"></span>
           <span className="relative z-10">{unreadCount > 99 ? '99+' : unreadCount}</span>
         </span>
       )}

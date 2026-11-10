@@ -9,12 +9,14 @@ router.get('/state', (req, res, next) => queueController.getStatus(req, res, nex
 router.get('/status', (req, res, next) => queueController.getStatus(req, res, next));
 router.get('/tickets', (req, res, next) => queueController.getTickets(req, res, next));
 
-// Ticket creation and check-in
+// Ticket creation, lookup, and check-in
 router.post('/ticket', (req, res, next) => queueController.createTicket(req, res, next));
+router.get('/ticket/:id', (req, res, next) => queueController.getPublicTicket(req, res, next));
 router.post('/ticket/:id/checkin', (req, res, next) => queueController.checkIn(req, res, next));
+router.post('/ticket/:id/review', (req, res, next) => queueController.submitTicketReview(req, res, next));
 
-// Officer station actions
-router.post('/call-next', authenticate, authorize('ticket.call'), (req, res, next) => queueController.callNext(req as any, res, next));
+// Officer station actions (supports both /ticket/call-next and /call-next)
+router.post(['/ticket/call-next', '/call-next'], authenticate, authorize('ticket.call'), (req, res, next) => queueController.callNext(req as any, res, next));
 router.post('/ticket/:id/recall', authenticate, authorize('ticket.recall'), (req, res, next) => queueController.recall(req as any, res, next));
 router.post('/ticket/:id/call-with-voice', authenticate, authorize('ticket.call'), (req, res, next) => queueController.callWithVoice(req as any, res, next));
 router.post('/ticket/:id/start', authenticate, authorize('ticket.start'), (req, res, next) => queueController.startServing(req as any, res, next));

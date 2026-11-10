@@ -1,5 +1,69 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary: #173B65;
+  --color-primary-dark: #0f2744;
+  --color-primary-light: #23528a;
+  --color-secondary: #2563EB;
+  --color-secondary-hover: #1d4ed8;
+  --color-accent: #0D9488;
+  --color-accent-hover: #0f766e;
+  --color-accent-light: #14b8a6;
+  --color-background: #F5F7FB;
+  --color-surface: #FFFFFF;
+  --color-text-primary: #172033;
+  --color-text-secondary: #64748B;
+  --color-success: #16A34A;
+  --color-warning: #F59E0B;
+  --color-error: #DC2626;
+  --color-borders: #E2E8F0;
+}
+
+:root {
+  --theme-primary: #173B65;
+  --theme-secondary: #2563EB;
+  --theme-accent: #0D9488;
+  --theme-background: #F5F7FB;
+  --theme-surface: #FFFFFF;
+  --theme-text-primary: #172033;
+  --theme-text-secondary: #64748B;
+  --theme-success: #16A34A;
+  --theme-warning: #F59E0B;
+  --theme-error: #DC2626;
+  --theme-borders: #E2E8F0;
+}
+
+body {
+  background-color: #F5F7FB;
+  color: #172033;
+}
+
+/* Explicit Custom Palette Utility Classes */
+.bg-palette-primary { background-color: #173B65; }
+.bg-palette-primary-dark { background-color: #0f2744; }
+.bg-palette-secondary { background-color: #2563EB; }
+.bg-palette-accent { background-color: #0D9488; }
+.bg-palette-background { background-color: #F5F7FB; }
+.bg-palette-surface { background-color: #FFFFFF; }
+
+.text-palette-primary { color: #172033; }
+.text-palette-secondary { color: #64748B; }
+.text-palette-brand-primary { color: #173B65; }
+.text-palette-brand-secondary { color: #2563EB; }
+.text-palette-accent { color: #0D9488; }
+
+.border-palette-borders { border-color: #E2E8F0; }
+.border-palette-primary { border-color: #173B65; }
+.border-palette-secondary { border-color: #2563EB; }
+.border-palette-accent { border-color: #0D9488; }
+
+.text-palette-success { color: #16A34A; }
+.bg-palette-success { background-color: #16A34A; }
+.text-palette-warning { color: #F59E0B; }
+.bg-palette-warning { background-color: #F59E0B; }
+.text-palette-error { color: #DC2626; }
+.bg-palette-error { background-color: #DC2626; }
+
 @media print {
   /* Page setup tailored for 80mm / 3-inch thermal receipt printers */
   @page {
