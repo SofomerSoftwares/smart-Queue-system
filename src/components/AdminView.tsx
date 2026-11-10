@@ -986,19 +986,19 @@ export const AdminView: React.FC = () => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
               <div className="text-xs text-slate-500 font-medium">{isAmharic ? 'የዛሬ ጠቅላላ ቲኬቶች' : 'Total Tickets Today'}</div>
-              <div className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1 font-mono tracking-tight">{stats?.total || 0}</div>
+              <div className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1 font-mono tracking-tight">{stats?.total ?? stats?.totalTicketsToday ?? 0}</div>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
               <div className="text-xs text-slate-500 font-medium">{isAmharic ? 'የተስተናገዱ ደንበኞች' : 'Completed Served'}</div>
-              <div className="text-2xl sm:text-3xl font-bold text-emerald-600 mt-1 font-mono tracking-tight">{stats?.completed || 0}</div>
+              <div className="text-2xl sm:text-3xl font-bold text-emerald-600 mt-1 font-mono tracking-tight">{stats?.completed ?? stats?.completedToday ?? 0}</div>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
               <div className="text-xs text-slate-500 font-medium">{isAmharic ? 'በመጠባበቅ ላይ' : 'Currently Waiting'}</div>
-              <div className="text-2xl sm:text-3xl font-bold text-amber-600 mt-1 font-mono tracking-tight">{stats?.waiting || 0}</div>
+              <div className="text-2xl sm:text-3xl font-bold text-amber-600 mt-1 font-mono tracking-tight">{stats?.waiting ?? stats?.currentlyWaiting ?? 0}</div>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
               <div className="text-xs text-slate-500 font-medium">{isAmharic ? 'አማካይ የጥበቃ ጊዜ' : 'Avg. Wait Time'}</div>
-              <div className="text-2xl sm:text-3xl font-bold text-slate-800 mt-1 font-mono tracking-tight">~{stats?.avgWaitMinutes || 0}m</div>
+              <div className="text-2xl sm:text-3xl font-bold text-slate-800 mt-1 font-mono tracking-tight">~{stats?.avgWaitMinutes ?? stats?.avgWaitTimeMinutes ?? 0}m</div>
             </div>
           </div>
 
@@ -1022,18 +1022,26 @@ export const AdminView: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-medium">
-                      {stats?.serviceBreakdown.map((s) => (
-                        <tr key={s.serviceId} className="hover:bg-slate-50">
-                          <td className="py-3 px-3 font-bold font-mono text-indigo-600">{s.prefix}</td>
-                          <td className="py-3 px-3 text-slate-900 font-bold">
-                            {isAmharic ? (s.serviceNameAmharic || s.serviceName) : s.serviceName}
+                      {(stats?.serviceBreakdown && stats.serviceBreakdown.length > 0) ? (
+                        stats.serviceBreakdown.map((s) => (
+                          <tr key={s.serviceId} className="hover:bg-slate-50">
+                            <td className="py-3 px-3 font-bold font-mono text-indigo-600">{s.prefix}</td>
+                            <td className="py-3 px-3 text-slate-900 font-bold">
+                              {isAmharic ? (s.serviceNameAmharic || s.serviceName) : s.serviceName}
+                            </td>
+                            <td className="py-3 px-3 text-center font-mono">{s.total}</td>
+                            <td className="py-3 px-3 text-center font-mono text-amber-600 font-bold">{s.waiting}</td>
+                            <td className="py-3 px-3 text-center font-mono text-emerald-600 font-bold">{s.completed}</td>
+                            <td className="py-3 px-3 text-right font-mono text-slate-500">~{s.avgServiceMinutes}m</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="py-6 text-center text-slate-400 italic">
+                            {isAmharic ? 'ምንም የአገልግሎት መረጃ እስካሁን የለም' : 'No service distribution data available for today yet'}
                           </td>
-                          <td className="py-3 px-3 text-center font-mono">{s.total}</td>
-                          <td className="py-3 px-3 text-center font-mono text-amber-600 font-bold">{s.waiting}</td>
-                          <td className="py-3 px-3 text-center font-mono text-emerald-600 font-bold">{s.completed}</td>
-                          <td className="py-3 px-3 text-right font-mono text-slate-500">~{s.avgServiceMinutes}m</td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1067,7 +1075,7 @@ export const AdminView: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {services.map((s) => (
+            {(services || []).map((s) => (
               <div key={s.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between">
@@ -1138,8 +1146,8 @@ export const AdminView: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {counters.map((c) => {
-              const assignedUser = usersList.find(u => u.assignedCounterId === c.id || (c.currentOfficerId && u.id === c.currentOfficerId));
+            {(counters || []).map((c) => {
+              const assignedUser = (usersList || []).find(u => u.assignedCounterId === c.id || (c.currentOfficerId && u.id === c.currentOfficerId));
               return (
                 <div key={c.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
                   <div>
@@ -1229,8 +1237,8 @@ export const AdminView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {usersList.map((u) => {
-                  const assignedCnt = counters.find(cnt => cnt.id === u.assignedCounterId);
+                {(usersList || []).map((u) => {
+                  const assignedCnt = (counters || []).find(cnt => cnt.id === u.assignedCounterId);
                   const hasPriority = u.canManagePriority === true || (u.canManagePriority === undefined && u.permissions?.includes('ticket.priority'));
                   return (
                     <tr key={u.id} className="hover:bg-slate-50">
@@ -1523,10 +1531,11 @@ export const AdminView: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {rolesList.map((role) => {
+              {(rolesList || []).map((role) => {
                 const isRoleAdmin = role.name === 'ADMIN';
-                const hasPriorityPerm = role.permissions.includes('ticket.priority');
-                const members = usersList.filter(u => u.role === role.name);
+                const rolePerms = role.permissions || [];
+                const hasPriorityPerm = rolePerms.includes('ticket.priority');
+                const members = (usersList || []).filter(u => u.role === role.name);
 
                 return (
                   <div 
@@ -1602,18 +1611,18 @@ export const AdminView: React.FC = () => {
                             {isAmharic ? 'የፈቃዶች ብዛት:' : 'Active Permissions:'}
                           </span>
                           <span className="font-bold text-slate-800">
-                            {isRoleAdmin ? (permissionsList.length || 22) : role.permissions.length} / {permissionsList.length || 22}
+                            {isRoleAdmin ? ((permissionsList || []).length || 22) : rolePerms.length} / {((permissionsList || []).length || 22)}
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-1">
-                          {role.permissions.slice(0, 4).map(p => (
+                          {rolePerms.slice(0, 4).map(p => (
                             <span key={p} className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-700 font-mono">
                               {p}
                             </span>
                           ))}
-                          {role.permissions.length > 4 && (
+                          {rolePerms.length > 4 && (
                             <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-500">
-                              +{role.permissions.length - 4} more
+                              +{rolePerms.length - 4} more
                             </span>
                           )}
                         </div>
@@ -2768,7 +2777,7 @@ export const AdminView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {auditLogs.map((log) => (
+                {(auditLogs || []).map((log) => (
                   <tr key={log.id} className="hover:bg-slate-50">
                     <td className="py-2.5 px-3 font-mono text-slate-500 text-[11px]">
                       {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
@@ -3064,7 +3073,7 @@ export const AdminView: React.FC = () => {
                   className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 >
                   <option value="">{isAmharic ? '-- የተመደበ መስኮት የለም (Unassigned) --' : '-- No Counter Assigned --'}</option>
-                  {counters.map(c => (
+                  {(counters || []).map(c => (
                     <option key={c.id} value={c.id}>
                       {isAmharic ? `መስኮት ${c.number} (${c.nameAmharic || c.name})` : `Counter ${c.number} (${c.name})`}
                     </option>
@@ -3340,7 +3349,7 @@ export const AdminView: React.FC = () => {
                 <div className="space-x-2">
                   <button
                     type="button"
-                    onClick={() => setSelectedRolePerms(permissionsList.map(p => p.id))}
+                    onClick={() => setSelectedRolePerms((permissionsList || []).map(p => p.id))}
                     className="text-indigo-600 hover:text-indigo-800 font-bold text-xs cursor-pointer"
                   >
                     {isAmharic ? 'ሁሉንም ምረጥ' : 'Select All'}
@@ -3366,7 +3375,7 @@ export const AdminView: React.FC = () => {
                   <span>{isAmharic ? 'የቅድሚያ እና የአስቸኳይ ሁኔታ ቁጥጥር (Priority & Triage)' : 'Priority & Triage Management'}</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {permissionsList.filter(p => p.id.startsWith('ticket.priority')).map(perm => {
+                  {(permissionsList || []).filter(p => p.id.startsWith('ticket.priority')).map(perm => {
                     const isChecked = selectedRolePerms.includes(perm.id);
                     return (
                       <label 
@@ -3408,7 +3417,7 @@ export const AdminView: React.FC = () => {
                   <span>{isAmharic ? 'የትኬት እና የወረፋ አገልግሎት ስራዎች' : 'Queue & Ticket Operations'}</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {permissionsList.filter(p => p.id.startsWith('ticket.') && !p.id.startsWith('ticket.priority')).map(perm => {
+                  {(permissionsList || []).filter(p => p.id.startsWith('ticket.') && !p.id.startsWith('ticket.priority')).map(perm => {
                     const isChecked = selectedRolePerms.includes(perm.id);
                     return (
                       <label 
@@ -3450,7 +3459,7 @@ export const AdminView: React.FC = () => {
                   <span>{isAmharic ? 'የአገልግሎቶች እና የመስኮቶች አስተዳደር' : 'Services & Counter Stations'}</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {permissionsList.filter(p => p.id.startsWith('services.') || p.id.startsWith('counters.')).map(perm => {
+                  {(permissionsList || []).filter(p => p.id.startsWith('services.') || p.id.startsWith('counters.')).map(perm => {
                     const isChecked = selectedRolePerms.includes(perm.id);
                     return (
                       <label 
@@ -3492,7 +3501,7 @@ export const AdminView: React.FC = () => {
                   <span>{isAmharic ? 'ሰራተኞች፣ ሪፖርቶች እና የስርዓት ቅንብሮች' : 'Staff, Reports & System Settings'}</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {permissionsList.filter(p => p.id.startsWith('staff.') || p.id.startsWith('reports.') || p.id.startsWith('settings.') || p.id.startsWith('audio.')).map(perm => {
+                  {(permissionsList || []).filter(p => p.id.startsWith('staff.') || p.id.startsWith('reports.') || p.id.startsWith('settings.') || p.id.startsWith('audio.')).map(perm => {
                     const isChecked = selectedRolePerms.includes(perm.id);
                     return (
                       <label 

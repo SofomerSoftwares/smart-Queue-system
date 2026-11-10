@@ -348,13 +348,5 @@ export interface QueueStateResponse {
   services: Service[];
   officeSetting: OfficeSetting;
   audioSetting: AudioSetting;
-  stats: {
-    totalTicketsToday: number;
-    completedToday: number;
-    cancelledToday: number;
-    currentlyWaiting: number;
-    currentlyServing: number;
-    avgWaitTimeMinutes: number;
-    avgServiceTimeMinutes: number;
-  };
+  stats: QueueStats;
 }

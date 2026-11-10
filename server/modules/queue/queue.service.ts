@@ -151,13 +151,16 @@ export class QueueService {
       officeSetting,
       audioSetting,
       stats: {
+        ...stats,
         totalTicketsToday: stats.total,
         completedToday: stats.completed,
         cancelledToday: stats.cancelled,
         currentlyWaiting: stats.waiting,
         currentlyServing: stats.serving,
         avgWaitTimeMinutes: stats.avgWaitMinutes,
-        avgServiceTimeMinutes: stats.avgServiceMinutes
+        avgServiceTimeMinutes: stats.avgServiceMinutes,
+        serviceBreakdown: stats.serviceBreakdown || [],
+        counterBreakdown: stats.counterBreakdown || []
       }
     };
   }

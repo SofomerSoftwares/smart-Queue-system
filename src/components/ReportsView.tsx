@@ -325,7 +325,7 @@ export const ReportsView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
-                  {statsData.serviceBreakdown.map((s) => (
+                  {(statsData.serviceBreakdown || []).map((s) => (
                     <tr key={s.serviceId} className="hover:bg-slate-50/80 transition">
                       <td className="py-3.5 px-4 font-black font-mono text-indigo-600">{s.prefix}</td>
                       <td className="py-3.5 px-4 text-slate-900 font-bold">
@@ -350,7 +350,7 @@ export const ReportsView: React.FC = () => {
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {statsData.counterBreakdown.map((cnt) => (
+              {(statsData.counterBreakdown || []).map((cnt) => (
                 <div key={cnt.counterId} className="p-5 bg-slate-50 rounded-2xl border border-slate-200">
                   <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                     {isAmharic ? `መስኮት ${cnt.counterNumber}` : `Counter ${cnt.counterNumber}`}
