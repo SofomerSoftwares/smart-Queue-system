@@ -16,7 +16,10 @@ import {
   Globe,
   Radio,
   Bell,
-  BellRing
+  BellRing,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Medal
 } from 'lucide-react';
 import { useQueue } from '../context/QueueContext';
 import { useAuth } from '../context/AuthContext';
@@ -25,9 +28,16 @@ import { AmharicLib } from '../lib/amharic';
 interface TopHeaderProps {
   currentView: string;
   onOpenMobileSidebar: () => void;
+  isSidebarHidden?: boolean;
+  onToggleSidebarHidden?: () => void;
 }
 
-export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileSidebar }) => {
+export const TopHeader: React.FC<TopHeaderProps> = ({ 
+  currentView, 
+  onOpenMobileSidebar,
+  isSidebarHidden = false,
+  onToggleSidebarHidden
+}) => {
   const { 
     uiLanguage, 
     officeSetting, 
@@ -111,6 +121,12 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
           subtitle: isAmharic ? 'የመስተንግዶ ጊዜ፣ የተጠቃሚ ብዛት እና የስራ አፈፃፀም' : 'Wait times, counter efficiency and peak hours',
           icon: BarChart3
         };
+      case 'officer-performance':
+        return {
+          title: isAmharic ? 'የሰራተኞች አፈፃፀም ሪፖርት' : 'Officer Performance Report',
+          subtitle: isAmharic ? 'የሰራተኞች ምርታማነት፣ አማካይ የአገልግሎት ጊዜ እና የደንበኞች ደረጃ' : 'Staff productivity, service speed, and customer satisfaction ratings',
+          icon: Medal
+        };
       case 'login':
         return {
           title: isAmharic ? 'የሰራተኛ መግቢያ' : 'Staff Authentication',
@@ -132,16 +148,52 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ currentView, onOpenMobileS
   return (
     <header className="h-16 bg-white/95 backdrop-blur-md border-b border-[#E2E8F0] px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs print:hidden">
       
-      {/* Left: Mobile Sidebar Trigger + View Title & Subtitle */}
+      {/* Left: Sidebar Toggle Buttons + View Title & Subtitle */}
       <div className="flex items-center gap-3">
+        {/* Mobile Sidebar Drawer Trigger */}
         <button
           id="btn-open-sidebar-mobile"
           onClick={onOpenMobileSidebar}
-          className="p-2 rounded-xl text-[#64748B] hover:text-[#172033] hover:bg-[#F5F7FB] md:hidden transition"
+          className="p-2 rounded-xl text-[#64748B] hover:text-[#172033] hover:bg-[#F5F7FB] border border-[#E2E8F0] md:hidden transition cursor-pointer"
           aria-label="Open Sidebar"
         >
           <Menu className="w-5 h-5" />
         </button>
+
+        {/* Desktop Sidebar Hide / Show Toggle Button */}
+        {onToggleSidebarHidden && (
+          <button
+            id="btn-toggle-sidebar-header"
+            onClick={onToggleSidebarHidden}
+            className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-xs font-semibold transition cursor-pointer ${
+              isSidebarHidden
+                ? 'bg-[#173B65] text-white border-[#173B65] hover:bg-[#1e4b82] shadow-2xs'
+                : 'bg-[#F5F7FB] text-[#173B65] border-[#E2E8F0] hover:bg-slate-200/70 hover:text-[#172033]'
+            }`}
+            title={
+              isSidebarHidden
+                ? (isAmharic ? 'የጎን ማውጫ አሳይ (Show Sidebar)' : 'Show Sidebar')
+                : (isAmharic ? 'የጎን ማውጫ ደብቅ (Hide Sidebar)' : 'Hide Sidebar')
+            }
+            aria-label={isSidebarHidden ? 'Show Sidebar' : 'Hide Sidebar'}
+          >
+            {isSidebarHidden ? (
+              <>
+                <PanelLeftOpen className="w-4 h-4 shrink-0" />
+                <span className="hidden lg:inline text-[11px] font-bold">
+                  {isAmharic ? 'ማውጫ አሳይ' : 'Show Sidebar'}
+                </span>
+              </>
+            ) : (
+              <>
+                <PanelLeftClose className="w-4 h-4 shrink-0" />
+                <span className="hidden lg:inline text-[11px] font-bold">
+                  {isAmharic ? 'ማውጫ ደብቅ' : 'Hide Sidebar'}
+                </span>
+              </>
+            )}
+          </button>
+        )}
 
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-[#F5F7FB] text-[#173B65] border border-[#E2E8F0] flex items-center justify-center shrink-0 hidden sm:flex">

@@ -25,6 +25,7 @@ const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<string>(getInitialView);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [isSidebarHidden, setIsSidebarHidden] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
   // Guard: Role-based view routing guards
@@ -76,6 +77,8 @@ const AppContent: React.FC = () => {
         onOpenChangePassword={() => setIsChangePasswordOpen(true)}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        isHidden={isSidebarHidden}
+        onToggleHidden={() => setIsSidebarHidden(!isSidebarHidden)}
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
@@ -83,12 +86,14 @@ const AppContent: React.FC = () => {
       {/* Main Content Layout */}
       <div 
         className={`flex-1 flex flex-col min-w-0 transition-[padding] duration-300 ease-in-out will-change-[padding] print:pl-0 ${
-          isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64'
+          isSidebarHidden ? 'md:pl-0' : isSidebarCollapsed ? 'md:pl-20' : 'md:pl-64'
         }`}
       >
         <TopHeader
           currentView={currentView}
           onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+          isSidebarHidden={isSidebarHidden}
+          onToggleSidebarHidden={() => setIsSidebarHidden(!isSidebarHidden)}
         />
 
         <main className="flex-1 min-w-0">

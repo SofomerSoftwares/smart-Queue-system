@@ -33,6 +33,8 @@ interface SidebarProps {
   onOpenChangePassword?: () => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  isHidden?: boolean;
+  onToggleHidden?: () => void;
   isMobileOpen: boolean;
   onCloseMobile: () => void;
 }
@@ -43,6 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenChangePassword,
   isCollapsed,
   onToggleCollapse,
+  isHidden = false,
   isMobileOpen,
   onCloseMobile
 }) => {
@@ -167,7 +170,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Sidebar Container */}
       <aside 
         className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-[#173B65] text-white border-r border-[#1e4b82] transition-[width,transform] duration-300 ease-in-out will-change-[width,transform] select-none print:hidden ${
-          isMobileOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'
+          isMobileOpen ? 'translate-x-0 w-64' : '-translate-x-full'
+        } ${
+          isHidden ? 'md:-translate-x-full' : 'md:translate-x-0'
         } ${isCollapsed ? 'md:w-20' : 'md:w-64'}`}
       >
         {/* Header / Brand Logo */}
